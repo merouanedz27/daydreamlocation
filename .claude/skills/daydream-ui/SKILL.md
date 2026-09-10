@@ -48,16 +48,24 @@ sans refonte.
 
 ## Typographie
 
-- **Latin** : **Roboto** (400 / 500 / 700).
-- **Arabe** : **Noto Kufi Arabic** (400 / 500 / 700).
-- Aucune famille *display* distincte : la hiérarchie se fait à la **graisse** et à l'approche.
-  `font-heading` est un alias de `font-sans`.
-- `--font-sans` est posée sur `<html>` selon la locale, dans `src/app/[locale]/layout.tsx`.
-  **C'est le seul endroit qui connaît la locale** — aucune autre règle CSS ne doit tester la langue.
+| Langue | Corps de texte | Titres |
+|---|---|---|
+| Français | **Roboto** 400/500/700 | Roboto 500/700 |
+| Arabe | **Tajawal** 400/500/700 | **Noto Kufi Arabic** 500/700 |
 
-Noto Kufi Arabic est une police **kufique**, très dessinée : excellente en titres, plus dense que la
-moyenne en corps de texte. Si l'équipe trouve les listes fatigantes, basculer le corps en
-Noto Sans Arabic et garder le Kufi pour les titres — un seul changement, dans le layout.
+Deux variables portent ce choix, posées sur `<html>` dans
+`src/app/[locale]/layout.tsx` : `--font-sans` (corps) et `--font-heading` (titres).
+**C'est le seul endroit du produit qui connaisse la locale** — aucune autre règle CSS ne doit
+tester la langue. Utiliser `font-sans` et `font-heading`, jamais une famille en dur.
+
+Pourquoi deux familles en arabe : Noto Kufi Arabic est une police **kufique**, géométrique et très
+dessinée. Elle donne son caractère au produit en grand, mais fatigue en petit corps — or l'équipe
+passe ses journées dans des listes de commandes. Tajawal, humaniste et ouverte, y reste confortable.
+
+Aucune famille serif dans le produit : en français la hiérarchie se fait à la **graisse**.
+
+L'arabe ne connaît pas la casse : ne jamais lui appliquer `uppercase`, `capitalize` ou une approche
+resserrée héritée du latin (`tracking-tight` est déjà neutralisé pour les titres arabes).
 
 ## Signature visuelle
 

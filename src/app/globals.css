@@ -15,13 +15,13 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* `--font-sans` est posée sur <html> selon la locale : Roboto en français,
-     Noto Kufi Arabic en arabe. Aucune autre règle n'a besoin de savoir
-     quelle langue est active. */
+  /* Les deux variables sont posées sur <html> selon la locale, dans
+     `src/app/[locale]/layout.tsx` — seul endroit qui connaisse la langue.
+       fr : Roboto pour tout.
+       ar : Tajawal en corps de texte, Noto Kufi Arabic en titres. */
   --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  /* Pas de famille display distincte : la hiérarchie vient de la graisse. */
-  --font-heading: var(--font-sans);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -211,8 +211,9 @@
     @apply font-sans;
   }
 
-  /* Roboto (latin) et Noto Kufi Arabic (arabe) n'ont pas de variante serif :
-     la hiérarchie se fait à la GRAISSE et à l'approche, pas à la famille.
+  /* En français, titres et corps partagent Roboto : la hiérarchie se fait à la
+     GRAISSE. En arabe, `font-heading` bascule sur le Kufi — c'est là qu'il
+     apporte son caractère, sans peser sur la lecture courante.
      Voir `daydream-ui`. */
   h1,
   h2,
@@ -220,7 +221,9 @@
     @apply font-heading font-medium tracking-tight;
   }
 
-  /* Le Kufi est déjà très dessiné : le resserrer le rendrait illisible. */
+  /* Le Kufi est déjà très dessiné : le resserrer le rendrait illisible.
+     L'arabe ne connaît pas la casse — aucune règle d'approche héritée du
+     latin ne doit s'y appliquer. */
   :lang(ar) h1,
   :lang(ar) h2,
   :lang(ar) h3 {

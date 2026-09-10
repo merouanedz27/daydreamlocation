@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Noto_Kufi_Arabic, Roboto } from "next/font/google";
+import { Noto_Kufi_Arabic, Roboto, Tajawal } from "next/font/google";
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
 import { localeDirection, routing, type Locale } from "@/i18n/routing";
@@ -17,15 +17,22 @@ const roboto = Roboto({
   display: "swap",
 });
 
-// Arabe — Noto Kufi Arabic.
-// C'est une police de caractère KUFI, donc très dessinée : superbe en titres,
-// plus dense que la moyenne en corps de texte. Si l'équipe trouve les listes
-// fatigantes à lire, passer le corps de texte en Noto Sans Arabic et garder le
-// Kufi pour les titres — le basculement se fait ici, `--font-sans` étant la
-// seule variable que le reste du CSS connaisse.
-const notoKufi = Noto_Kufi_Arabic({
+// Arabe, CORPS DE TEXTE — Tajawal.
+// C'est la police que l'équipe lit vraiment : listes de commandes, tailles,
+// montants, notes. Humaniste et ouverte, elle reste confortable en petit corps.
+const tajawal = Tajawal({
   subsets: ["arabic"],
   weight: ["400", "500", "700"],
+  variable: "--font-tajawal",
+  display: "swap",
+});
+
+// Arabe, TITRES — Noto Kufi Arabic.
+// Police kufique, très dessinée : elle donne son caractère au produit en grand,
+// mais fatigue en corps de texte. On la réserve donc aux titres.
+const notoKufi = Noto_Kufi_Arabic({
+  subsets: ["arabic"],
+  weight: ["500", "700"],
   variable: "--font-kufi",
   display: "swap",
 });
@@ -78,12 +85,18 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={dir}
-      className={`${roboto.variable} ${notoKufi.variable} h-full antialiased`}
+      className={`${roboto.variable} ${tajawal.variable} ${notoKufi.variable} h-full antialiased`}
       style={
         {
-          // `--font-sans` bascule selon la langue ; tout le reste du CSS
-          // n'a jamais à savoir quelle locale est active.
-          "--font-sans": isArabic ? "var(--font-kufi)" : "var(--font-roboto)",
+          // Ces deux variables sont le SEUL endroit du produit qui connaisse
+          // la locale. Tout le reste du CSS utilise `font-sans` / `font-heading`
+          // sans jamais tester la langue.
+          //
+          // En arabe, corps et titres emploient deux familles différentes :
+          // Tajawal se lit sans fatigue en petit, le Kufi n'apporte son
+          // caractère qu'en grand. En français, Roboto assure les deux.
+          "--font-sans": isArabic ? "var(--font-tajawal)" : "var(--font-roboto)",
+          "--font-heading": isArabic ? "var(--font-kufi)" : "var(--font-roboto)",
         } as React.CSSProperties
       }
       suppressHydrationWarning
