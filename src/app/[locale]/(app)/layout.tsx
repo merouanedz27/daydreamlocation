@@ -1,0 +1,40 @@
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { AppHeader } from "@/components/app-header";
+import { BottomNav } from "@/components/bottom-nav";
+import { requireProfile, isOwner } from "@/lib/auth";
+import type { Locale } from "@/i18n/routing";
+
+/**
+ * Layout protégé. Toute page sous `(app)` exige une session valide.
+ *
+ * Le contrôle se fait ICI et non dans le proxy : la doc Next déconseille
+ * explicitement d'y placer l'authentification. Et même si ce garde-fou sautait,
+ * RLS ne renverrait aucune donnée — c'est la vraie protection.
+ */
+export default async function AppLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
+  const profile = await requireProfile(locale as Locale);
+  const t = await getTranslations("roles");
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <AppHeader
+        fullName={profile.full_name}
+        roleLabel={t(profile.role === "owner" ? "owner" : "staff")}
+        showDashboard={isOwner(profile)}
+      />
+
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</div>
+
+      <BottomNav showDashboard={isOwner(profile)} />
+    </div>
+  );
+}

@@ -76,6 +76,15 @@
     "unitUnavailable": "Cette pièce est déjà réservée sur ces dates.",
     "generic": "Une erreur est survenue. Réessayez.",
     "offline": "Vous êtes hors ligne.",
-    "notFound": "Page introuvable"
+    "notFound": "Page introuvable",
+    "emailRequired": "Saisissez votre e-mail.",
+    "emailInvalid": "Cet e-mail n'est pas valide.",
+    "passwordRequired": "Saisissez votre mot de passe.",
+    "invalidCredentials": "E-mail ou mot de passe incorrect.",
+    "forbidden": "Vous n'avez pas accès à cette page."
+  },
+  "roles": {
+    "owner": "Propriétaire",
+    "staff": "Équipe"
   }
 }

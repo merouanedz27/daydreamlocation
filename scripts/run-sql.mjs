@@ -61,6 +61,12 @@ function renderTable(rows) {
   for (const r of rows) console.log(line(cols.map((c) => r[c])));
 }
 
+// `raise notice` est le principal moyen d'expression des blocs PL/pgSQL :
+// sans cet écouteur, un test qui « parle » resterait muet.
+client.on("notice", (n) => {
+  if (n?.message) console.log(`NOTICE: ${n.message}`);
+});
+
 try {
   await client.connect();
   const results = await client.query(sql);
