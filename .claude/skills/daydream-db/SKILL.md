@@ -163,9 +163,24 @@ Indexer toute colonne utilisée dans une policy ou une clé étrangère
 
 ## Conventions
 
+- Clés primaires : **`bigint generated always as identity`**, pas `uuid default gen_random_uuid()`.
+  Un UUIDv4 est aléatoire : les insertions se dispersent dans l'index et le fragmentent, pour aucun
+  bénéfice ici (application interne, pas de système distribué). Exception : `profiles.id`, qui doit
+  être le `uuid` de `auth.users`.
 - Montants : `numeric(12,2)`, jamais `float` (erreurs d'arrondi sur de l'argent réel).
+- Chaînes : `text`, pas `varchar(n)`. Horodatages : `timestamptz`, pas `timestamp`.
+- Statuts : `text` + contrainte `check`, pas de type enum — un enum se modifie mal
+  (impossible de retirer une valeur).
 - Dates de location : `date`, pas `timestamptz` — une location se compte en jours.
 - Suppression : préférer `is_active = false` à un `DELETE` sur le stock. Une pièce supprimée
   détruirait l'historique des commandes.
-- Toute nouvelle table : `id uuid default gen_random_uuid()`, `created_at timestamptz default now()`,
-  RLS activée, policies écrites dans la **même** migration.
+- Toute nouvelle table : `created_at timestamptz default now()`, RLS activée, policies et index
+  écrits dans la **même** migration.
+
+## Tests
+
+`supabase/tests/availability.sql` prouve le moteur de disponibilité : conflit refusé, second
+exemplaire louable, annulation qui libère la pièce, décalage de dates re-vérifié, pièce externe non
+bloquante, `balance` non écrivable. Le script se termine par un `rollback` — il ne laisse rien en base.
+
+**À rejouer après toute modification touchant `orders`, `order_lines` ou les triggers.**
