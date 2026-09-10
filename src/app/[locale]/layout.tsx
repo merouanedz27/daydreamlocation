@@ -2,33 +2,31 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Cormorant_Garamond, Inter, Tajawal } from "next/font/google";
+import { Noto_Kufi_Arabic, Roboto } from "next/font/google";
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
 import { localeDirection, routing, type Locale } from "@/i18n/routing";
 import "../globals.css";
 
-// UI et données — la lisibilité prime, c'est lu toute la journée sur téléphone.
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-// Titres et montants — la signature « faire-part ». Voir `daydream-ui`.
-const cormorant = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-// Arabe. Pas d'équivalent serif display convaincant : le contraste
-// se fait à la graisse, pas à la famille.
-const tajawal = Tajawal({
-  subsets: ["arabic", "latin"],
+// Latin — Roboto. Lu toute la journée sur téléphone : on privilégie la
+// lisibilité aux petites tailles.
+const roboto = Roboto({
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "700"],
-  variable: "--font-tajawal",
+  variable: "--font-roboto",
+  display: "swap",
+});
+
+// Arabe — Noto Kufi Arabic.
+// C'est une police de caractère KUFI, donc très dessinée : superbe en titres,
+// plus dense que la moyenne en corps de texte. Si l'équipe trouve les listes
+// fatigantes à lire, passer le corps de texte en Noto Sans Arabic et garder le
+// Kufi pour les titres — le basculement se fait ici, `--font-sans` étant la
+// seule variable que le reste du CSS connaisse.
+const notoKufi = Noto_Kufi_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "700"],
+  variable: "--font-kufi",
   display: "swap",
 });
 
@@ -52,7 +50,7 @@ export async function generateMetadata(props: {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#FBF8F3",
+  themeColor: "#FFFFFF",
   width: "device-width",
   initialScale: 1,
   // L'équipe travaille au téléphone : le zoom reste autorisé (accessibilité).
@@ -80,12 +78,12 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={dir}
-      className={`${inter.variable} ${cormorant.variable} ${tajawal.variable} h-full antialiased`}
+      className={`${roboto.variable} ${notoKufi.variable} h-full antialiased`}
       style={
         {
           // `--font-sans` bascule selon la langue ; tout le reste du CSS
           // n'a jamais à savoir quelle locale est active.
-          "--font-sans": isArabic ? "var(--font-tajawal)" : "var(--font-inter)",
+          "--font-sans": isArabic ? "var(--font-kufi)" : "var(--font-roboto)",
         } as React.CSSProperties
       }
       suppressHydrationWarning

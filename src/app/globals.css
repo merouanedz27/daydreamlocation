@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ==========================================================================
-   DayDream Location — « Ivoire & Or Ancien »
+   DayDream Location — « Or & Brun sur blanc »
    Toutes les valeurs OKLCH sont converties depuis les hex de référence du
    skill `daydream-ui` et vérifiées en contraste WCAG AA.
    Ne jamais écrire une couleur en dur dans un composant.
@@ -15,10 +15,13 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
+  /* `--font-sans` est posée sur <html> selon la locale : Roboto en français,
+     Noto Kufi Arabic en arabe. Aucune autre règle n'a besoin de savoir
+     quelle langue est active. */
   --font-sans: var(--font-sans);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --font-heading: var(--font-display);
-  --font-display: var(--font-display);
+  /* Pas de famille display distincte : la hiérarchie vient de la graisse. */
+  --font-heading: var(--font-sans);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -73,68 +76,74 @@
 }
 
 :root {
-  /* ivoire / papier — #FBF8F3 */
-  --background: oklch(0.9801 0.0074 80.72);
-  /* encre aubergine — #2E1F2B — 14.7:1 sur le fond */
-  --foreground: oklch(0.2627 0.0311 333.66);
+  /* blanc */
+  --background: oklch(1 0 0);
+  /* encre brun-noir — #2B2119 — 15,7:1 sur blanc */
+  --foreground: oklch(0.2569 0.0211 60.32);
 
   --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
 
-  /* or ancien — #B08D57.
-     Texte SOMBRE sur or : 5.04:1 (AA).  Ivoire sur or : 2.92:1 (échec).
+  /* OR — #BE9B45. Couleur d'accent et de remplissage.
+     Encre sur or : 5,97:1 (AA).  Blanc sur or : 2,64:1 (échec).
      D'où primary-foreground = encre, jamais blanc. */
-  --primary: oklch(0.6641 0.0831 77.40);
-  --primary-foreground: oklch(0.2627 0.0311 333.66);
+  --primary: oklch(0.7048 0.1121 86.95);
+  --primary-foreground: oklch(0.2569 0.0211 60.32);
 
-  /* #F2EDE4 */
-  --secondary: oklch(0.9475 0.0131 82.40);
-  --secondary-foreground: var(--foreground);
-  --muted: oklch(0.9475 0.0131 82.40);
-  /* #675A64 — 6.15:1 sur ivoire, 5.59:1 sur muted */
-  --muted-foreground: oklch(0.4836 0.0228 333.88);
-  --accent: oklch(0.9401 0.0222 80.69);
+  /* BRUN — #6B4F3A. Blanc dessus : 7,49:1. */
+  --secondary: oklch(0.4518 0.0497 57.96);
+  --secondary-foreground: oklch(1 0 0);
+
+  /* #F6F2EC */
+  --muted: oklch(0.9626 0.0091 78.28);
+  /* #645850 — 6,88:1 sur blanc, 6,17:1 sur muted */
+  --muted-foreground: oklch(0.4696 0.0202 55.84);
+  /* #F7EFDD — voile doré */
+  --accent: oklch(0.9536 0.0253 86.87);
   --accent-foreground: var(--foreground);
 
-  /* bordeaux — #7A2E3E — ivoire dessus : 8.66:1 */
-  --destructive: oklch(0.4144 0.1067 10.10);
-  --destructive-foreground: oklch(0.9801 0.0074 80.72);
+  /* #8B2F2F — blanc dessus : 8,25:1 */
+  --destructive: oklch(0.4410 0.1256 23.82);
+  --destructive-foreground: oklch(1 0 0);
 
-  /* #E4DACB */
-  --border: oklch(0.8923 0.0230 78.21);
-  --input: oklch(0.8923 0.0230 78.21);
-  --ring: oklch(0.6641 0.0831 77.40);
+  /* #E7DFD3 */
+  --border: oklch(0.9067 0.0184 78.24);
+  --input: oklch(0.9067 0.0184 78.24);
+  --ring: oklch(0.7048 0.1121 86.95);
 
   /* Statuts.
-     `--success` / `--warning` = pastilles et bordures uniquement (trop clairs
-     pour du texte). Pour du TEXTE, utiliser les variantes `-foreground`
-     sur les fonds `-soft`. */
-  --success: oklch(0.6196 0.0306 141.91); /* sauge #7C8B7A */
-  --success-foreground: oklch(0.4195 0.0398 146.11); /* #3F5340 — 7.86:1 */
-  --success-soft: oklch(0.9404 0.0107 136.56); /* #E8EDE6 */
-  --warning: oklch(0.6862 0.0663 18.91); /* rose poudré #C08A8A */
-  --warning-foreground: oklch(0.4575 0.0800 20.65); /* #7E4444 — 7.09:1 */
-  --warning-soft: oklch(0.9399 0.0164 17.45); /* #F6E7E7 */
+     `--success` / `--warning` sont assez sombres pour servir de TEXTE sur
+     blanc. Les fonds `-soft` servent aux pastilles. */
+  --success: oklch(0.4646 0.0573 137.11); /* #4A6141 — 6,82:1 */
+  --success-foreground: oklch(0.4646 0.0573 137.11);
+  --success-soft: oklch(0.9481 0.0135 134.90); /* #EAF0E7 — texte dessus 5,89:1 */
+  --warning: oklch(0.5097 0.0945 66.56); /* #8A5A22 — 5,89:1 */
+  --warning-foreground: oklch(0.5097 0.0945 66.56);
+  --warning-soft: oklch(0.9548 0.0266 74.76); /* #FBEEDD — texte dessus 5,15:1 */
 
-  --gold-soft: oklch(0.9401 0.0222 80.69); /* #F3EADB */
-  --gold-strong: oklch(0.5119 0.0724 76.96); /* #7E6134 — 5.44:1, or lisible */
+  --gold-soft: oklch(0.9536 0.0253 86.87); /* #F7EFDD */
+  /* AUCUN or ne dépasse 4,5:1 sur blanc (le meilleur plafonne à 3,50).
+     Pour de l'or LISIBLE en texte, utiliser cette variante sombre.
+     #8A6A1F — 5,05:1. */
+  --gold-strong: oklch(0.5426 0.0983 84.43);
+  --brown-soft: oklch(0.9381 0.0138 67.66); /* #F1E9E1 */
 
-  --chart-1: oklch(0.6641 0.0831 77.4); /* or */
-  --chart-2: oklch(0.6196 0.0306 141.91); /* sauge */
-  --chart-3: oklch(0.6862 0.0663 18.91); /* rose */
-  --chart-4: oklch(0.4156 0.038 338.32); /* aubergine */
-  --chart-5: oklch(0.8253 0.0458 79.24); /* sable */
+  --chart-1: oklch(0.7048 0.1121 86.95); /* or */
+  --chart-2: oklch(0.4518 0.0497 57.96); /* brun */
+  --chart-3: oklch(0.4646 0.0573 137.11); /* vert */
+  --chart-4: oklch(0.5097 0.0945 66.56); /* ambre */
+  --chart-5: oklch(0.7774 0.0504 77.12); /* sable */
 
-  --sidebar: oklch(0.9475 0.0131 82.4);
+  --sidebar: oklch(0.9626 0.0091 78.28);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.6641 0.0831 77.4);
-  --sidebar-primary-foreground: oklch(0.2627 0.0311 333.66);
-  --sidebar-accent: oklch(0.9401 0.0222 80.69);
+  --sidebar-primary: oklch(0.7048 0.1121 86.95);
+  --sidebar-primary-foreground: oklch(0.2569 0.0211 60.32);
+  --sidebar-accent: oklch(0.9536 0.0253 86.87);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.8923 0.023 78.21);
-  --sidebar-ring: oklch(0.6641 0.0831 77.4);
+  --sidebar-border: oklch(0.9067 0.0184 78.24);
+  --sidebar-ring: oklch(0.7048 0.1121 86.95);
 
   --radius: 0.5rem;
 }
@@ -143,41 +152,47 @@
    liée à la classe `.dark`, donc le mode sombre du système ne le déclenche pas.
    Défini pour pouvoir l'activer plus tard sans refonte. */
 .dark {
-  --background: oklch(0.1969 0.0224 334.5);
-  --foreground: oklch(0.9475 0.0131 82.4);
-  --card: oklch(0.2431 0.0258 334);
+  --background: oklch(0.1997 0.0140 71.96);
+  --foreground: oklch(0.9483 0.0136 78.26);
+  --card: oklch(0.2363 0.0182 70.50);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.2431 0.0258 334);
+  --popover: oklch(0.2363 0.0182 70.50);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.7452 0.0885 78);
-  --primary-foreground: oklch(0.1969 0.0224 334.5);
-  --secondary: oklch(0.2882 0.0262 334);
-  --secondary-foreground: var(--foreground);
-  --muted: oklch(0.2882 0.0262 334);
-  --muted-foreground: oklch(0.7215 0.0201 334);
-  --accent: oklch(0.3216 0.0301 334);
+  --primary: oklch(0.7936 0.1139 89.12);
+  --primary-foreground: oklch(0.1997 0.0140 71.96);
+  --secondary: oklch(0.6418 0.0687 67.62);
+  --secondary-foreground: oklch(0.1997 0.0140 71.96);
+  --muted: oklch(0.2716 0.0222 69.63);
+  --muted-foreground: oklch(0.7250 0.0243 71.69);
+  --accent: oklch(0.2716 0.0222 69.63);
   --accent-foreground: var(--foreground);
-  --destructive: oklch(0.5804 0.1301 12);
-  --destructive-foreground: oklch(0.9801 0.0074 80.72);
+  --destructive: oklch(0.6204 0.1501 25);
+  --destructive-foreground: oklch(0.1997 0.0140 71.96);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.7452 0.0885 78);
-  --success: oklch(0.6196 0.0306 141.91);
-  --success-foreground: oklch(0.7804 0.0402 143);
-  --success-soft: oklch(0.3098 0.0301 140);
-  --warning: oklch(0.6862 0.0663 18.91);
-  --warning-foreground: oklch(0.8204 0.0602 20);
-  --warning-soft: oklch(0.3216 0.0451 18);
-  --gold-soft: oklch(0.3098 0.0421 80);
-  --gold-strong: oklch(0.8102 0.0724 78);
-  --sidebar: oklch(0.2431 0.0258 334);
+  --ring: oklch(0.7936 0.1139 89.12);
+  --success: oklch(0.7204 0.0702 139);
+  --success-foreground: oklch(0.7204 0.0702 139);
+  --success-soft: oklch(0.3098 0.0401 138);
+  --warning: oklch(0.7602 0.1002 70);
+  --warning-foreground: oklch(0.7602 0.1002 70);
+  --warning-soft: oklch(0.3216 0.0551 68);
+  --gold-soft: oklch(0.3098 0.0451 86);
+  --gold-strong: oklch(0.8302 0.1002 87);
+  --brown-soft: oklch(0.3016 0.0301 67);
+  --chart-1: oklch(0.7936 0.1139 89.12);
+  --chart-2: oklch(0.6418 0.0687 67.62);
+  --chart-3: oklch(0.7204 0.0702 139);
+  --chart-4: oklch(0.7602 0.1002 70);
+  --chart-5: oklch(0.7774 0.0504 77.12);
+  --sidebar: oklch(0.2363 0.0182 70.50);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.7452 0.0885 78);
-  --sidebar-primary-foreground: oklch(0.1969 0.0224 334.5);
-  --sidebar-accent: oklch(0.3216 0.0301 334);
+  --sidebar-primary: oklch(0.7936 0.1139 89.12);
+  --sidebar-primary-foreground: oklch(0.1997 0.0140 71.96);
+  --sidebar-accent: oklch(0.2716 0.0222 69.63);
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.7452 0.0885 78);
+  --sidebar-ring: oklch(0.7936 0.1139 89.12);
 }
 
 @layer base {
@@ -196,19 +211,20 @@
     @apply font-sans;
   }
 
-  /* Titres et montants en serif display — la signature « faire-part ».
-     En arabe, Tajawal n'a pas d'équivalent serif : le contraste vient
-     de la graisse, pas de la famille. Voir `daydream-ui`. */
+  /* Roboto (latin) et Noto Kufi Arabic (arabe) n'ont pas de variante serif :
+     la hiérarchie se fait à la GRAISSE et à l'approche, pas à la famille.
+     Voir `daydream-ui`. */
   h1,
   h2,
   h3 {
-    @apply font-heading tracking-tight;
+    @apply font-heading font-medium tracking-tight;
   }
 
+  /* Le Kufi est déjà très dessiné : le resserrer le rendrait illisible. */
   :lang(ar) h1,
   :lang(ar) h2,
   :lang(ar) h3 {
-    @apply font-sans font-semibold tracking-normal;
+    @apply tracking-normal;
   }
 
   /* Les chiffres restent occidentaux même en arabe (usage au Maghreb)
