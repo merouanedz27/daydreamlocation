@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "DayDream Location",
+    "tagline": "Gestion des locations de costumes"
+  },
+  "nav": {
+    "orders": "Commandes",
+    "stock": "Stock",
+    "new": "Nouvelle",
+    "dashboard": "Tableau de bord",
+    "expenses": "Dépenses"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "back": "Retour",
+    "next": "Suivant",
+    "search": "Rechercher",
+    "loading": "Chargement…",
+    "empty": "Rien à afficher",
+    "language": "Langue"
+  },
+  "orders": {
+    "title": "Commandes",
+    "new": "Nouvelle commande",
+    "customer": "Client",
+    "phone": "Téléphone",
+    "eventDate": "Date de l'événement",
+    "pickupDate": "Retrait",
+    "returnDate": "Retour prévu",
+    "pickedUp": "Aller validé",
+    "returned": "Retour validé",
+    "total": "Prix total",
+    "paid": "Versement",
+    "balance": "Reste",
+    "caution": "Caution",
+    "cautionReturned": "Caution rendue",
+    "fees": "Frais",
+    "status": {
+      "reserved": "Réservée",
+      "inProgress": "En cours",
+      "returned": "Retournée",
+      "cancelled": "Annulée"
+    }
+  },
+  "stock": {
+    "title": "Stock",
+    "model": "Modèle",
+    "piece": "Pièce",
+    "ensemble": "Ensemble",
+    "size": "Taille",
+    "reference": "Référence",
+    "available": "Disponible",
+    "reserved": "Réservé",
+    "cleaning": "Au nettoyage",
+    "repair": "En réparation",
+    "retired": "Retiré",
+    "external": "Pièce externe"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "revenue": "Chiffre d'affaires",
+    "expenses": "Dépenses",
+    "profit": "Bénéfice",
+    "orderCount": "Commandes"
+  },
+  "auth": {
+    "signIn": "Se connecter",
+    "signOut": "Se déconnecter",
+    "email": "E-mail",
+    "password": "Mot de passe"
+  },
+  "errors": {
+    "unitUnavailable": "Cette pièce est déjà réservée sur ces dates.",
+    "generic": "Une erreur est survenue. Réessayez.",
+    "offline": "Vous êtes hors ligne.",
+    "notFound": "Page introuvable"
+  }
+}

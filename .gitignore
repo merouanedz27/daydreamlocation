@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# garder un modèle d'env versionné
+!.env.example
+
+# Skills tierces : la source est .agents/skills/ (versionnée).
+# .claude/skills/ n'en contient que des liens symboliques, recréés par
+# `npx skills add` / skills-lock.json — ne pas versionner le doublon.
+.claude/skills/shadcn/
+.claude/skills/supabase/
+.claude/skills/supabase-postgres-best-practices/

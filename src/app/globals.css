@@ -1,26 +1,261 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   DayDream Location — « Ivoire & Or Ancien »
+   Toutes les valeurs OKLCH sont converties depuis les hex de référence du
+   skill `daydream-ui` et vérifiées en contraste WCAG AA.
+   Ne jamais écrire une couleur en dur dans un composant.
+   ========================================================================== */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --font-sans: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-heading: var(--font-display);
+  --font-display: var(--font-display);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Statuts métier — voir `daydream-ui` */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-strong: var(--gold-strong);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  /* ivoire / papier — #FBF8F3 */
+  --background: oklch(0.9801 0.0074 80.72);
+  /* encre aubergine — #2E1F2B — 14.7:1 sur le fond */
+  --foreground: oklch(0.2627 0.0311 333.66);
+
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+
+  /* or ancien — #B08D57.
+     Texte SOMBRE sur or : 5.04:1 (AA).  Ivoire sur or : 2.92:1 (échec).
+     D'où primary-foreground = encre, jamais blanc. */
+  --primary: oklch(0.6641 0.0831 77.40);
+  --primary-foreground: oklch(0.2627 0.0311 333.66);
+
+  /* #F2EDE4 */
+  --secondary: oklch(0.9475 0.0131 82.40);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.9475 0.0131 82.40);
+  /* #675A64 — 6.15:1 sur ivoire, 5.59:1 sur muted */
+  --muted-foreground: oklch(0.4836 0.0228 333.88);
+  --accent: oklch(0.9401 0.0222 80.69);
+  --accent-foreground: var(--foreground);
+
+  /* bordeaux — #7A2E3E — ivoire dessus : 8.66:1 */
+  --destructive: oklch(0.4144 0.1067 10.10);
+  --destructive-foreground: oklch(0.9801 0.0074 80.72);
+
+  /* #E4DACB */
+  --border: oklch(0.8923 0.0230 78.21);
+  --input: oklch(0.8923 0.0230 78.21);
+  --ring: oklch(0.6641 0.0831 77.40);
+
+  /* Statuts.
+     `--success` / `--warning` = pastilles et bordures uniquement (trop clairs
+     pour du texte). Pour du TEXTE, utiliser les variantes `-foreground`
+     sur les fonds `-soft`. */
+  --success: oklch(0.6196 0.0306 141.91); /* sauge #7C8B7A */
+  --success-foreground: oklch(0.4195 0.0398 146.11); /* #3F5340 — 7.86:1 */
+  --success-soft: oklch(0.9404 0.0107 136.56); /* #E8EDE6 */
+  --warning: oklch(0.6862 0.0663 18.91); /* rose poudré #C08A8A */
+  --warning-foreground: oklch(0.4575 0.0800 20.65); /* #7E4444 — 7.09:1 */
+  --warning-soft: oklch(0.9399 0.0164 17.45); /* #F6E7E7 */
+
+  --gold-soft: oklch(0.9401 0.0222 80.69); /* #F3EADB */
+  --gold-strong: oklch(0.5119 0.0724 76.96); /* #7E6134 — 5.44:1, or lisible */
+
+  --chart-1: oklch(0.6641 0.0831 77.4); /* or */
+  --chart-2: oklch(0.6196 0.0306 141.91); /* sauge */
+  --chart-3: oklch(0.6862 0.0663 18.91); /* rose */
+  --chart-4: oklch(0.4156 0.038 338.32); /* aubergine */
+  --chart-5: oklch(0.8253 0.0458 79.24); /* sable */
+
+  --sidebar: oklch(0.9475 0.0131 82.4);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: oklch(0.6641 0.0831 77.4);
+  --sidebar-primary-foreground: oklch(0.2627 0.0311 333.66);
+  --sidebar-accent: oklch(0.9401 0.0222 80.69);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(0.8923 0.023 78.21);
+  --sidebar-ring: oklch(0.6641 0.0831 77.4);
+
+  --radius: 0.5rem;
+}
+
+/* Mode sombre non exposé en v1 (pas de bascule dans l'UI) : la variante est
+   liée à la classe `.dark`, donc le mode sombre du système ne le déclenche pas.
+   Défini pour pouvoir l'activer plus tard sans refonte. */
+.dark {
+  --background: oklch(0.1969 0.0224 334.5);
+  --foreground: oklch(0.9475 0.0131 82.4);
+  --card: oklch(0.2431 0.0258 334);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.2431 0.0258 334);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.7452 0.0885 78);
+  --primary-foreground: oklch(0.1969 0.0224 334.5);
+  --secondary: oklch(0.2882 0.0262 334);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.2882 0.0262 334);
+  --muted-foreground: oklch(0.7215 0.0201 334);
+  --accent: oklch(0.3216 0.0301 334);
+  --accent-foreground: var(--foreground);
+  --destructive: oklch(0.5804 0.1301 12);
+  --destructive-foreground: oklch(0.9801 0.0074 80.72);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7452 0.0885 78);
+  --success: oklch(0.6196 0.0306 141.91);
+  --success-foreground: oklch(0.7804 0.0402 143);
+  --success-soft: oklch(0.3098 0.0301 140);
+  --warning: oklch(0.6862 0.0663 18.91);
+  --warning-foreground: oklch(0.8204 0.0602 20);
+  --warning-soft: oklch(0.3216 0.0451 18);
+  --gold-soft: oklch(0.3098 0.0421 80);
+  --gold-strong: oklch(0.8102 0.0724 78);
+  --sidebar: oklch(0.2431 0.0258 334);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: oklch(0.7452 0.0885 78);
+  --sidebar-primary-foreground: oklch(0.1969 0.0224 334.5);
+  --sidebar-accent: oklch(0.3216 0.0301 334);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.7452 0.0885 78);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* évite le zoom involontaire sur iOS et le rubber-band horizontal */
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-x: none;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  /* Titres et montants en serif display — la signature « faire-part ».
+     En arabe, Tajawal n'a pas d'équivalent serif : le contraste vient
+     de la graisse, pas de la famille. Voir `daydream-ui`. */
+  h1,
+  h2,
+  h3 {
+    @apply font-heading tracking-tight;
+  }
+
+  :lang(ar) h1,
+  :lang(ar) h2,
+  :lang(ar) h3 {
+    @apply font-sans font-semibold tracking-normal;
+  }
+
+  /* Les chiffres restent occidentaux même en arabe (usage au Maghreb)
+     et alignés en colonne dans les listes de prix. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Séparateur ornemental — trait fin + losange centré.
+     Élément signature, à réutiliser entre les sections. */
+  .ornament {
+    @apply flex items-center gap-3 text-primary;
+  }
+
+  /* les deux filets ; le losange est un enfant `.ornament-diamond` */
+  .ornament::before,
+  .ornament::after {
+    content: "";
+    @apply h-px flex-1 bg-current opacity-40;
+  }
+
+  .ornament > .ornament-diamond {
+    @apply size-1.5 rotate-45 bg-current;
+  }
+}
+
+@layer utilities {
+  /* Les chevrons et flèches directionnelles doivent être miroités en RTL.
+     Une flèche « retour » qui pointe à gauche en arabe est un bug. */
+  .icon-directional:where([dir="rtl"] *) {
+    transform: scaleX(-1);
+  }
+
+  /* Zone tactile de 44 px minimum sans grossir le visuel. */
+  .tap-44 {
+    @apply relative;
+  }
+
+  .tap-44::after {
+    content: "";
+    @apply absolute left-1/2 top-1/2 size-11 -translate-x-1/2 -translate-y-1/2;
+  }
+
+  /* Marge de sécurité pour la barre d'onglets basse (encoche iOS). */
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
+  }
 }

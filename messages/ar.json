@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "DayDream Location",
+    "tagline": "تسيير كراء البدلات"
+  },
+  "nav": {
+    "orders": "الطلبيات",
+    "stock": "المخزون",
+    "new": "جديدة",
+    "dashboard": "لوحة القيادة",
+    "expenses": "المصاريف"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "back": "رجوع",
+    "next": "التالي",
+    "search": "بحث",
+    "loading": "جارٍ التحميل…",
+    "empty": "لا يوجد شيء للعرض",
+    "language": "اللغة"
+  },
+  "orders": {
+    "title": "الطلبيات",
+    "new": "طلبية جديدة",
+    "customer": "الزبون",
+    "phone": "الهاتف",
+    "eventDate": "تاريخ المناسبة",
+    "pickupDate": "الاستلام",
+    "returnDate": "الإرجاع المتوقع",
+    "pickedUp": "تم التسليم",
+    "returned": "تم الإرجاع",
+    "total": "السعر الإجمالي",
+    "paid": "التسبيق",
+    "balance": "الباقي",
+    "caution": "الضمان",
+    "cautionReturned": "تم إرجاع الضمان",
+    "fees": "المصاريف",
+    "status": {
+      "reserved": "محجوزة",
+      "inProgress": "جارية",
+      "returned": "مُرجعة",
+      "cancelled": "ملغاة"
+    }
+  },
+  "stock": {
+    "title": "المخزون",
+    "model": "الموديل",
+    "piece": "القطعة",
+    "ensemble": "الطقم",
+    "size": "المقاس",
+    "reference": "المرجع",
+    "available": "متوفر",
+    "reserved": "محجوز",
+    "cleaning": "في التنظيف",
+    "repair": "في الإصلاح",
+    "retired": "مسحوب",
+    "external": "قطعة خارجية"
+  },
+  "dashboard": {
+    "title": "لوحة القيادة",
+    "revenue": "رقم الأعمال",
+    "expenses": "المصاريف",
+    "profit": "الربح",
+    "orderCount": "الطلبيات"
+  },
+  "auth": {
+    "signIn": "تسجيل الدخول",
+    "signOut": "تسجيل الخروج",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور"
+  },
+  "errors": {
+    "unitUnavailable": "هذه القطعة محجوزة بالفعل في هذه التواريخ.",
+    "generic": "حدث خطأ. أعد المحاولة.",
+    "offline": "أنت غير متصل بالإنترنت.",
+    "notFound": "الصفحة غير موجودة"
+  }
+}
