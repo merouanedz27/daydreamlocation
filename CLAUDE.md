@@ -28,11 +28,22 @@ npm run build             # build de production
 npm run lint              # ESLint (inclut la règle RTL, voir plus bas)
 npm run typecheck         # tsc --noEmit
 
-npx supabase start        # Postgres local (nécessite Docker)
+npm run db:push           # applique les migrations sur la base en ligne
+npm run db:test           # rejoue les tests de disponibilité (rollback, sans trace)
+npm run db:advisors       # audit sécurité + performance Supabase
+npm run db:types          # régénère src/lib/supabase/database.types.ts
+
 npx supabase migration new <nom>
-npx supabase db reset     # rejoue toutes les migrations + seed
-npx supabase gen types typescript --local > src/lib/supabase/database.types.ts
 ```
+
+**Pas de base locale, pas de Docker** : on travaille directement sur le projet
+Supabase en ligne. `SUPABASE_DB_URL` (dans `.env.local`, jamais versionné) pointe
+sur le *session pooler*, port **5432** — le 6543 est en mode transaction et gère
+mal le DDL. Cette variable n'a PAS de préfixe `NEXT_PUBLIC_` : elle contient le
+mot de passe de la base et ne doit jamais atteindre le navigateur.
+
+`db:types` passe par l'API de gestion (`--project-id`) et non par `--db-url`, qui
+exigerait Docker.
 
 ## Règles non négociables
 

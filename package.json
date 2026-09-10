@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:push": "supabase db push --db-url $SUPABASE_DB_URL --yes",
+    "db:test": "node scripts/run-sql.mjs supabase/tests/availability.sql",
+    "db:advisors": "supabase db advisors --db-url $SUPABASE_DB_URL",
+    "db:types": "supabase gen types typescript --project-id ydhlonfforwvgpgffwqw > src/lib/supabase/database.types.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -32,10 +36,12 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

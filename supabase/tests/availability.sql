@@ -1,131 +1,190 @@
 -- =============================================================================
 -- Vérification du moteur de disponibilité
 --
--- À exécuter APRÈS les migrations. Le script s'annule entièrement (rollback) :
--- il ne laisse aucune donnée derrière lui.
+--   npx supabase db query -f supabase/tests/availability.sql --db-url "..."
 --
--- Il prouve la seule chose qui compte vraiment dans cette application :
--- une pièce déjà louée ne peut pas être relouée sur des dates qui se
--- chevauchent, et c'est POSTGRES qui refuse — pas le code applicatif.
+-- Le script s'annule entièrement (rollback) : il ne laisse aucune donnée.
+-- Il prouve la seule chose qui compte vraiment dans cette application : une
+-- pièce déjà louée ne peut pas être relouée sur des dates qui se chevauchent,
+-- et c'est POSTGRES qui refuse — pas le code applicatif.
+--
+-- À rejouer après toute modification de `orders`, `order_lines` ou des triggers.
 -- =============================================================================
 
 begin;
 
--- --- jeu d'essai ------------------------------------------------------------
-insert into public.article_models (ref_code, name_fr, category_id, base_price)
-values ('TEST-Gio-079', 'Veste de test', (select id from public.categories where slug = 'veste'), 3000);
+create temp table test_results (
+  step text,
+  attendu text,
+  obtenu text,
+  ok boolean
+) on commit drop;
 
-insert into public.article_units (model_id, ref_code, size)
-select id, 'TEST-Gio-079-01', '50' from public.article_models where ref_code = 'TEST-Gio-079';
-
-insert into public.article_units (model_id, ref_code, size)
-select id, 'TEST-Gio-079-02', '50' from public.article_models where ref_code = 'TEST-Gio-079';
-
--- Commande 1 : mariage du 26/08. Retrait le 25, retour le 27 (défauts).
-insert into public.orders (customer_name, event_date)
-values ('Hafid', '2026-08-26');
-
-insert into public.order_lines (order_id, unit_id, unit_price)
-select o.id, u.id, 3000
-from public.orders o, public.article_units u
-where o.customer_name = 'Hafid' and u.ref_code = 'TEST-Gio-079-01';
-
-\echo ''
-\echo '=== 1. fenêtre déduite d une seule date d événement ==='
-select event_date, pickup_date, return_due_date
-from public.orders where customer_name = 'Hafid';
-
-\echo ''
-\echo '=== 2. plage réellement bloquée (retour + battement nettoyage) ==='
-select l.rental_range, l.is_active
-from public.order_lines l
-join public.orders o on o.id = l.order_id
-where o.customer_name = 'Hafid';
-
-\echo ''
-\echo '=== 3. totaux recalculés depuis les lignes ==='
-select total_price, amount_paid, balance from public.orders where customer_name = 'Hafid';
-
--- --- LE test ----------------------------------------------------------------
-\echo ''
-\echo '=== 4. MÊME pièce, dates qui se chevauchent -> doit ÉCHOUER (23P01) ==='
-insert into public.orders (customer_name, event_date) values ('Zohir', '2026-08-27');
-
-savepoint avant_conflit;
 do $$
+declare
+  v_model_id bigint;
+  v_unit1 bigint;
+  v_unit2 bigint;
+  v_hafid bigint;
+  v_zohir bigint;
+  v_karim bigint;
+  v_rec record;
 begin
+  -- --- jeu d'essai ----------------------------------------------------------
+  insert into public.article_models (ref_code, name_fr, category_id, base_price)
+  values ('TEST-Gio-079', 'Veste de test',
+          (select id from public.categories where slug = 'veste'), 3000)
+  returning id into v_model_id;
+
+  insert into public.article_units (model_id, ref_code, size)
+  values (v_model_id, 'TEST-Gio-079-01', '50') returning id into v_unit1;
+
+  insert into public.article_units (model_id, ref_code, size)
+  values (v_model_id, 'TEST-Gio-079-02', '50') returning id into v_unit2;
+
+  -- Mariage du 26/08. L'employé ne saisit QUE cette date.
+  insert into public.orders (customer_name, event_date)
+  values ('Hafid', '2026-08-26') returning id into v_hafid;
+
   insert into public.order_lines (order_id, unit_id, unit_price)
-  select o.id, u.id, 3000
-  from public.orders o, public.article_units u
-  where o.customer_name = 'Zohir' and u.ref_code = 'TEST-Gio-079-01';
+  values (v_hafid, v_unit1, 3000);
 
-  raise exception 'ECHEC DU TEST : la double-reservation a ete acceptee';
-exception
-  when exclusion_violation then
-    raise notice 'OK -> Postgres a refuse la double-reservation (SQLSTATE 23P01)';
+  -- --- 1. fenêtre déduite d'une seule date ----------------------------------
+  select pickup_date, return_due_date into v_rec
+  from public.orders where id = v_hafid;
+
+  insert into test_results values (
+    '1. fenetre deduite de l evenement',
+    '25/08 -> 27/08',
+    to_char(v_rec.pickup_date, 'DD/MM') || ' -> ' || to_char(v_rec.return_due_date, 'DD/MM'),
+    v_rec.pickup_date = '2026-08-25' and v_rec.return_due_date = '2026-08-27'
+  );
+
+  -- --- 2. plage bloquée = retour + battement nettoyage -----------------------
+  select rental_range::text as r into v_rec
+  from public.order_lines where order_id = v_hafid;
+
+  insert into test_results values (
+    '2. plage bloquee (retour + nettoyage)',
+    '[2026-08-25,2026-08-29)',
+    v_rec.r,
+    v_rec.r = '[2026-08-25,2026-08-29)'
+  );
+
+  -- --- 3. totaux recalculés depuis les lignes --------------------------------
+  update public.orders set amount_paid = 3000 where id = v_hafid;
+  select total_price, amount_paid, balance into v_rec
+  from public.orders where id = v_hafid;
+
+  insert into test_results values (
+    '3. total et reste calcules',
+    'total 3000 / verse 3000 / reste 0',
+    'total ' || v_rec.total_price::int || ' / verse ' || v_rec.amount_paid::int
+      || ' / reste ' || v_rec.balance::int,
+    v_rec.total_price = 3000 and v_rec.balance = 0
+  );
+
+  -- --- 4. LE test : même pièce, dates qui se chevauchent ---------------------
+  insert into public.orders (customer_name, event_date)
+  values ('Zohir', '2026-08-27') returning id into v_zohir;
+
+  begin
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_zohir, v_unit1, 3000);
+    insert into test_results values (
+      '4. MEME piece, dates chevauchantes', 'refus 23P01', 'ACCEPTE', false);
+  exception when exclusion_violation then
+    insert into test_results values (
+      '4. MEME piece, dates chevauchantes', 'refus 23P01', 'refus 23P01', true);
+  end;
+
+  -- --- 5. autre exemplaire, même taille, mêmes dates -> doit passer ----------
+  begin
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_zohir, v_unit2, 3000);
+    insert into test_results values (
+      '5. AUTRE exemplaire meme taille', 'accepte', 'accepte', true);
+  exception when exclusion_violation then
+    insert into test_results values (
+      '5. AUTRE exemplaire meme taille', 'accepte', 'REFUSE A TORT', false);
+  end;
+
+  -- --- 6. pièce externe (FETHI LOC) : aucun blocage --------------------------
+  begin
+    insert into public.order_lines
+      (order_id, external_source, external_label, external_cost, unit_price)
+    values (v_zohir, 'Fethi', 'Veste taille 60', 1500, 4000);
+    insert into test_results values (
+      '6. piece sous-louee (sans unit_id)', 'accepte', 'accepte', true);
+  exception when others then
+    insert into test_results values (
+      '6. piece sous-louee (sans unit_id)', 'accepte', 'REFUSE: ' || sqlerrm, false);
+  end;
+
+  -- --- 7. annuler la commande libère la pièce --------------------------------
+  update public.orders set status = 'annulee' where id = v_hafid;
+  begin
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_zohir, v_unit1, 3000);
+    insert into test_results values (
+      '7. annulation libere la piece', 'accepte', 'accepte', true);
+  exception when exclusion_violation then
+    insert into test_results values (
+      '7. annulation libere la piece', 'accepte', 'ENCORE BLOQUEE', false);
+  end;
+
+  -- --- 8. décaler une commande sur un créneau déjà pris ----------------------
+  -- Le piège classique : changer les dates sans re-verifier les pieces.
+  insert into public.orders (customer_name, event_date)
+  values ('Karim', '2026-12-25') returning id into v_karim;
+  insert into public.order_lines (order_id, unit_id, unit_price)
+  values (v_karim, v_unit2, 3000);
+
+  begin
+    update public.orders
+    set event_date = '2026-08-27', pickup_date = '2026-08-26',
+        return_due_date = '2026-08-28'
+    where id = v_karim;
+    insert into test_results values (
+      '8. decalage vers creneau pris', 'refus 23P01', 'ACCEPTE', false);
+  exception when exclusion_violation then
+    insert into test_results values (
+      '8. decalage vers creneau pris', 'refus 23P01', 'refus 23P01', true);
+  end;
+
+  -- --- 9. balance est générée, non écrivable ---------------------------------
+  begin
+    update public.orders set balance = 999 where id = v_zohir;
+    insert into test_results values (
+      '9. balance non ecrivable', 'refus', 'ECRITURE ACCEPTEE', false);
+  exception when others then
+    insert into test_results values (
+      '9. balance non ecrivable', 'refus', 'refus (' || sqlstate || ')', true);
+  end;
+
+  -- --- 10. RLS active sur toutes les tables publiques -------------------------
+  select count(*)::int as n, string_agg(tablename, ', ') as noms into v_rec
+  from pg_tables
+  where schemaname = 'public' and not rowsecurity;
+
+  insert into test_results values (
+    '10. RLS active partout',
+    '0 table sans RLS',
+    coalesce(v_rec.n, 0) || ' sans RLS' || coalesce(' : ' || v_rec.noms, ''),
+    coalesce(v_rec.n, 0) = 0
+  );
 end $$;
-rollback to savepoint avant_conflit;
 
-\echo ''
-\echo '=== 5. AUTRE exemplaire, même taille, mêmes dates -> doit RÉUSSIR ==='
-insert into public.order_lines (order_id, unit_id, unit_price)
-select o.id, u.id, 3000
-from public.orders o, public.article_units u
-where o.customer_name = 'Zohir' and u.ref_code = 'TEST-Gio-079-02';
-\echo 'OK -> le second exemplaire est bien louable'
+select
+  case when ok then 'OK  ' else 'ECHEC' end as resultat,
+  step, attendu, obtenu
+from test_results
+order by step;
 
-\echo ''
-\echo '=== 6. annuler la commande 1 libère la pièce ==='
-update public.orders set status = 'annulee' where customer_name = 'Hafid';
-
-insert into public.order_lines (order_id, unit_id, unit_price)
-select o.id, u.id, 3000
-from public.orders o, public.article_units u
-where o.customer_name = 'Zohir' and u.ref_code = 'TEST-Gio-079-01';
-\echo 'OK -> piece liberee par l annulation, relouable'
-
-\echo ''
-\echo '=== 7. pièce sous-louée chez un confrère (FETHI LOC) -> pas de blocage ==='
-insert into public.order_lines (order_id, external_source, external_label, external_cost, unit_price)
-select id, 'Fethi', 'Veste taille 60', 1500, 4000
-from public.orders where customer_name = 'Zohir';
-\echo 'OK -> ligne externe acceptee sans unit_id'
-
-\echo ''
-\echo '=== 8. décaler une commande sur un créneau déjà pris -> doit ÉCHOUER ==='
-insert into public.orders (customer_name, event_date) values ('Karim', '2026-12-25');
-insert into public.order_lines (order_id, unit_id, unit_price)
-select o.id, u.id, 3000
-from public.orders o, public.article_units u
-where o.customer_name = 'Karim' and u.ref_code = 'TEST-Gio-079-02';
-
-savepoint avant_decalage;
-do $$
-begin
-  update public.orders set event_date = '2026-08-27',
-                           pickup_date = '2026-08-26',
-                           return_due_date = '2026-08-28'
-  where customer_name = 'Karim';
-
-  raise exception 'ECHEC DU TEST : le decalage vers un creneau pris a ete accepte';
-exception
-  when exclusion_violation then
-    raise notice 'OK -> un decalage de dates est verifie comme une reservation';
-end $$;
-rollback to savepoint avant_decalage;
-
-\echo ''
-\echo '=== 9. balance est bien une colonne generee (non ecrivable) ==='
-do $$
-begin
-  update public.orders set balance = 999 where customer_name = 'Zohir';
-  raise exception 'ECHEC DU TEST : balance a pu etre ecrite';
-exception
-  when generated_always then
-    raise notice 'OK -> balance est calculee, non saisissable';
-end $$;
+select
+  count(*) filter (where ok) || '/' || count(*) || ' tests reussis' as bilan,
+  case when count(*) filter (where not ok) = 0
+       then 'TOUT PASSE' else 'DES TESTS ECHOUENT' end as verdict
+from test_results;
 
 rollback;
-
-\echo ''
-\echo '=== Tous les tests termines. Aucune donnee laissee en base (rollback). ==='
