@@ -11,7 +11,7 @@
     "db:push": "supabase db push --db-url $SUPABASE_DB_URL --yes",
     "db:test": "node scripts/run-sql.mjs supabase/tests/availability.sql",
     "db:advisors": "supabase db advisors --db-url $SUPABASE_DB_URL",
-    "db:types": "supabase gen types typescript --project-id ydhlonfforwvgpgffwqw > src/lib/supabase/database.types.ts"
+    "db:types": "node scripts/gen-types.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

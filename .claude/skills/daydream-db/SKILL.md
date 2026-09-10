@@ -7,17 +7,36 @@ description: Database reference for DayDream Location — full schema, Supabase 
 
 ## Workflow — non négociable
 
-Le schéma vit dans `supabase/migrations/`. **Jamais de modification par le dashboard Supabase** :
-un changement cliqué n'est pas reproductible et n'existe pas en local.
+**Pas de base locale, pas de Docker.** On travaille sur le projet Supabase en ligne.
+
+Le schéma vit dans `supabase/migrations/`, un fichier par changement, **toujours**. C'est la seule
+source de vérité : un changement appliqué sans fichier n'est pas reproductible et sera perdu au
+prochain environnement.
 
 ```bash
-supabase start                       # Postgres local
-supabase migration new <nom>         # crée le fichier SQL
-supabase db reset                    # rejoue tout depuis zéro + seed
-supabase gen types typescript --local > src/lib/supabase/database.types.ts
+npx supabase migration new <nom>   # cree le fichier SQL horodate
+# -> ecrire le SQL, puis le faire appliquer (copier-coller dans l'editeur SQL
+#    du dashboard : c'est le mode retenu sur ce projet)
+npm run db:types                   # REGENERER LES TYPES, sinon TypeScript ment
+npm run db:test                    # rejouer les tests de disponibilite
+npm run db:advisors                # audit securite + performance
 ```
 
-Régénérer les types **après chaque migration**, sinon TypeScript ment.
+**Une migration déjà appliquée ne se modifie jamais** : on en écrit une nouvelle qui corrige.
+
+### Génération des types
+
+`npm run db:types` exécute `scripts/gen-types.mjs`, qui introspecte le catalogue Postgres via la
+connexion `SUPABASE_DB_URL`. On n'utilise **pas** `supabase gen types` : avec `--db-url` il lance
+pg-meta dans un conteneur Docker, et avec `--project-id` il exige un jeton de compte.
+
+Le script exclut correctement de `Insert`/`Update` les colonnes `generated always` — c'est ce qui
+rend `orders.balance` impossible à écrire depuis le code, et pas seulement depuis SQL.
+
+### Exécuter un fichier SQL
+
+`node scripts/run-sql.mjs <fichier>`. Ne pas utiliser `supabase db query -f` : cette commande
+enveloppe le fichier dans un *prepared statement*, qui n'accepte qu'une seule instruction.
 
 ## Schéma
 
