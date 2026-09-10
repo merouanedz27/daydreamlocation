@@ -57,7 +57,22 @@
     "cleaning": "Au nettoyage",
     "repair": "En réparation",
     "retired": "Retiré",
-    "external": "Pièce externe"
+    "external": "Pièce externe",
+    "allCategories": "Tout",
+    "noMatch": "Aucun résultat pour cette recherche.",
+    "newModel": "Nouveau modèle",
+    "addPiece": "Ajouter une pièce",
+    "pieces": "Pièces",
+    "availableCount": "{available} / {total} disponible(s)",
+    "price": "Prix",
+    "color": "Couleur",
+    "brand": "Marque",
+    "category": "Catégorie",
+    "length": "Longueur",
+    "purchasePrice": "Prix d'achat",
+    "priceOverride": "Prix spécifique",
+    "condition": "État",
+    "photo": "Photo"
   },
   "dashboard": {
     "title": "Tableau de bord",

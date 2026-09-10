@@ -57,7 +57,22 @@
     "cleaning": "في التنظيف",
     "repair": "في الإصلاح",
     "retired": "مسحوب",
-    "external": "قطعة خارجية"
+    "external": "قطعة خارجية",
+    "allCategories": "الكل",
+    "noMatch": "لا نتيجة لهذا البحث.",
+    "newModel": "موديل جديد",
+    "addPiece": "إضافة قطعة",
+    "pieces": "القطع",
+    "availableCount": "{available} / {total} متوفرة",
+    "price": "السعر",
+    "color": "اللون",
+    "brand": "العلامة",
+    "category": "الفئة",
+    "length": "الطول",
+    "purchasePrice": "سعر الشراء",
+    "priceOverride": "سعر خاص",
+    "condition": "الحالة",
+    "photo": "صورة"
   },
   "dashboard": {
     "title": "لوحة القيادة",
