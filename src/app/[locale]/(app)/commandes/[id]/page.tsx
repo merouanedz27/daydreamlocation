@@ -128,9 +128,14 @@ export default async function OrderPage({
       <dl className="space-y-2 text-sm">
         <Amount label={t("orders.total")} value={formatMoney(order.total_price, l)} strong />
         <Amount label={t("orders.paid")} value={formatMoney(order.amount_paid, l)} />
+        {/* Un reste NÉGATIF n'est pas une dette : le client a versé plus que
+            le prix final (acompte encaissé avant une remise). C'est un montant
+            à RENDRE, pas une alerte — même règle que sur la liste. */}
         <Amount
-          label={t("orders.balance")}
-          value={formatMoney(order.balance ?? 0, l)}
+          label={
+            (order.balance ?? 0) < 0 ? t("orders.toRefund") : t("orders.balance")
+          }
+          value={formatMoney(Math.abs(order.balance ?? 0), l)}
           warning={(order.balance ?? 0) > 0}
         />
         <Amount label={t("orders.caution")} value={formatMoney(order.caution_amount, l)} />

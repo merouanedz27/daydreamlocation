@@ -85,7 +85,17 @@
     "orderNo": "N° commande",
     "statusLabel": "Statut",
     "columns": "Colonnes",
-    "columnsHint": "Choisissez ce qui s'affiche. Le réglage vaut pour cet appareil : vous pouvez en montrer moins sur le téléphone que sur l'ordinateur."
+    "columnsHint": "Choisissez ce qui s'affiche. Le réglage vaut pour cet appareil : vous pouvez en montrer moins sur le téléphone que sur l'ordinateur.",
+    "searchPlaceholder": "Nom du client, n° de commande, téléphone",
+    "clearSearch": "Effacer la recherche",
+    "allStatuses": "Toutes",
+    "noMatch": "Aucune commande ne correspond à cette recherche.",
+    "toRefund": "À rendre",
+    "range": "{first}–{last} sur {total}",
+    "pagination": "Pages",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "pageOf": "Page {page} / {total}"
   },
   "stock": {
     "title": "Stock",

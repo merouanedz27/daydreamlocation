@@ -3,8 +3,10 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
-import { OrdersList, type OrderRow } from "@/components/orders-list";
-import { createClient } from "@/lib/supabase/server";
+import { OrdersFilters } from "@/components/orders-filters";
+import { OrdersList } from "@/components/orders-list";
+import { getOrdersPage } from "@/lib/queries/orders-list";
+import { parseOrdersQuery } from "@/lib/orders-query";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -16,26 +18,27 @@ export async function generateMetadata(props: {
 
 export default async function OrdersPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{
+    q?: string;
+    statut?: string;
+    tri?: string;
+    sens?: string;
+    page?: string;
+  }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
 
   const t = await getTranslations();
 
-  const supabase = await createClient();
-  // On remonte TOUTES les colonnes réglables d'un coup : le choix se fait côté
-  // client, par appareil, et refaire une requête à chaque case cochée serait
-  // absurde pour une liste de 50 lignes.
-  const { data: orders } = await supabase
-    .from("orders")
-    .select(
-      `id, order_no, customer_name, customer_phone, event_date, pickup_date,
-       status, total_price, amount_paid, balance, caution_amount`,
-    )
-    .order("event_date", { ascending: false })
-    .limit(50);
+  // Recherche, filtre, tri et pagination viennent de l'URL et sont appliqués
+  // EN BASE. Toute valeur inconnue retombe sur la valeur par défaut plutôt que
+  // de produire une erreur — un lien mal recopié ne doit pas casser l'écran.
+  const query = parseOrdersQuery(await searchParams);
+  const { rows, total } = await getOrdersPage(query);
 
   return (
     <div>
@@ -49,7 +52,15 @@ export default async function OrdersPage({
         </Button>
       </div>
 
-      <OrdersList orders={(orders ?? []) as OrderRow[]} />
+      <OrdersFilters />
+
+      <OrdersList
+        orders={rows}
+        total={total}
+        page={query.page}
+        sort={query.sort}
+        ascending={query.ascending}
+      />
     </div>
   );
 }
