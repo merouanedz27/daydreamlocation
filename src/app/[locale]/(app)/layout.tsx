@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AppHeader } from "@/components/app-header";
 import { BottomNav } from "@/components/bottom-nav";
+import { AppFooter } from "@/components/app-footer";
 import { requireProfile, isOwner } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
 
@@ -33,6 +34,8 @@ export default async function AppLayout({
       />
 
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</div>
+
+      <AppFooter />
 
       <BottomNav showDashboard={isOwner(profile)} />
     </div>

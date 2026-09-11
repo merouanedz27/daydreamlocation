@@ -16,6 +16,7 @@ il n'y a **pas** de `tailwind.config.ts`).
 | Rôle | Hex | Contraste | Usage |
 |---|---|---|---|
 | `background` | `#FFFFFF` | — | blanc |
+| `cream` | `#FAF5EA` | encre 14,47:1 · muted-fg 6,32:1 | **barres de navigation** (en-tête, barre basse) et pied de page |
 | `foreground` | `#2B2119` | 15,7:1 | encre brun-noir |
 | `primary` | `#EAB308` | — | **jaune 500** : remplissages UNIQUEMENT |
 | `primary-foreground` | `#2B2119` | 8,21:1 sur jaune | texte SUR le jaune |

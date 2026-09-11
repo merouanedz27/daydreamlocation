@@ -42,7 +42,7 @@ export function AppHeader({
   ] as const;
 
   return (
-    <header className="border-border bg-card sticky top-0 z-40 border-b">
+    <header className="border-border bg-cream sticky top-0 z-40 border-b">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
         <Link href="/commandes" className="font-heading shrink-0 text-lg">
           {t("app.name")}
