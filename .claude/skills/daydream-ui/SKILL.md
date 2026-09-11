@@ -60,19 +60,40 @@ sans refonte.
 
 | Langue | Corps de texte | Titres |
 |---|---|---|
-| Français | **Roboto** 400/500/700 | Roboto 500/700 |
-| Arabe | **Tajawal** 400/500/700 | **Noto Kufi Arabic** 500/700 |
+| Français | **Inter** (variable) | Inter, graisse 500 |
+| Arabe | **Cairo** (variable) | Cairo, graisse 500 |
 
 Deux variables portent ce choix, posées sur `<html>` dans
 `src/app/[locale]/layout.tsx` : `--font-sans` (corps) et `--font-heading` (titres).
 **C'est le seul endroit du produit qui connaisse la locale** — aucune autre règle CSS ne doit
 tester la langue. Utiliser `font-sans` et `font-heading`, jamais une famille en dur.
 
-Pourquoi deux familles en arabe : Noto Kufi Arabic est une police **kufique**, géométrique et très
-dessinée. Elle donne son caractère au produit en grand, mais fatigue en petit corps — or l'équipe
-passe ses journées dans des listes de commandes. Tajawal, humaniste et ouverte, y reste confortable.
+**Une seule famille par langue.** La hiérarchie se fait à la **graisse**, jamais au changement de
+police. Les deux variables restent malgré tout distinctes : un caractère de titre pourra revenir
+sans toucher un seul composant. Aucune famille serif dans le produit.
 
-Aucune famille serif dans le produit : en français la hiérarchie se fait à la **graisse**.
+Cairo charge le sous-ensemble **latin en plus de l'arabe**, et ce n'est pas décoratif : même en
+arabe, l'application affiche des chiffres occidentaux et des références latines (« Gio-079-01 »).
+Sans ce sous-ensemble, ces caractères tombent sur la police système.
+
+### Chiffres tabulaires — mesuré, pas supposé
+
+`font-variant-numeric: tabular-nums` est posé sur `html` dans `globals.css`, pour tout le produit.
+Mesure des chasses de chiffres (sur 1000) :
+
+| Police | Chiffres de largeur égale ? | `tnum` |
+|---|---|---|
+| Inter | **non** — 407 pour le « 1 », 646 pour le « 4 » | oui |
+| Cairo | **oui** — 560 partout | non |
+| Roboto (ancien) | oui — 562 partout | oui |
+| Tajawal (ancien) | non — 375 à 553 | **non** |
+
+Sans la règle globale, passer de Roboto à Inter aurait mis en dents de scie toute colonne de prix
+ou de dates non marquée `.tabular`. Et Tajawal ne pouvait s'aligner d'aucune façon : ni chasses
+égales, ni fonction `tnum` à activer — les montants arabes n'ont jamais été alignés jusqu'ici.
+
+Avant de changer une police de ce produit, **remesurer** : c'est un registre de comptes, les
+colonnes de nombres sont la lecture principale.
 
 L'arabe ne connaît pas la casse : ne jamais lui appliquer `uppercase`, `capitalize` ou une approche
 resserrée héritée du latin (`tracking-tight` est déjà neutralisé pour les titres arabes).

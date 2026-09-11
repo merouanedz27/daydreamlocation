@@ -2,38 +2,30 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Noto_Kufi_Arabic, Roboto, Tajawal } from "next/font/google";
+import { Cairo, Inter } from "next/font/google";
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
 import { localeDirection, routing, type Locale } from "@/i18n/routing";
 import "../globals.css";
 
-// Latin — Roboto. Lu toute la journée sur téléphone : on privilégie la
-// lisibilité aux petites tailles.
-const roboto = Roboto({
+// Latin — Inter. Corps et titres. Dessinée pour les écrans et pour les petites
+// tailles : c'est ce que l'équipe lit toute la journée sur son téléphone.
+// Police VARIABLE : pas de liste de graisses à déclarer, un seul fichier couvre
+// 400 / 500 / 700.
+const inter = Inter({
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "700"],
-  variable: "--font-roboto",
+  variable: "--font-inter",
   display: "swap",
 });
 
-// Arabe, CORPS DE TEXTE — Tajawal.
-// C'est la police que l'équipe lit vraiment : listes de commandes, tailles,
-// montants, notes. Humaniste et ouverte, elle reste confortable en petit corps.
-const tajawal = Tajawal({
-  subsets: ["arabic"],
-  weight: ["400", "500", "700"],
-  variable: "--font-tajawal",
-  display: "swap",
-});
-
-// Arabe, TITRES — Noto Kufi Arabic.
-// Police kufique, très dessinée : elle donne son caractère au produit en grand,
-// mais fatigue en corps de texte. On la réserve donc aux titres.
-const notoKufi = Noto_Kufi_Arabic({
-  subsets: ["arabic"],
-  weight: ["500", "700"],
-  variable: "--font-kufi",
+// Arabe — Cairo. Corps et titres également.
+// Le sous-ensemble « latin » est indispensable et non décoratif : même en arabe
+// l'application affiche des chiffres occidentaux (prix, dates, tailles) et des
+// références latines (« Gio-079-01 »). Sans lui, tous ces caractères tombaient
+// sur la police système — c'était le cas avec Tajawal.
+const cairo = Cairo({
+  subsets: ["arabic", "latin"],
+  variable: "--font-cairo",
   display: "swap",
 });
 
@@ -85,18 +77,19 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={dir}
-      className={`${roboto.variable} ${tajawal.variable} ${notoKufi.variable} h-full antialiased`}
+      className={`${inter.variable} ${cairo.variable} h-full antialiased`}
       style={
         {
           // Ces deux variables sont le SEUL endroit du produit qui connaisse
           // la locale. Tout le reste du CSS utilise `font-sans` / `font-heading`
           // sans jamais tester la langue.
           //
-          // En arabe, corps et titres emploient deux familles différentes :
-          // Tajawal se lit sans fatigue en petit, le Kufi n'apporte son
-          // caractère qu'en grand. En français, Roboto assure les deux.
-          "--font-sans": isArabic ? "var(--font-tajawal)" : "var(--font-roboto)",
-          "--font-heading": isArabic ? "var(--font-kufi)" : "var(--font-roboto)",
+          // Une seule famille par langue : la hiérarchie se fait à la GRAISSE,
+          // pas au changement de police. Les deux variables restent distinctes
+          // pour pouvoir réintroduire un caractère de titre sans toucher aux
+          // composants, qui utilisent déjà `font-heading`.
+          "--font-sans": isArabic ? "var(--font-cairo)" : "var(--font-inter)",
+          "--font-heading": isArabic ? "var(--font-cairo)" : "var(--font-inter)",
         } as React.CSSProperties
       }
       suppressHydrationWarning
