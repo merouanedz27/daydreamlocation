@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { rangeContains } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
 
 export type Category = Tables<"categories">;
@@ -108,17 +109,6 @@ export function isUnitFreeToday(unit: UnitWithBookings): boolean {
   return !unit.order_lines?.some(
     (line) => line.is_active && rangeContains(line.rental_range, today),
   );
-}
-
-/** `[2026-08-25,2026-08-29)` — borne basse incluse, borne haute exclue. */
-function rangeContains(range: string | null, day: string): boolean {
-  if (!range) return false;
-  const m = range.match(/^([[(])([^,]*),([^)\]]*)([)\]])$/);
-  if (!m) return false;
-  const [, lowBracket, low, high, highBracket] = m;
-  const afterLow = lowBracket === "[" ? day >= low : day > low;
-  const beforeHigh = highBracket === "]" ? day <= high : day < high;
-  return afterLow && beforeHigh;
 }
 
 /** Compte les pièces d'un modèle par état, pour l'affichage en liste. */

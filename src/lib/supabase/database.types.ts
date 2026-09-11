@@ -438,7 +438,23 @@ export type Database = {
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      create_order: {
+        Args: {
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_event_date: string;
+          p_pickup_date?: string;
+          p_return_due_date?: string;
+          p_discount?: number;
+          p_amount_paid?: number;
+          p_caution_amount?: number;
+          p_notes?: string;
+          p_lines?: Json;
+        };
+        Returns: number;
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };

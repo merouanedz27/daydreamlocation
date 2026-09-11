@@ -173,6 +173,151 @@ begin
     coalesce(v_rec.n, 0) || ' sans RLS' || coalesce(' : ' || v_rec.noms, ''),
     coalesce(v_rec.n, 0) = 0
   );
+
+  -- --- 11. create_order est ATOMIQUE ----------------------------------------
+  -- Le scenario qui justifie la fonction SQL : une commande dont la PREMIERE
+  -- piece est libre et la SECONDE deja louee. Si la creation n'etait pas
+  -- atomique, la commande et sa premiere ligne resteraient en base, bloquant
+  -- une piece au profit d'une commande fantome.
+  declare
+    v_m2      bigint;
+    v_libre   bigint;
+    v_avant   int;
+    v_apres   int;
+    v_lignes  int;
+    v_msg     text;
+    v_cmd     bigint;
+  begin
+    insert into public.article_models (ref_code, name_fr, category_id, base_price)
+    values ('TEST-ATOM', 'Veste atomique',
+            (select id from public.categories where slug = 'veste'), 4000)
+    returning id into v_m2;
+
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_m2, 'TEST-ATOM-01', '52') returning id into v_libre;
+
+    select count(*)::int into v_avant from public.orders;
+
+    begin
+      select public.create_order(
+        p_customer_name := 'Atomique',
+        p_customer_phone := null,
+        p_event_date := '2026-08-27',
+        p_lines := jsonb_build_array(
+          jsonb_build_object('unitId', v_libre, 'unitPrice', 4000),
+          jsonb_build_object('unitId', v_unit1, 'unitPrice', 3000)
+        )
+      ) into v_cmd;
+      v_msg := 'ACCEPTE A TORT';
+    exception when exclusion_violation then
+      v_msg := sqlerrm;
+    end;
+
+    select count(*)::int into v_apres from public.orders;
+
+    insert into test_results values (
+      '11a. create_order refuse et nomme la piece',
+      'unit_unavailable:TEST-Gio-079-01',
+      v_msg,
+      v_msg = 'unit_unavailable:TEST-Gio-079-01'
+    );
+
+    insert into test_results values (
+      '11b. create_order atomique (rien ne subsiste)',
+      'aucune commande creee',
+      (v_apres - v_avant) || ' commande(s) creee(s)',
+      v_apres = v_avant
+    );
+
+    -- La piece libre ne doit pas non plus etre restee bloquee.
+    select count(*)::int into v_lignes
+    from public.order_lines where unit_id = v_libre;
+
+    insert into test_results values (
+      '11c. la piece libre n est pas restee bloquee',
+      '0 ligne',
+      v_lignes || ' ligne(s)',
+      v_lignes = 0
+    );
+
+    -- --- 12. ensemble eclate : chaque piece se bloque SEULE ------------------
+    -- Le cas d'usage signale par le client : on prend la veste du Costume n12
+    -- avec la chemise d'un autre. La chemise du n12 doit rester louable.
+    declare
+      v_mchem  bigint;
+      v_chem1  bigint;
+      v_chem2  bigint;
+      v_ens    bigint;
+      v_ok     boolean;
+      v_cmd2   bigint;
+    begin
+      insert into public.article_models (ref_code, name_fr, category_id, base_price)
+      values ('TEST-CHM', 'Chemise de test',
+              (select id from public.categories where slug = 'chemise'), 1000)
+      returning id into v_mchem;
+
+      insert into public.article_units (model_id, ref_code, size)
+      values (v_mchem, 'TEST-CHM-01', 'M') returning id into v_chem1;
+      insert into public.article_units (model_id, ref_code, size)
+      values (v_mchem, 'TEST-CHM-02', 'M') returning id into v_chem2;
+
+      -- « Costume n12 » = la veste libre + la chemise 01.
+      insert into public.ensembles (name, package_price)
+      values ('TEST Costume n12', 4500) returning id into v_ens;
+      insert into public.ensemble_items (ensemble_id, unit_id)
+      values (v_ens, v_libre), (v_ens, v_chem1);
+
+      -- On prend la VESTE du n12 mais la chemise 02, prise ailleurs.
+      select public.create_order(
+        p_customer_name := 'Ensemble eclate',
+        p_customer_phone := null,
+        p_event_date := '2026-09-20',
+        p_lines := jsonb_build_array(
+          jsonb_build_object('unitId', v_libre, 'unitPrice', 4000),
+          jsonb_build_object('unitId', v_chem2, 'unitPrice', 1000)
+        )
+      ) into v_cmd2;
+
+      -- La chemise 01, qui appartient pourtant au meme ensemble, reste libre.
+      begin
+        select public.create_order(
+          p_customer_name := 'Autre client',
+          p_customer_phone := null,
+          p_event_date := '2026-09-20',
+          p_lines := jsonb_build_array(
+            jsonb_build_object('unitId', v_chem1, 'unitPrice', 1000)
+          )
+        ) into v_cmd;
+        v_ok := true;
+      exception when exclusion_violation then
+        v_ok := false;
+      end;
+
+      insert into test_results values (
+        '12a. ensemble eclate : la piece restante reste louable',
+        'accepte', case when v_ok then 'accepte' else 'REFUSE A TORT' end, v_ok);
+
+      -- Mais la veste partie avec l'autre commande, elle, est bien bloquee.
+      begin
+        select public.create_order(
+          p_customer_name := 'Troisieme client',
+          p_customer_phone := null,
+          p_event_date := '2026-09-20',
+          p_lines := jsonb_build_array(
+            jsonb_build_object('unitId', v_libre, 'unitPrice', 4000)
+          )
+        ) into v_cmd;
+        v_ok := false;
+      exception when exclusion_violation then
+        v_ok := true;
+      end;
+
+      insert into test_results values (
+        '12b. ensemble eclate : la piece partie est bloquee',
+        'refus 23P01', case when v_ok then 'refus 23P01' else 'ACCEPTE A TORT' end, v_ok);
+    end;
+  end;
+
 end $$;
 
 select

@@ -93,10 +93,67 @@ const FK_SQL = `
   order by src.relname, con.conname, sk.ord;
 `;
 
+/**
+ * Fonctions exposées par PostgREST : celles du schéma `public` que le rôle
+ * `authenticated` peut exécuter. On exclut les fonctions de trigger (elles ne
+ * s'appellent pas via `rpc`, pas plus que les event triggers) et celles du
+ * schéma `private`, qui ne sont pas exposées.
+ */
+const FUNCTIONS_SQL = `
+  select
+    p.proname as name,
+    pg_get_function_arguments(p.oid) as args,
+    pg_get_function_result(p.oid)    as result
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.prokind = 'f'
+    and pg_get_function_result(p.oid) not in ('trigger', 'event_trigger')
+    and has_function_privilege('authenticated', p.oid, 'execute')
+  order by p.proname;
+`;
+
+/** `p_customer_name text, p_lines jsonb DEFAULT ...` -> membres TypeScript. */
+function parseArgs(args) {
+  if (!args.trim()) return [];
+  // Découpe sur les virgules de premier niveau (les DEFAULT peuvent en cacher).
+  const parts = [];
+  let depth = 0, cur = "";
+  for (const ch of args) {
+    if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth--;
+    if (ch === "," && depth === 0) { parts.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
+
+  return parts.map((raw) => {
+    const part = raw.trim();
+    const optional = / DEFAULT /i.test(part);
+    const withoutDefault = part.split(/ DEFAULT /i)[0].trim();
+    const tokens = withoutDefault.split(/\s+/);
+    const name = tokens.shift();
+    return { name, optional, type: sqlToTs(tokens.join(" ")) };
+  });
+}
+
+/** Types tels que `pg_get_function_arguments` les écrit (noms SQL, pas udt). */
+function sqlToTs(sql) {
+  const t = sql.toLowerCase().replace(/\[\]$/, "");
+  const arr = sql.endsWith("[]") ? "[]" : "";
+  if (/^(bigint|integer|smallint|numeric|real|double precision)/.test(t)) return "number" + arr;
+  if (/^bool/.test(t)) return "boolean" + arr;
+  if (/^(json|jsonb)/.test(t)) return "Json" + arr;
+  if (/^(text|character|uuid|date|time|name)/.test(t)) return "string" + arr;
+  if (/^void$/.test(t)) return "undefined";
+  return "unknown" + arr;
+}
+
 try {
   await client.connect();
   const { rows: cols } = await client.query(COLUMNS_SQL);
   const { rows: fks } = await client.query(FK_SQL);
+  const { rows: fns } = await client.query(FUNCTIONS_SQL);
 
   if (!cols.length) {
     console.error("Aucune table trouvée dans le schéma public.");
@@ -198,7 +255,30 @@ try {
 
   out.push("    };");
   out.push("    Views: { [_ in never]: never };");
-  out.push("    Functions: { [_ in never]: never };");
+
+  if (!fns.length) {
+    out.push("    Functions: { [_ in never]: never };");
+  } else {
+    out.push("    Functions: {");
+    for (const fn of fns) {
+      const args = parseArgs(fn.args);
+      out.push(`      ${fn.name}: {`);
+      if (!args.length) {
+        out.push("        Args: Record<PropertyKey, never>;");
+      } else {
+        out.push("        Args: {");
+        for (const a of args) {
+          out.push(`          ${a.name}${a.optional ? "?" : ""}: ${a.type};`);
+        }
+        out.push("        };");
+      }
+      out.push(`        Returns: ${sqlToTs(fn.result.replace(/^SETOF /i, ""))}${
+        /^SETOF /i.test(fn.result) ? "[]" : ""
+      };`);
+      out.push("      };");
+    }
+    out.push("    };");
+  }
   out.push("    Enums: { [_ in never]: never };");
   out.push("    CompositeTypes: { [_ in never]: never };");
   out.push("  };");
