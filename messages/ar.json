@@ -226,6 +226,7 @@
     "noOrder": "مصروف عام",
     "empty": "لا توجد مصاريف هذا الشهر.",
     "confirmDelete": "حذف هذا المصروف ؟",
+    "total": "المجموع",
     "previousMonth": "الشهر السابق",
     "nextMonth": "الشهر التالي",
     "categories": {

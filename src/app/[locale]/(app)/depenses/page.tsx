@@ -69,7 +69,9 @@ export default async function ExpensesPage({
         <ExpenseForm orders={orders} />
       </div>
 
-      <div className="border-border mt-6 flex items-center justify-between gap-3 rounded-lg border p-3">
+      {/* Navigateur de mois — une LIGNE, pas une carte encadrée. Le mois et son
+          total se lisent d'un seul regard ; les chevrons gardent leurs 44 px. */}
+      <div className="mt-2 flex items-center gap-1">
         <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
           <Link href={`/depenses?mois=${shiftMonth(month, -1)}`}>
             <ChevronLeft className="size-5 rtl:-scale-x-100" aria-hidden />
@@ -77,12 +79,15 @@ export default async function ExpensesPage({
           </Link>
         </Button>
 
-        <div className="min-w-0 text-center">
-          <p className="truncate font-medium">{monthLabel}</p>
-          <p className="tabular text-muted-foreground text-sm">
-            {t("dashboard.expenses")} {formatMoney(total, l)}
-          </p>
-        </div>
+        <p className="min-w-0 flex-1 truncate text-center">
+          <span className="font-medium">{monthLabel}</span>
+          <span className="text-muted-foreground" aria-hidden>
+            {" · "}
+          </span>
+          <span className="tabular text-muted-foreground text-sm">
+            {t("expenses.total")} {formatMoney(total, l)}
+          </span>
+        </p>
 
         <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
           <Link href={`/depenses?mois=${shiftMonth(month, 1)}`}>

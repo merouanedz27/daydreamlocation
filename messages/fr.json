@@ -226,6 +226,7 @@
     "noOrder": "Charge générale",
     "empty": "Aucune dépense ce mois-ci.",
     "confirmDelete": "Supprimer cette dépense ?",
+    "total": "Total",
     "previousMonth": "Mois précédent",
     "nextMonth": "Mois suivant",
     "categories": {

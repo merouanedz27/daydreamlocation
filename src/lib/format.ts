@@ -73,3 +73,25 @@ export function formatDate(date: Date | string, locale: Locale): string {
 export function formatNumber(value: number, locale: Locale): string {
   return formatGrouped(value, locale);
 }
+
+/**
+ * « 11/09 » — jour et mois, sans l'année.
+ *
+ * Réservé aux listes DÉJÀ bornées à une période affichée ailleurs (le registre
+ * des dépenses, qui porte « Septembre 2026 » en tête). Répéter l'année sur
+ * trente lignes coûte un tiers de la largeur d'une colonne de téléphone pour
+ * une information que l'écran donne déjà. Partout ailleurs : `formatDate`.
+ */
+export function formatDayMonth(date: Date | string, locale: Locale): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const parts = new Intl.DateTimeFormat(NUMBER_LOCALE[locale], {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Africa/Algiers",
+  }).formatToParts(d);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+
+  return `${get("day")}/${get("month")}`;
+}
