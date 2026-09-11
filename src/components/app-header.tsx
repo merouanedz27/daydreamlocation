@@ -71,7 +71,7 @@ export function AppHeader({
         </nav>
 
         <div className="ms-auto flex items-center gap-2">
-          <LocaleSwitcher className="hidden sm:inline-flex" />
+          <LocaleSwitcher />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -90,12 +90,6 @@ export function AppHeader({
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
-
-              <div className="p-1 sm:hidden">
-                <LocaleSwitcher />
-              </div>
-
-              <DropdownMenuSeparator className="sm:hidden" />
 
               <form action={signOut}>
                 <input type="hidden" name="locale" value={locale} />

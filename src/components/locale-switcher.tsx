@@ -2,59 +2,63 @@
 
 import { useParams } from "next/navigation";
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Languages } from "lucide-react";
 import { usePathname, useRouter } from "@/i18n/navigation";
-import { locales, localeLabels, type Locale } from "@/i18n/routing";
+import {
+  locales,
+  localeLabels,
+  localeShortLabels,
+  type Locale,
+} from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 
 /**
- * Bascule FR / AR. Conserve la page courante : `usePathname` de `@/i18n/navigation`
- * retourne le chemin SANS préfixe de locale, que `router.replace` re-préfixe.
+ * Bascule FR / AR — UN SEUL bouton, qui annonce la langue vers laquelle on va.
+ *
+ * Avant : un segment à deux boutons, masqué sous `sm:` et recopié dans le menu
+ * compte. Sur téléphone — l'appareil que l'équipe utilise toute la journée — la
+ * langue était donc enterrée à deux taps. Ici le bouton est toujours visible et
+ * un seul tap suffit.
+ *
+ * Suppose EXACTEMENT deux locales (cf. `locales`). Une troisième langue
+ * demanderait un menu, pas une bascule.
  */
 export function LocaleSwitcher({ className }: { className?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
   const [isPending, startTransition] = useTransition();
+  const t = useTranslations();
 
   const current = params.locale as Locale;
+  const target = locales.find((l) => l !== current) ?? current;
 
   return (
-    <div
+    <button
+      type="button"
+      /* Jamais `disabled` : le bouton doit rester atteignable au clavier.
+         `isPending` ne fait que griser. */
+      aria-label={t("common.switchTo", { language: localeLabels[target] })}
+      onClick={() =>
+        startTransition(() => {
+          // `usePathname` de `@/i18n/navigation` renvoie le chemin SANS préfixe
+          // de locale ; `replace` le re-préfixe. On reste donc sur la page.
+          router.replace(pathname, { locale: target });
+        })
+      }
       className={cn(
-        "border-border bg-card inline-flex items-center gap-1 rounded-full border p-1",
-        isPending && "opacity-60",
+        "border-border bg-card hover:bg-muted focus-visible:ring-ring/50",
+        "inline-flex min-h-11 items-center gap-2 rounded-full border px-4",
+        "text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+        isPending && "pointer-events-none opacity-60",
         className,
       )}
     >
-      <Languages
-        className="text-muted-foreground ms-2 size-4 shrink-0"
-        aria-hidden
-      />
-      {locales.map((locale) => {
-        const isActive = locale === current;
-        return (
-          <button
-            key={locale}
-            type="button"
-            disabled={isPending || isActive}
-            aria-current={isActive ? "true" : undefined}
-            onClick={() =>
-              startTransition(() => {
-                router.replace(pathname, { locale });
-              })
-            }
-            className={cn(
-              "min-h-9 rounded-full px-3 text-sm transition-colors",
-              isActive
-                ? "bg-primary text-primary-foreground font-medium"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {localeLabels[locale]}
-          </button>
-        );
-      })}
-    </div>
+      <Languages className="text-muted-foreground size-4 shrink-0" aria-hidden />
+      {/* `lang` sur le libellé : sans lui, « عربي » s'afficherait dans la police
+          latine au lieu de Tajawal. */}
+      <span lang={target}>{localeShortLabels[target]}</span>
+    </button>
   );
 }

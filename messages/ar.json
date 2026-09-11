@@ -20,7 +20,8 @@
     "search": "بحث",
     "loading": "جارٍ التحميل…",
     "empty": "لا يوجد شيء للعرض",
-    "language": "اللغة"
+    "language": "اللغة",
+    "switchTo": "التبديل إلى {language}"
   },
   "orders": {
     "title": "الطلبيات",

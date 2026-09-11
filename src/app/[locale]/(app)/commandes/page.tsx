@@ -79,7 +79,7 @@ export default async function OrdersPage({
             <li key={order.id}>
               <Link
                 href={`/commandes/${order.id}`}
-                className="border-border bg-card hover:border-primary block rounded-lg border p-4 transition-colors"
+                className="border-border bg-card hover:border-gold-strong block rounded-lg border p-4 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

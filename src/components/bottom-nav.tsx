@@ -40,7 +40,7 @@ export function BottomNav({ showDashboard }: { showDashboard: boolean }) {
               className={cn(
                 "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 text-xs transition-colors",
                 active
-                  ? "text-primary font-medium"
+                  ? "text-gold-strong font-medium"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >

@@ -20,7 +20,8 @@
     "search": "Rechercher",
     "loading": "Chargement…",
     "empty": "Rien à afficher",
-    "language": "Langue"
+    "language": "Langue",
+    "switchTo": "Passer en {language}"
   },
   "orders": {
     "title": "Commandes",

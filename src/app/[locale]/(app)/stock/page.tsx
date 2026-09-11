@@ -89,7 +89,7 @@ export default async function StockPage({
               <li key={model.id}>
                 <Link
                   href={`/stock/${model.id}`}
-                  className="border-border bg-card hover:border-primary flex gap-3 rounded-lg border p-3 transition-colors"
+                  className="border-border bg-card hover:border-gold-strong flex gap-3 rounded-lg border p-3 transition-colors"
                 >
                   {/* Vignette carrée : sans photo, une icône plutôt qu'un trou. */}
                   <div className="bg-muted relative size-20 shrink-0 overflow-hidden rounded-md">

@@ -14,6 +14,12 @@ export const localeLabels: Record<Locale, string> = {
   ar: "العربية",
 };
 
+/** Libellés courts de la bascule de langue — doivent tenir dans un bouton. */
+export const localeShortLabels: Record<Locale, string> = {
+  fr: "FR",
+  ar: "عربي",
+};
+
 export const routing = defineRouting({
   locales,
   defaultLocale: "fr",

@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ==========================================================================
-   DayDream Location — « Or & Brun sur blanc »
+   DayDream Location — « Jaune & Brun sur blanc »
    Toutes les valeurs OKLCH sont converties depuis les hex de référence du
    skill `daydream-ui` et vérifiées en contraste WCAG AA.
    Ne jamais écrire une couleur en dur dans un composant.
@@ -86,10 +86,11 @@
   --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
 
-  /* OR — #BE9B45. Couleur d'accent et de remplissage.
-     Encre sur or : 5,97:1 (AA).  Blanc sur or : 2,64:1 (échec).
-     D'où primary-foreground = encre, jamais blanc. */
-  --primary: oklch(0.7048 0.1121 86.95);
+  /* JAUNE 500 — #EAB308. Couleur de REMPLISSAGE uniquement.
+     Encre sur jaune : 8,21:1 (AAA).  Blanc sur jaune : 1,84:1 (échec).
+     D'où primary-foreground = encre, jamais blanc.
+     En TEXTE sur blanc le jaune ne vaut que 1,92:1 : utiliser gold-strong. */
+  --primary: oklch(0.7952 0.1617 86.05);
   --primary-foreground: oklch(0.2569 0.0211 60.32);
 
   /* BRUN — #6B4F3A. Blanc dessus : 7,49:1. */
@@ -100,8 +101,8 @@
   --muted: oklch(0.9626 0.0091 78.28);
   /* #645850 — 6,88:1 sur blanc, 6,17:1 sur muted */
   --muted-foreground: oklch(0.4696 0.0202 55.84);
-  /* #F7EFDD — voile doré */
-  --accent: oklch(0.9536 0.0253 86.87);
+  /* #FEF9C3 — voile jaune ; encre dessus 14,65:1 */
+  --accent: oklch(0.9729 0.0693 103.19);
   --accent-foreground: var(--foreground);
 
   /* #8B2F2F — blanc dessus : 8,25:1 */
@@ -111,7 +112,9 @@
   /* #E7DFD3 */
   --border: oklch(0.9067 0.0184 78.24);
   --input: oklch(0.9067 0.0184 78.24);
-  --ring: oklch(0.7048 0.1121 86.95);
+  /* L'anneau de focus est un ÉLÉMENT D'INTERFACE : minimum 3:1 sur blanc.
+     Le jaune vif n'y arrive pas (1,92:1) — d'où le jaune foncé, 4,92:1. */
+  --ring: oklch(0.5538 0.1207 66.44);
 
   /* Statuts.
      `--success` / `--warning` sont assez sombres pour servir de TEXTE sur
@@ -119,31 +122,33 @@
   --success: oklch(0.4646 0.0573 137.11); /* #4A6141 — 6,82:1 */
   --success-foreground: oklch(0.4646 0.0573 137.11);
   --success-soft: oklch(0.9481 0.0135 134.90); /* #EAF0E7 — texte dessus 5,89:1 */
-  --warning: oklch(0.5097 0.0945 66.56); /* #8A5A22 — 5,89:1 */
-  --warning-foreground: oklch(0.5097 0.0945 66.56);
-  --warning-soft: oklch(0.9548 0.0266 74.76); /* #FBEEDD — texte dessus 5,15:1 */
+  /* Terre cuite, et non plus ambre : à côté d'un jaune vif de marque, une
+     pastille « Reste dû » en nuance de jaune ne se lit plus comme une alerte. */
+  --warning: oklch(0.5534 0.1739 38.40); /* #C2410C — 5,18:1 */
+  --warning-foreground: oklch(0.5534 0.1739 38.40);
+  --warning-soft: oklch(0.9542 0.0372 75.16); /* #FFEDD5 — texte dessus 4,52:1 */
 
-  --gold-soft: oklch(0.9536 0.0253 86.87); /* #F7EFDD */
-  /* AUCUN or ne dépasse 4,5:1 sur blanc (le meilleur plafonne à 3,50).
-     Pour de l'or LISIBLE en texte, utiliser cette variante sombre.
-     #8A6A1F — 5,05:1. */
-  --gold-strong: oklch(0.5426 0.0983 84.43);
+  --gold-soft: oklch(0.9729 0.0693 103.19); /* #FEF9C3 */
+  /* Le jaune vif est ILLISIBLE en texte sur blanc : 1,92:1.
+     Partout où le jaune est du TEXTE, un TRAIT FIN ou une ICÔNE, utiliser
+     cette variante foncée.  #A16207 — 4,92:1. */
+  --gold-strong: oklch(0.5538 0.1207 66.44);
   --brown-soft: oklch(0.9381 0.0138 67.66); /* #F1E9E1 */
 
-  --chart-1: oklch(0.7048 0.1121 86.95); /* or */
+  --chart-1: oklch(0.7952 0.1617 86.05); /* jaune */
   --chart-2: oklch(0.4518 0.0497 57.96); /* brun */
   --chart-3: oklch(0.4646 0.0573 137.11); /* vert */
-  --chart-4: oklch(0.5097 0.0945 66.56); /* ambre */
+  --chart-4: oklch(0.5534 0.1739 38.40); /* terre cuite */
   --chart-5: oklch(0.7774 0.0504 77.12); /* sable */
 
   --sidebar: oklch(0.9626 0.0091 78.28);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.7048 0.1121 86.95);
+  --sidebar-primary: oklch(0.7952 0.1617 86.05);
   --sidebar-primary-foreground: oklch(0.2569 0.0211 60.32);
-  --sidebar-accent: oklch(0.9536 0.0253 86.87);
+  --sidebar-accent: oklch(0.9729 0.0693 103.19);
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: oklch(0.9067 0.0184 78.24);
-  --sidebar-ring: oklch(0.7048 0.1121 86.95);
+  --sidebar-ring: oklch(0.5538 0.1207 66.44);
 
   --radius: 0.5rem;
 }
@@ -158,7 +163,7 @@
   --card-foreground: var(--foreground);
   --popover: oklch(0.2363 0.0182 70.50);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.7936 0.1139 89.12);
+  --primary: oklch(0.8606 0.1731 91.94); /* #FACC15 — 10,30:1 sur le fond */
   --primary-foreground: oklch(0.1997 0.0140 71.96);
   --secondary: oklch(0.6418 0.0687 67.62);
   --secondary-foreground: oklch(0.1997 0.0140 71.96);
@@ -170,29 +175,29 @@
   --destructive-foreground: oklch(0.1997 0.0140 71.96);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.7936 0.1139 89.12);
+  --ring: oklch(0.8606 0.1731 91.94);
   --success: oklch(0.7204 0.0702 139);
   --success-foreground: oklch(0.7204 0.0702 139);
   --success-soft: oklch(0.3098 0.0401 138);
-  --warning: oklch(0.7602 0.1002 70);
-  --warning-foreground: oklch(0.7602 0.1002 70);
-  --warning-soft: oklch(0.3216 0.0551 68);
-  --gold-soft: oklch(0.3098 0.0451 86);
-  --gold-strong: oklch(0.8302 0.1002 87);
+  --warning: oklch(0.7576 0.1590 55.93); /* #FB923C — 6,97:1 sur le fond */
+  --warning-foreground: oklch(0.7576 0.1590 55.93);
+  --warning-soft: oklch(0.2840 0.0420 54.49); /* texte dessus 6,43:1 */
+  --gold-soft: oklch(0.3077 0.0461 86.25); /* gold-strong dessus 8,68:1 */
+  --gold-strong: oklch(0.8606 0.1731 91.94);
   --brown-soft: oklch(0.3016 0.0301 67);
-  --chart-1: oklch(0.7936 0.1139 89.12);
+  --chart-1: oklch(0.8606 0.1731 91.94);
   --chart-2: oklch(0.6418 0.0687 67.62);
   --chart-3: oklch(0.7204 0.0702 139);
-  --chart-4: oklch(0.7602 0.1002 70);
+  --chart-4: oklch(0.7576 0.1590 55.93);
   --chart-5: oklch(0.7774 0.0504 77.12);
   --sidebar: oklch(0.2363 0.0182 70.50);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.7936 0.1139 89.12);
+  --sidebar-primary: oklch(0.8606 0.1731 91.94);
   --sidebar-primary-foreground: oklch(0.1997 0.0140 71.96);
   --sidebar-accent: oklch(0.2716 0.0222 69.63);
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.7936 0.1139 89.12);
+  --sidebar-ring: oklch(0.8606 0.1731 91.94);
 }
 
 @layer base {
@@ -240,8 +245,10 @@
 @layer components {
   /* Séparateur ornemental — trait fin + losange centré.
      Élément signature, à réutiliser entre les sections. */
+  /* Filets d'un cheveu : en jaune vif (1,92:1) ils disparaîtraient sur le
+     blanc. Le jaune foncé les rend visibles sans les rendre lourds. */
   .ornament {
-    @apply flex items-center gap-3 text-primary;
+    @apply flex items-center gap-3 text-gold-strong;
   }
 
   /* les deux filets ; le losange est un enfant `.ornament-diamond` */

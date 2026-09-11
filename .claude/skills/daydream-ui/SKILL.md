@@ -3,9 +3,9 @@ name: daydream-ui
 description: Design system for DayDream Location — colour tokens, typography, the mandatory RTL logical-properties rule, shadcn/ui conventions and mobile-first patterns. Use whenever writing styles, building a component, or laying out a screen in this project.
 ---
 
-# Design system — « Or & Brun sur blanc »
+# Design system — « Jaune & Brun sur blanc »
 
-Boutique de location de costumes de mariage. Blanc franc, or en accent, brun en appui.
+Boutique de location de costumes de mariage. Blanc franc, jaune en accent, brun en appui.
 **Jamais** le template SaaS générique.
 
 ## Tokens
@@ -17,10 +17,11 @@ il n'y a **pas** de `tailwind.config.ts`).
 |---|---|---|---|
 | `background` | `#FFFFFF` | — | blanc |
 | `foreground` | `#2B2119` | 15,7:1 | encre brun-noir |
-| `primary` | `#BE9B45` | — | **or** : remplissages, accents, anneaux de focus |
-| `primary-foreground` | `#2B2119` | 5,97:1 sur or | texte SUR l'or |
-| `gold-strong` | `#8A6A1F` | 5,05:1 | or **lisible en texte** |
-| `gold-soft` | `#F7EFDD` | — | voile doré (pastilles, survol) |
+| `primary` | `#EAB308` | — | **jaune 500** : remplissages UNIQUEMENT |
+| `primary-foreground` | `#2B2119` | 8,21:1 sur jaune | texte SUR le jaune |
+| `gold-strong` | `#A16207` | 4,92:1 | jaune **lisible en texte / trait / icône** |
+| `gold-soft` | `#FEF9C3` | encre dessus 14,65:1 | voile jaune (pastilles, survol) |
+| `ring` | `#A16207` | 4,92:1 | anneau de focus (jamais le jaune vif) |
 | `secondary` | `#6B4F3A` | — | **brun** |
 | `secondary-foreground` | `#FFFFFF` | 7,49:1 sur brun | texte SUR le brun |
 | `brown-soft` | `#F1E9E1` | — | surface brune très claire |
@@ -29,17 +30,25 @@ il n'y a **pas** de `tailwind.config.ts`).
 | `border` | `#E7DFD3` | — | bordures fines |
 | `success` | `#4A6141` | 6,82:1 | vert — **disponible** |
 | `success-soft` | `#EAF0E7` | texte dessus 5,89:1 | pastille disponible |
-| `warning` | `#8A5A22` | 5,89:1 | ambre — retard, reste dû |
-| `warning-soft` | `#FBEEDD` | texte dessus 5,15:1 | pastille alerte |
+| `warning` | `#C2410C` | 5,18:1 | terre cuite — retard, reste dû |
+| `warning-soft` | `#FFEDD5` | texte dessus 4,52:1 | pastille alerte |
 | `destructive` | `#8B2F2F` | blanc dessus 8,25:1 | suppression, annulation |
 
-### Deux pièges mesurés — ne pas les redécouvrir
+### Trois pièges mesurés — ne pas les redécouvrir
 
-1. **Le blanc sur l'or ne passe pas** : 2,64:1. Un bouton or porte du texte **encre** (5,97:1).
-   `primary-foreground` vaut donc l'encre, jamais le blanc.
-2. **AUCUN or n'atteint 4,5:1 sur blanc** — le meilleur candidat plafonne à 3,50. L'or convient
-   aux remplissages, bordures et grands titres, **pas au texte courant**. Pour de l'or lisible,
-   utiliser `gold-strong` (`#8A6A1F`, 5,05:1).
+1. **Le blanc sur le jaune ne passe pas** : 1,84:1. Un bouton jaune porte du texte **encre**
+   (8,21:1). `primary-foreground` vaut donc l'encre, jamais le blanc.
+2. **Le jaune vif ne vaut que 1,92:1 sur blanc.** `primary` est une couleur de **remplissage**.
+   Dès que le jaune devient du **texte**, un **trait fin**, une **icône** ou un **anneau de
+   focus**, utiliser `gold-strong` (`#A16207`, 4,92:1). C'est la règle qui a motivé le
+   passage de `text-primary` à `text-gold-strong` dans `bottom-nav`, `.ornament`, les
+   variantes `link` et les survols de lien.
+3. **`warning` a dû quitter l'ambre.** À côté d'un jaune vif de marque, une pastille « Reste dû »
+   en nuance de jaune ne se lit plus comme une alerte : d'où la terre cuite `#C2410C`, chaude
+   mais franchement distincte du jaune comme du rouge `destructive`.
+
+Les ratios ci-dessus sont **mesurés**, pas estimés. La palette a échoué deux fois à cet examen :
+ivoire-sur-or à 2,92:1, puis l'or entier sous 4,5:1 sur blanc. **Mesurer avant d'affirmer.**
 
 Ne jamais écrire une couleur en dur dans un composant — toujours via un token.
 
