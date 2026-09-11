@@ -1,6 +1,13 @@
 "use client";
 
-import { ClipboardList, LayoutGrid, LogOut, TrendingUp, User } from "lucide-react";
+import {
+  ClipboardList,
+  LayoutGrid,
+  LogOut,
+  Receipt,
+  TrendingUp,
+  User,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -36,8 +43,14 @@ export function AppHeader({
   const items = [
     { href: "/commandes", icon: ClipboardList, label: t("nav.orders") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
+    // Dépenses n'entre PAS dans la barre basse : elle porte déjà quatre
+    // cibles, et une cinquième casserait les 44 px à 390 px de large. Sur
+    // téléphone on y accède par le menu compte et le tableau de bord.
     ...(showDashboard
-      ? [{ href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") }]
+      ? [
+          { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },
+          { href: "/depenses", icon: Receipt, label: t("nav.expenses") },
+        ]
       : []),
   ] as const;
 
@@ -90,6 +103,18 @@ export function AppHeader({
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
+
+              {showDashboard && (
+                <>
+                  <DropdownMenuItem asChild className="md:hidden">
+                    <Link href="/depenses">
+                      <Receipt className="size-4" aria-hidden />
+                      {t("nav.expenses")}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="md:hidden" />
+                </>
+              )}
 
               <form action={signOut}>
                 <input type="hidden" name="locale" value={locale} />

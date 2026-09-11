@@ -138,7 +138,20 @@
     "revenue": "Chiffre d'affaires",
     "expenses": "Dépenses",
     "profit": "Bénéfice",
-    "orderCount": "Commandes"
+    "orderCount": "Commandes",
+    "today": "Aujourd'hui",
+    "thisWeek": "Cette semaine",
+    "thisMonth": "Ce mois",
+    "thisYear": "Cette année",
+    "result": "Résultat",
+    "twelveMonths": "12 derniers mois",
+    "stockState": "État du stock",
+    "rented": "En location",
+    "unpaid": "Impayés",
+    "unpaidCount": "{count} commande(s)",
+    "unpaidMore": "et {count} autre(s)",
+    "allPaid": "Tout est réglé.",
+    "noExpensesYet": "Aucune dépense enregistrée sur cette période : le bénéfice est donc égal au chiffre d'affaires."
   },
   "auth": {
     "signIn": "Se connecter",
@@ -175,5 +188,30 @@
   "roles": {
     "owner": "Propriétaire",
     "staff": "Équipe"
+  },
+  "expenses": {
+    "add": "Ajouter une dépense",
+    "addHint": "Loyer, achat de stock, pressing, retouche… Rattachez-la à une commande s'il s'agit de frais facturés pour elle.",
+    "amount": "Montant",
+    "category": "Catégorie",
+    "date": "Date",
+    "description": "Description",
+    "linkedOrder": "Commande liée",
+    "linkedOrderHint": "Facultatif. Renseignée, la dépense compte comme frais de cette commande.",
+    "noOrder": "Charge générale",
+    "empty": "Aucune dépense ce mois-ci.",
+    "confirmDelete": "Supprimer cette dépense ?",
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "categories": {
+      "achat_stock": "Achat de stock",
+      "nettoyage": "Nettoyage",
+      "retouche": "Retouche",
+      "sous_location": "Sous-location",
+      "loyer": "Loyer",
+      "salaire": "Salaire",
+      "transport": "Transport",
+      "autre": "Autre"
+    }
   }
 }

@@ -138,7 +138,20 @@
     "revenue": "رقم الأعمال",
     "expenses": "المصاريف",
     "profit": "الربح",
-    "orderCount": "الطلبيات"
+    "orderCount": "الطلبيات",
+    "today": "اليوم",
+    "thisWeek": "هذا الأسبوع",
+    "thisMonth": "هذا الشهر",
+    "thisYear": "هذه السنة",
+    "result": "النتيجة",
+    "twelveMonths": "آخر 12 شهرًا",
+    "stockState": "حالة المخزون",
+    "rented": "مكراة",
+    "unpaid": "غير المسدّد",
+    "unpaidCount": "{count} طلبية",
+    "unpaidMore": "و{count} أخرى",
+    "allPaid": "كل شيء مسدّد.",
+    "noExpensesYet": "لا توجد مصاريف مسجّلة في هذه الفترة : الربح يساوي إذن رقم الأعمال."
   },
   "auth": {
     "signIn": "تسجيل الدخول",
@@ -175,5 +188,30 @@
   "roles": {
     "owner": "المالك",
     "staff": "الفريق"
+  },
+  "expenses": {
+    "add": "إضافة مصروف",
+    "addHint": "الإيجار، شراء المخزون، التنظيف، التعديل… اربطه بطلبية إن كان من مصاريفها.",
+    "amount": "المبلغ",
+    "category": "الفئة",
+    "date": "التاريخ",
+    "description": "الوصف",
+    "linkedOrder": "الطلبية المرتبطة",
+    "linkedOrderHint": "اختياري. إن حُدّدت، يُحتسب المصروف ضمن مصاريف هذه الطلبية.",
+    "noOrder": "مصروف عام",
+    "empty": "لا توجد مصاريف هذا الشهر.",
+    "confirmDelete": "حذف هذا المصروف ؟",
+    "previousMonth": "الشهر السابق",
+    "nextMonth": "الشهر التالي",
+    "categories": {
+      "achat_stock": "شراء المخزون",
+      "nettoyage": "التنظيف",
+      "retouche": "التعديل",
+      "sous_location": "الكراء من الغير",
+      "loyer": "الإيجار",
+      "salaire": "الأجور",
+      "transport": "النقل",
+      "autre": "أخرى"
+    }
   }
 }
