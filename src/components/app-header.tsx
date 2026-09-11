@@ -55,7 +55,16 @@ export function AppHeader({
   ] as const;
 
   return (
-    <header className="border-border bg-cream sticky top-0 z-40 border-b">
+    /* Barre TRANSLUCIDE ET FLOUTÉE : le contenu défile visiblement dessous,
+       ce qui rattache la barre à la page au lieu de la poser par-dessus.
+       85 % de crème, MESURÉ, pas choisi à l'œil : c'est le seuil où le texte
+       secondaire (`muted-foreground`) tient encore 4,72:1 même si un aplat
+       d'encre passait dessous. À 80 % il tombe à 4,25:1 — sous la norme.
+       `bg-cream` opaque reste le repli : sans `backdrop-filter`, une barre
+       translucide laisserait le texte de la page traverser le sien.
+       (Ce n'est pas du « glassmorphism » : pas de halo, pas d'ombre, le filet
+       de bordure fait toujours la séparation. Voir `daydream-ui`.) */
+    <header className="border-border bg-cream supports-[backdrop-filter]:bg-cream/85 sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
         <Link href="/commandes" className="font-heading shrink-0 text-lg">
           {t("app.name")}

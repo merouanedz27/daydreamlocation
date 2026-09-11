@@ -95,7 +95,20 @@
     "pagination": "الصفحات",
     "previous": "السابق",
     "next": "التالي",
-    "pageOf": "الصفحة {page} / {total}"
+    "pageOf": "الصفحة {page} / {total}",
+    "event": "المناسبة",
+    "today": "اليوم",
+    "tomorrow": "غدًا",
+    "inDays": "خلال {count} يوم",
+    "settled": "مسدَّدة",
+    "callCustomer": "الاتصال بالزبون",
+    "createdBy": "أنشأها {name} في {date}",
+    "createdOn": "أُنشئت في {date}",
+    "piecesCount": "{count} قطعة",
+    "notesTitle": "ملاحظة",
+    "amounts": "المبالغ",
+    "actualReturn": "أُعيدت في {date}",
+    "viewInStock": "عرض في المخزون"
   },
   "stock": {
     "title": "المخزون",

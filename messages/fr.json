@@ -95,7 +95,20 @@
     "pagination": "Pages",
     "previous": "Précédent",
     "next": "Suivant",
-    "pageOf": "Page {page} / {total}"
+    "pageOf": "Page {page} / {total}",
+    "event": "Événement",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "inDays": "Dans {count} jours",
+    "settled": "Soldé",
+    "callCustomer": "Appeler le client",
+    "createdBy": "Créée le {date} par {name}",
+    "createdOn": "Créée le {date}",
+    "piecesCount": "{count} pièce(s)",
+    "notesTitle": "Note",
+    "amounts": "Montants",
+    "actualReturn": "Rendu le {date}",
+    "viewInStock": "Voir dans le stock"
   },
   "stock": {
     "title": "Stock",

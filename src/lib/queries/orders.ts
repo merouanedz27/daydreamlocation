@@ -187,8 +187,24 @@ export async function getUnavailableUnits(
 export type OrderLine = Tables<"order_lines">;
 export type Order = Tables<"orders">;
 
+/**
+ * Une ligne de commande, plus la pièce réelle qu'elle désigne.
+ *
+ * `article_units` vaut `null` sur une PIÈCE EXTERNE (`unit_id` nul) : elle est
+ * sous-louée chez un confrère, elle n'existe pas dans le stock. C'est ce qui
+ * distingue les deux cas à l'affichage — pas une convention de libellé.
+ *
+ * Les libellés affichés restent ceux des colonnes `*_snapshot`, figées à la
+ * création : si le patron renomme un modèle l'an prochain, une commande de
+ * cette année doit continuer à dire ce que le client a réellement emporté.
+ * La jointure ne sert qu'à la RÉFÉRENCE de la pièce et au lien vers sa fiche.
+ */
+export type OrderDetailLine = OrderLine & {
+  article_units: { ref_code: string; model_id: number } | null;
+};
+
 export type OrderDetail = Order & {
-  order_lines: OrderLine[];
+  order_lines: OrderDetailLine[];
   profiles: { full_name: string } | null;
 };
 
@@ -197,8 +213,15 @@ export async function getOrder(id: number): Promise<OrderDetail | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("orders")
-    .select(`*, order_lines (*), profiles ( full_name )`)
+    .select(
+      `*, profiles ( full_name ),
+       order_lines ( *, article_units ( ref_code, model_id ) )`,
+    )
     .eq("id", id)
+    // Ordre d'affichage stable : sans `order`, PostgREST ne promet rien sur
+    // les lignes imbriquées, et les pièces pourraient changer de place d'un
+    // rechargement à l'autre sur la même commande.
+    .order("id", { referencedTable: "order_lines", ascending: true })
     .single();
 
   if (error) return null;

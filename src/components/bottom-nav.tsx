@@ -26,7 +26,7 @@ export function BottomNav({ showDashboard }: { showDashboard: boolean }) {
 
   return (
     <nav
-      className="border-border bg-cream pb-safe sticky bottom-0 z-40 border-t md:hidden"
+      className="border-border bg-cream supports-[backdrop-filter]:bg-cream/85 pb-safe sticky bottom-0 z-40 border-t backdrop-blur-md md:hidden"
       aria-label={t("orders")}
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-around">

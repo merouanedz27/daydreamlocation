@@ -105,9 +105,30 @@ resserrée héritée du latin (`tracking-tight` est déjà neutralisé pour les 
 - Bordures fines et beaucoup de blanc. Cartes plates : sur fond blanc, ce sont les **bordures**
   qui structurent, pas les ombres.
 
+### Barres de navigation : crème translucide et floutée
+
+En-tête et barre basse sont `bg-cream` **à 85 %** avec `backdrop-blur-md`. Le contenu défile
+visiblement dessous : la barre appartient à la page au lieu de flotter par-dessus.
+
+```
+bg-cream supports-[backdrop-filter]:bg-cream/85 backdrop-blur-md
+```
+
+Deux points à ne pas simplifier :
+
+1. **85 %, mesuré.** C'est le seuil où `muted-foreground` tient encore 4,72:1 même si un aplat
+   d'encre passait dessous. À 80 % il tombe à 4,25:1 — sous la norme. L'encre, elle, ne descend
+   jamais sous 10,8:1.
+2. **`bg-cream` opaque reste le repli**, d'où le `supports-[backdrop-filter]`. Sans flou, une
+   barre translucide laisse le texte de la page traverser le sien : illisible.
+
+Ce n'est **pas** du glassmorphism : ni halo, ni ombre portée, ni bord lumineux. C'est le filet de
+bordure qui sépare, comme partout ailleurs dans le produit.
+
 ### Interdits
-Dégradés violet-bleu · glassmorphism · ombres épaisses · coins ultra-arrondis (`rounded-3xl`+) ·
-émojis en guise d'icônes (utiliser `lucide-react`).
+Dégradés violet-bleu · glassmorphism (halos, bords lumineux, cartes « en verre » — la translucidité
+mesurée des barres de navigation ci-dessus est la seule exception) · ombres épaisses ·
+coins ultra-arrondis (`rounded-3xl`+) · émojis en guise d'icônes (utiliser `lucide-react`).
 
 ## RÈGLE ABSOLUE — propriétés logiques (RTL)
 

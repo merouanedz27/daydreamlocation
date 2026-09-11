@@ -46,6 +46,27 @@ export function addDays(date: IsoDate, days: number): IsoDate {
   return fromUtc(toUtc(date) + days * DAY_MS);
 }
 
+/**
+ * Date du jour TELLE QUE LA BOUTIQUE LA VIT, en `YYYY-MM-DD`.
+ *
+ * Surtout pas `new Date().toISOString()` : Vercel fait tourner le serveur en
+ * UTC, et Alger est à UTC+1. Entre 23 h et minuit, heure d'Alger, un serveur
+ * UTC est encore la veille — l'écran annoncerait « retrait demain » le matin
+ * même du retrait. Le paramètre `now` n'existe que pour rendre la fonction
+ * testable ; l'appel normal se fait sans argument.
+ *
+ * `en-CA` est choisie pour une seule raison : c'est la locale qui rend
+ * naturellement l'ordre année-mois-jour attendu ici.
+ */
+export function todayIso(now: Date = new Date()): IsoDate {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Algiers",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
 /** Nombre de jours de `from` à `to` (négatif si `to` précède `from`). */
 export function daysBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((toUtc(to) - toUtc(from)) / DAY_MS);

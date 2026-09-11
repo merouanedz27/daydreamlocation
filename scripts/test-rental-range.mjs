@@ -14,6 +14,7 @@
  */
 import {
   addDays,
+  todayIso,
   daysBetween,
   defaultWindow,
   rentalRange,
@@ -30,6 +31,18 @@ const check = (label, got, expected) => {
   if (!ok) failed++;
   console.log(`${ok ? "OK   " : "ECHEC"} ${label.padEnd(58)} ${ok ? g : `${g} (attendu ${e})`}`);
 };
+
+/* --- date du jour a Alger ---------------------------------------------- */
+
+// Alger est a UTC+1 toute l'annee (pas d'heure d'ete depuis 1981). Le serveur,
+// lui, tourne en UTC : c'est exactement la fenetre ou les deux ne sont pas le
+// meme jour.
+check("23h30 UTC : Alger est deja le lendemain",
+  todayIso(new Date("2026-09-11T23:30:00Z")), "2026-09-12");
+check("00h30 UTC : Alger est le meme jour",
+  todayIso(new Date("2026-09-12T00:30:00Z")), "2026-09-12");
+check("minuit pile UTC, dernier jour du mois",
+  todayIso(new Date("2026-09-30T23:00:00Z")), "2026-10-01");
 
 /* --- arithmétique de dates --------------------------------------------- */
 
