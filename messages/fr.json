@@ -81,7 +81,11 @@
     "cautionNotRevenue": "La caution n'est pas du chiffre d'affaires.",
     "noPieceAvailable": "Aucune pièce dans ce modèle.",
     "allUnitsTaken": "Toutes les pièces de ce modèle sont prises sur ces dates.",
-    "rentalWindow": "Location"
+    "rentalWindow": "Location",
+    "orderNo": "N° commande",
+    "statusLabel": "Statut",
+    "columns": "Colonnes",
+    "columnsHint": "Choisissez ce qui s'affiche. Le réglage vaut pour cet appareil : vous pouvez en montrer moins sur le téléphone que sur l'ordinateur."
   },
   "stock": {
     "title": "Stock",
