@@ -8,6 +8,8 @@
     "stock": "Stock",
     "new": "Nouvelle",
     "dashboard": "Tableau de bord",
+    "dashboardShort": "Bilan",
+    "primary": "Navigation principale",
     "expenses": "Dépenses"
   },
   "common": {
