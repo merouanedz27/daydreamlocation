@@ -454,6 +454,12 @@ export type Database = {
         };
         Returns: number;
       };
+      dashboard_stats: {
+        Args: {
+          p_today?: string;
+        };
+        Returns: Json;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
