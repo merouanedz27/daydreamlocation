@@ -72,7 +72,24 @@
     "purchasePrice": "Prix d'achat",
     "priceOverride": "Prix spécifique",
     "condition": "État",
-    "photo": "Photo"
+    "photo": "Photo",
+    "nameFr": "Nom (français)",
+    "nameAr": "Nom (arabe)",
+    "nameArHint": "Facultatif. Sans nom arabe, le nom français s'affiche dans les deux langues.",
+    "refCodeHint": "Le code du fournisseur. Les pièces en dériveront : Gio-079-01, Gio-079-02…",
+    "priceHint": "Prix de location par défaut. Modifiable pièce par pièce et sur chaque commande.",
+    "priceOverrideHint": "Laisser vide pour utiliser le prix du modèle.",
+    "purchasePriceHint": "Ce que vous avez payé. Sert au calcul de rentabilité, jamais affiché au client.",
+    "sizeHint": "Comme vous l'écrivez d'habitude : 50, M, 42…",
+    "quantity": "Nombre d'exemplaires",
+    "nextRefHint": "Première référence attribuée : {ref}",
+    "newModelHint": "Un modèle est un type de vêtement. Vous y ajouterez ensuite les pièces réelles.",
+    "conditions": {
+      "neuf": "Neuf",
+      "bon": "Bon",
+      "use": "Usé",
+      "retire": "Retiré"
+    }
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -96,7 +113,16 @@
     "emailInvalid": "Cet e-mail n'est pas valide.",
     "passwordRequired": "Saisissez votre mot de passe.",
     "invalidCredentials": "E-mail ou mot de passe incorrect.",
-    "forbidden": "Vous n'avez pas accès à cette page."
+    "forbidden": "Vous n'avez pas accès à cette page.",
+    "required": "Ce champ est obligatoire.",
+    "numberInvalid": "Saisissez un nombre.",
+    "numberNegative": "Le montant ne peut pas être négatif.",
+    "refCodeInvalid": "Lettres, chiffres, point, tiret et barre oblique uniquement.",
+    "refCodeTaken": "Cette référence existe déjà.",
+    "refCodeRace": "Références prises entre-temps. Réessayez.",
+    "photoType": "Format non accepté : JPEG, PNG, WebP ou AVIF.",
+    "photoTooBig": "Photo trop lourde (5 Mo maximum).",
+    "photoUpload": "Envoi de la photo impossible. Réessayez."
   },
   "roles": {
     "owner": "Propriétaire",

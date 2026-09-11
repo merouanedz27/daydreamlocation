@@ -13,7 +13,8 @@
     "db:advisors": "supabase db advisors --db-url $SUPABASE_DB_URL",
     "db:types": "node scripts/gen-types.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
-    "verify": "npm run check:i18n && npm run typecheck && npm run lint"
+    "verify": "npm run check:i18n && npm run test:refs && npm run typecheck && npm run lint",
+    "test:refs": "node --experimental-strip-types scripts/test-stock-refs.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
