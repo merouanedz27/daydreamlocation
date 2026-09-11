@@ -50,7 +50,9 @@ export function LocaleSwitcher({ className }: { className?: string }) {
         })
       }
       className={cn(
-        "border-border bg-card hover:bg-muted focus-visible:ring-ring/50",
+        // Couleurs par DÉFAUT, valables sur la page de connexion (fond blanc).
+        // L'en-tête, dont la barre est brune, les remplace par `className`.
+        "border-border bg-card text-muted-foreground hover:bg-muted focus-visible:ring-ring/50",
         // La cible tactile reste à 44 px même si le visuel a rétréci.
         "inline-flex size-11 items-center justify-center rounded-full border",
         "transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
@@ -58,7 +60,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
         className,
       )}
     >
-      <Languages className="text-muted-foreground size-5 shrink-0" aria-hidden />
+      <Languages className="size-5 shrink-0" aria-hidden />
     </button>
   );
 }

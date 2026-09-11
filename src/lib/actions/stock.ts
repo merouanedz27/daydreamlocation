@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
+import type { ZodError } from "zod";
 import { modelSchema, unitSchema } from "@/lib/validation/stock";
 import { nextUnitRefs } from "@/lib/stock-refs";
 import { redirectTo } from "@/i18n/navigation";
@@ -20,6 +21,36 @@ function resolveLocale(value: FormDataEntryValue | null): Locale {
 
 /** Code Postgres d'une violation d'unicité. */
 const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Première erreur Zod, ramenée à quelque chose d'AFFICHABLE.
+ *
+ * Deux garde-fous, appris d'un bug qui a fait échouer toute création de modèle
+ * sans le moindre message à l'écran :
+ *
+ * 1. Zod produit ses propres messages en anglais quand la règle n'en fournit
+ *    pas (« expected string, received null »). L'interface les passe à `t()`,
+ *    qui ne trouve pas la clé — l'erreur se volatilise. On ne laisse donc
+ *    sortir que des clés `errors.*`.
+ * 2. Le champ fautif peut ne pas exister dans le formulaire. On ne le renvoie
+ *    que s'il est effectivement saisissable, faute de quoi l'appelant
+ *    accrocherait le message à un champ absent — donc invisible.
+ */
+function firstIssue(
+  error: ZodError,
+  visibleFields: readonly string[],
+): { ok: false; error: string; field?: string } {
+  const issue = error.issues[0];
+  const field = String(issue.path[0] ?? "");
+  return {
+    ok: false,
+    error: issue.message.startsWith("errors.") ? issue.message : "errors.generic",
+    field: visibleFields.includes(field) ? field : undefined,
+  };
+}
+
+/** Champs réellement rendus par `ModelForm` — voir `firstIssue`. */
+const MODEL_FIELDS = ["ref_code", "name_fr", "category_id", "base_price"] as const;
 
 /**
  * Crée un modèle.
@@ -47,10 +78,7 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
     photo_path: formData.get("photo_path") || null,
   });
 
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return { ok: false, error: issue.message, field: String(issue.path[0]) };
-  }
+  if (!parsed.success) return firstIssue(parsed.error, MODEL_FIELDS);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -66,9 +94,21 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "errors.generic" };
   }
 
+  // La liste est rafraîchie AVANT la redirection, sinon l'employé arrive sur
+  // un catalogue où son modèle ne figure pas encore.
   revalidatePath(`/${locale}/stock`);
-  redirectTo(`/stock/${data.id}`, locale);
+  revalidatePath(`/${locale}/stock/${data.id}`);
+  redirectTo("/stock", locale);
 }
+
+/** Champs réellement rendus par `UnitForm` — voir `firstIssue`. */
+const UNIT_FIELDS = [
+  "size",
+  "length_cm",
+  "quantity",
+  "price_override",
+  "purchase_price",
+] as const;
 
 /**
  * Ajoute une ou plusieurs pièces à un modèle.
@@ -94,10 +134,7 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
     quantity: formData.get("quantity") || 1,
   });
 
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return { ok: false, error: issue.message, field: String(issue.path[0]) };
-  }
+  if (!parsed.success) return firstIssue(parsed.error, UNIT_FIELDS);
 
   const { model_id, quantity, ...unit } = parsed.data;
   const supabase = await createClient();

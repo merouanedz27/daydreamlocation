@@ -55,16 +55,20 @@ export function AppHeader({
   ] as const;
 
   return (
-    /* Barre TRANSLUCIDE ET FLOUTÉE : le contenu défile visiblement dessous,
-       ce qui rattache la barre à la page au lieu de la poser par-dessus.
-       85 % de crème, MESURÉ, pas choisi à l'œil : c'est le seuil où le texte
-       secondaire (`muted-foreground`) tient encore 4,72:1 même si un aplat
-       d'encre passait dessous. À 80 % il tombe à 4,25:1 — sous la norme.
-       `bg-cream` opaque reste le repli : sans `backdrop-filter`, une barre
+    /* Barre BRUNE, translucide et floutée : le contenu défile visiblement
+       dessous, ce qui rattache la barre à la page au lieu de la poser
+       par-dessus.
+       92 % et non 85 % comme du temps du crème — une barre sombre inverse le
+       risque : ce qui la menace n'est plus un aplat sombre qui passerait
+       dessous, mais le fond BLANC de la page, donc le cas ordinaire. Mesures
+       du pire cas dans `globals.css`.
+       `bg-nav` opaque reste le repli : sans `backdrop-filter`, une barre
        translucide laisserait le texte de la page traverser le sien.
+       Toutes les couleurs de texte sont REPOSÉES ici : celles de la page
+       (`muted-foreground` en tête) tombent à 1,09:1 sur ce brun.
        (Ce n'est pas du « glassmorphism » : pas de halo, pas d'ombre, le filet
        de bordure fait toujours la séparation. Voir `daydream-ui`.) */
-    <header className="border-border bg-cream supports-[backdrop-filter]:bg-cream/85 sticky top-0 z-40 border-b backdrop-blur-md">
+    <header className="border-nav-border bg-nav supports-[backdrop-filter]:bg-nav/92 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
         <Link href="/commandes" className="font-heading shrink-0 text-lg">
           {t("app.name")}
@@ -81,8 +85,14 @@ export function AppHeader({
                 className={cn(
                   "flex min-h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors",
                   active
-                    ? "bg-accent text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-muted",
+                    // Pastille or clair sur le brun : 5,67:1 contre la barre,
+                    // et l'encre dessus 14,65:1. L'onglet actif se voit de
+                    // loin, sans recourir au jaune vif qui, en TEXTE sur ce
+                    // brun, ne vaut que 3,17:1.
+                    ? "bg-gold-soft text-foreground font-medium"
+                    // Le survol éclaircit le FOND ET le texte : à 8 % de voile
+                    // blanc, le beige seul repasserait sous 4,5:1.
+                    : "text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground",
                 )}
               >
                 <Icon className="size-4" aria-hidden />
@@ -93,11 +103,17 @@ export function AppHeader({
         </nav>
 
         <div className="ms-auto flex items-center gap-2">
-          <LocaleSwitcher />
+          {/* Le commutateur sert aussi la page de connexion, sur fond
+              blanc : ses couleurs de barre lui sont passées d'ici. */}
+          <LocaleSwitcher className="border-nav-border bg-nav-foreground/10 text-nav-foreground hover:bg-nav-foreground/20" />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-10">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground size-10"
+              >
                 <User className="size-5" aria-hidden />
                 <span className="sr-only">{fullName}</span>
               </Button>

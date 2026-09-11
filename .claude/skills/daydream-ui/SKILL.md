@@ -16,7 +16,11 @@ il n'y a **pas** de `tailwind.config.ts`).
 | Rôle | Hex | Contraste | Usage |
 |---|---|---|---|
 | `background` | `#FFFFFF` | — | blanc |
-| `cream` | `#FAF5EA` | encre 14,47:1 · muted-fg 6,32:1 | **barres de navigation** (en-tête, barre basse) et pied de page |
+| `nav` | `#6B4F3A` | voir la section « Barres » | **surface** des barres et du pied de page |
+| `nav-foreground` | `#FFFFFF` | 6,09:1 au pire | texte principal et onglet actif SUR la barre |
+| `nav-muted` | `#E9DFD5` | 4,63:1 au pire | texte secondaire SUR la barre |
+| `nav-border` | blanc 18 % | — | filet de séparation des barres |
+| `cream` | `#FAF5EA` | encre 14,47:1 · muted-fg 6,32:1 | surface chaude disponible (plus utilisée par les barres) |
 | `foreground` | `#2B2119` | 15,7:1 | encre brun-noir |
 | `primary` | `#EAB308` | — | **jaune 500** : remplissages UNIQUEMENT |
 | `primary-foreground` | `#2B2119` | 8,21:1 sur jaune | texte SUR le jaune |
@@ -105,25 +109,54 @@ resserrée héritée du latin (`tracking-tight` est déjà neutralisé pour les 
 - Bordures fines et beaucoup de blanc. Cartes plates : sur fond blanc, ce sont les **bordures**
   qui structurent, pas les ombres.
 
-### Barres de navigation : crème translucide et floutée
+### Barres de navigation : brun translucide et flouté
 
-En-tête et barre basse sont `bg-cream` **à 85 %** avec `backdrop-blur-md`. Le contenu défile
-visiblement dessous : la barre appartient à la page au lieu de flotter par-dessus.
+En-tête et barre basse sont `bg-nav` (brun `#6B4F3A`) **à 92 %** avec `backdrop-blur-md`.
+Le contenu défile visiblement dessous : la barre appartient à la page au lieu de flotter
+par-dessus. Le pied de page reprend le même brun, **opaque** — il ne surplombe rien.
 
 ```
-bg-cream supports-[backdrop-filter]:bg-cream/85 backdrop-blur-md
+bg-nav supports-[backdrop-filter]:bg-nav/92 backdrop-blur-md
 ```
 
-Deux points à ne pas simplifier :
+Trois points à ne pas simplifier :
 
-1. **85 %, mesuré.** C'est le seuil où `muted-foreground` tient encore 4,72:1 même si un aplat
-   d'encre passait dessous. À 80 % il tombe à 4,25:1 — sous la norme. L'encre, elle, ne descend
-   jamais sous 10,8:1.
-2. **`bg-cream` opaque reste le repli**, d'où le `supports-[backdrop-filter]`. Sans flou, une
+1. **92 %, mesuré — et non 85 % comme du temps du crème.** Une barre SOMBRE inverse le risque de
+   la translucidité : ce qui la menace n'est plus un aplat sombre qui passerait dessous, mais le
+   fond **blanc** de la page, c'est-à-dire le cas ordinaire. Pire cas (brun 92 % sur blanc) :
+
+   | Sur la barre | Contraste au pire | Verdict |
+   |---|---|---|
+   | `nav-foreground` `#FFFFFF` | 6,09:1 | texte |
+   | `nav-muted` `#E9DFD5` | 4,63:1 | texte — le beige le plus sombre qui tienne AA |
+   | pastille `gold-soft` `#FEF9C3` | 5,67:1 (encre dessus 14,65:1) | onglet actif |
+   | jaune vif `#EAB308` | 3,17:1 | **trait ou pastille seulement, jamais du texte** |
+
+2. **Aucune couleur de texte de la page ne survit sur ce brun.** `muted-foreground` y tombe à
+   **1,09:1**, l'encre à 2,10:1. Tout composant placé dans une barre doit reposer explicitement
+   sa couleur en `nav-foreground` / `nav-muted` — y compris les boutons shadcn, dont les
+   variantes `ghost` supposent un fond clair.
+3. **`bg-nav` opaque reste le repli**, d'où le `supports-[backdrop-filter]`. Sans flou, une
    barre translucide laisse le texte de la page traverser le sien : illisible.
+
+Le survol éclaircit le **fond ET le texte** (`hover:bg-nav-foreground/8 hover:text-nav-foreground`) :
+à 8 % de voile blanc, `nav-muted` seul repasserait sous 4,5:1.
 
 Ce n'est **pas** du glassmorphism : ni halo, ni ombre portée, ni bord lumineux. C'est le filet de
 bordure qui sépare, comme partout ailleurs dans le produit.
+
+`themeColor` dans `src/app/[locale]/layout.tsx` suit `--nav`, pas le fond de page : sinon un
+bandeau blanc de navigateur se colle au-dessus d'un en-tête brun sur le téléphone de l'équipe.
+
+### Titres de page : pas deux fois la même information
+
+Un écran qui figure dans la barre de navigation (Commandes, Stock, Tableau de bord, Dépenses)
+n'affiche **pas** de titre visible : l'onglet actif le dit déjà, et sur un écran de 390 px cette
+ligne est volée au contenu. Le `<h1>` reste dans le DOM en `sr-only` — un document sans `h1`
+casse la navigation par titres des lecteurs d'écran.
+
+Les écrans qui **ne** figurent pas dans la barre (fiche commande, fiche modèle, nouveau modèle,
+ajout de pièce) gardent leur titre visible : lui n'est répété nulle part.
 
 ### Interdits
 Dégradés violet-bleu · glassmorphism (halos, bords lumineux, cartes « en verre » — la translucidité

@@ -14,10 +14,12 @@ export async function AppFooter() {
   const t = await getTranslations();
 
   return (
-    <footer className="border-border bg-cream mt-8 hidden border-t md:block">
-      <div className="text-muted-foreground mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 text-sm">
+    /* Même brun que les barres, mais OPAQUE : le pied de page ne surplombe
+       rien, il n'y a pas de contenu à laisser transparaître dessous. */
+    <footer className="border-nav-border bg-nav mt-8 hidden border-t md:block">
+      <div className="text-nav-muted mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-5 text-sm">
         <p>
-          <span className="text-foreground font-medium">{t("app.name")}</span>
+          <span className="text-nav-foreground font-medium">{t("app.name")}</span>
           <span className="mx-2" aria-hidden>
             ·
           </span>

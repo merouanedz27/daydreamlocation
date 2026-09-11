@@ -53,6 +53,14 @@
   --color-cream: var(--cream);
   --color-cream-foreground: var(--cream-foreground);
 
+  /* Surface des BARRES (en-tête, barre basse, pied de page). Un seul jeu de
+     quatre variables : changer d'avis sur la couleur des barres ne doit
+     toucher qu'un endroit, pas trois composants. */
+  --color-nav: var(--nav);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-border: var(--nav-border);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -137,6 +145,27 @@
   --cream: oklch(0.9710 0.0155 86.42);
   --cream-foreground: var(--foreground);
 
+  /* BARRES DE NAVIGATION — BRUN #6B4F3A.
+     Une barre SOMBRE inverse le risque de la translucidité : le danger n'est
+     plus un aplat sombre qui passerait dessous, mais le fond BLANC de la page
+     — c'est-à-dire le cas ordinaire — qui la délave. D'où 92 % d'opacité ici,
+     contre 85 % du temps du crème. MESURÉ sur neuf fonds ; au pire (brun 92 %
+     sur blanc) :
+       nav-foreground blanc        6,09:1
+       nav-muted #E9DFD5           4,63:1  — le beige le plus sombre qui
+                                             tienne encore AA
+       pastille gold-soft          5,67:1 contre la barre,
+                                   encre dessus 14,65:1
+       jaune vif #EAB308           3,17:1  — assez pour un TRAIT ou une
+                                             pastille, JAMAIS pour du texte
+     Corollaire à ne pas oublier : muted-foreground tombe à 1,09:1 sur ce
+     brun. Aucun texte de la barre ne doit hériter des couleurs de la page. */
+  --nav: oklch(0.4518 0.0497 57.96); /* #6B4F3A */
+  --nav-foreground: oklch(1 0 0);
+  --nav-muted: oklch(0.9088 0.0174 67.61); /* #E9DFD5 */
+  /* Filet décoratif, pas du texte : aucun minimum de contraste à tenir. */
+  --nav-border: oklch(1 0 0 / 18%);
+
   --gold-soft: oklch(0.9729 0.0693 103.19); /* #FEF9C3 */
   /* Le jaune vif est ILLISIBLE en texte sur blanc : 1,92:1.
      Partout où le jaune est du TEXTE, un TRAIT FIN ou une ICÔNE, utiliser
@@ -193,6 +222,10 @@
   --warning-soft: oklch(0.2840 0.0420 54.49); /* texte dessus 6,43:1 */
   --cream: oklch(0.2363 0.0182 70.50);
   --cream-foreground: var(--foreground);
+  --nav: oklch(0.2363 0.0182 70.50);
+  --nav-foreground: var(--foreground);
+  --nav-muted: oklch(0.7250 0.0243 71.69);
+  --nav-border: oklch(1 0 0 / 12%);
   --gold-soft: oklch(0.3077 0.0461 86.25); /* gold-strong dessus 8,68:1 */
   --gold-strong: oklch(0.8606 0.1731 91.94);
   --brown-soft: oklch(0.3016 0.0301 67);

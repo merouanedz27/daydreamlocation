@@ -39,7 +39,7 @@ export function ModelForm({ categories }: { categories: Category[] }) {
     setField(null);
     startTransition(async () => {
       const result = await createModel(formData);
-      // Succès = redirection : on n'arrive ici que sur erreur.
+      // Succès = redirection vers le stock : on n'arrive ici que sur erreur.
       if (result && !result.ok) {
         setError(result.error);
         setField(result.field ?? null);
@@ -153,6 +153,10 @@ export function ModelForm({ categories }: { categories: Category[] }) {
           />
         </Field>
 
+        {/* Encart de repli. Il n'est juste que parce que l'action ne renvoie
+            QUE des champs réellement rendus ci-dessus (voir `firstIssue`) :
+            un `field` sans emplacement à l'écran rendait l'erreur invisible,
+            et le bouton « Enregistrer » paraissait sans effet. */}
         {error && !field && (
           <Alert variant="destructive">
             <AlertCircle />

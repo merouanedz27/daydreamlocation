@@ -2,11 +2,21 @@ import { z } from "zod";
 
 /** Messages = CLÉS i18n, jamais des phrases. Voir `daydream-i18n`. */
 
+/**
+ * Texte facultatif venant d'un FORMULAIRE.
+ *
+ * `.nullish()`, surtout pas `.optional()` seul : un champ ABSENT du formulaire
+ * donne `formData.get(...) === null`, et non `undefined`. Zod rejetait donc le
+ * schéma entier sur un champ que l'employé ne voit même pas — c'est ce qui
+ * empêchait toute création de modèle, `description` n'existant pas dans le
+ * formulaire. L'échec était de surcroît muet : le champ nommé dans l'erreur
+ * n'ayant pas de place à l'écran, rien ne s'affichait.
+ */
 const optionalText = z
   .string()
   .trim()
   .max(200)
-  .optional()
+  .nullish()
   .transform((v) => (v ? v : null));
 
 const money = z.coerce

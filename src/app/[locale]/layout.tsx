@@ -49,7 +49,11 @@ export async function generateMetadata(props: {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#FFFFFF",
+  // Teinte la barre d'adresse du navigateur mobile et la barre d'état une fois
+  // l'application installée. Elle doit suivre l'EN-TÊTE, pas le fond de page :
+  // sinon un bandeau blanc se colle au-dessus d'un en-tête brun. Même valeur
+  // que `--nav` (#6B4F3A) — à changer en même temps que lui.
+  themeColor: "#6B4F3A",
   width: "device-width",
   initialScale: 1,
   // L'équipe travaille au téléphone : le zoom reste autorisé (accessibilité).

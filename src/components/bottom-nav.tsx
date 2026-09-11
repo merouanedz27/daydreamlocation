@@ -26,7 +26,7 @@ export function BottomNav({ showDashboard }: { showDashboard: boolean }) {
 
   return (
     <nav
-      className="border-border bg-cream supports-[backdrop-filter]:bg-cream/85 pb-safe sticky bottom-0 z-40 border-t backdrop-blur-md md:hidden"
+      className="border-nav-border bg-nav supports-[backdrop-filter]:bg-nav/92 pb-safe sticky bottom-0 z-40 border-t backdrop-blur-md md:hidden"
       aria-label={t("orders")}
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-around">
@@ -38,12 +38,22 @@ export function BottomNav({ showDashboard }: { showDashboard: boolean }) {
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 text-xs transition-colors",
+                "relative flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-2 text-xs transition-colors",
                 active
-                  ? "text-gold-strong font-medium"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "text-nav-foreground font-medium"
+                  : "text-nav-muted hover:text-nav-foreground",
               )}
             >
+              {/* L'onglet actif se signale par un TRAIT jaune, pas par un
+                  libellé jaune : sur ce brun le jaune vif ne vaut que 3,17:1,
+                  assez pour un élément graphique, pas pour du texte.
+                  `inset-x` porte sur les deux côtés — rien à miroiter en RTL. */}
+              {active && (
+                <span
+                  className="bg-primary absolute inset-x-4 top-0 h-0.5 rounded-full"
+                  aria-hidden
+                />
+              )}
               <Icon className="size-5" aria-hidden />
               {label}
             </Link>

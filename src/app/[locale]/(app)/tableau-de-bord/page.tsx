@@ -44,8 +44,11 @@ export default async function DashboardPage({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl">{t("dashboard.title")}</h1>
+      {/* Titre reporté en `sr-only` : la barre de navigation dit déjà où l'on
+          est. On le garde dans le DOM — un écran sans `h1` casse la navigation
+          par titres des lecteurs d'écran. */}
+      <div className="flex items-center justify-end gap-4">
+        <h1 className="sr-only">{t("dashboard.title")}</h1>
         <Button asChild variant="outline" className="h-11">
           <Link href="/depenses">
             <Receipt className="size-4" aria-hidden />
