@@ -1,5 +1,4 @@
 import { getTranslations } from "next-intl/server";
-import { CalendarDays, Shirt, Sparkles } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import pkg from "../../package.json";
 
@@ -9,15 +8,20 @@ import pkg from "../../package.json";
  * Sur téléphone la barre d'onglets basse occupe déjà cette zone : y empiler un
  * pied de page volerait de la place au pouce.
  *
+ * Surface `brown-soft` (#F1E9E1) et NON le brun des barres : un pied de page
+ * clôt la page, il ne la commande pas. Un aplat sombre en bas de chaque écran
+ * pesait autant que l'en-tête alors qu'il ne porte rien d'urgent. Contrastes
+ * MESURÉS dessus (les deux modes) : encre 13,10:1, texte secondaire 5,72:1,
+ * `gold-strong` 5,81:1. Le texte reste donc en `foreground` /
+ * `muted-foreground` ordinaires — pas de jeu de tokens dédié.
+ *
  * Contenu volontairement VRAI. Pas de « Mentions légales » ni de « Support » :
- * un lien mort fait plus de dégâts qu'une absence de lien, et cette
- * application n'a ni l'un ni l'autre.
+ * un lien mort fait plus de dégâts qu'une absence de lien.
  *
  * Ce qu'on N'Y MET PAS non plus : des chiffres du jour (retraits, retards,
  * impayés). Ils vivent sur le tableau de bord et la liste des commandes, en
- * haut de page. Une alerte qu'il faut faire défiler jusqu'en bas pour voir est
- * une alerte manquée — et elle coûterait une requête à CHAQUE page rendue.
- * Un pied de page porte ce qu'on vient chercher, pas ce qui doit vous trouver.
+ * haut de page. Une alerte qu'il faut faire défiler jusqu'en bas est une
+ * alerte manquée — et elle coûterait une requête à CHAQUE page rendue.
  */
 export async function AppFooter({ showOwnerLinks }: { showOwnerLinks: boolean }) {
   const t = await getTranslations();
@@ -41,71 +45,63 @@ export async function AppFooter({ showOwnerLinks }: { showOwnerLinks: boolean })
   // que l'application fait des dates et du stock. Formulées SANS chiffre : le
   // nombre de jours vient de `public.settings` et peut changer — une phrase
   // qui dit « la veille » deviendrait fausse sans prévenir.
-  const tips = [
-    { icon: CalendarDays, text: t("footer.tipDates") },
-    { icon: Sparkles, text: t("footer.tipCleaning") },
-    { icon: Shirt, text: t("footer.tipUnits") },
-  ];
+  const tips = [t("footer.tipDates"), t("footer.tipCleaning"), t("footer.tipUnits")];
 
   return (
-    /* Même brun que les barres, mais OPAQUE : le pied de page ne surplombe
-       rien, il n'y a pas de contenu à laisser transparaître dessous. */
-    <footer className="border-nav-border bg-nav mt-8 hidden border-t md:block">
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="grid gap-8 md:grid-cols-3">
-          <div>
-            <p className="font-heading text-nav-foreground text-base">{t("app.name")}</p>
-            <p className="text-nav-muted mt-1 text-sm">{t("app.tagline")}</p>
-          </div>
-
-          <nav aria-labelledby="footer-nav">
-            <h2 id="footer-nav" className="text-nav-foreground text-sm font-medium">
-              {t("footer.navTitle")}
-            </h2>
-            {/* Deux colonnes de liens : six entrées empilées feraient une
-                colonne deux fois plus haute que ses voisines. */}
-            <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              {links.map(({ href, label }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-nav-muted hover:text-nav-foreground inline-flex min-h-7 items-center transition-colors hover:underline"
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <section aria-labelledby="footer-tips">
-            <h2 id="footer-tips" className="text-nav-foreground text-sm font-medium">
-              {t("footer.tipsTitle")}
-            </h2>
-            <ul className="text-nav-muted mt-3 space-y-2 text-sm">
-              {tips.map(({ icon: Icon, text }) => (
-                <li key={text} className="flex gap-2">
-                  <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span>{text}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+    <footer className="border-border bg-brown-soft mt-8 hidden border-t md:block">
+      {/* Trois colonnes de hauteur comparable, en `text-xs` : c'est ce qui
+          tient le pied de page sous ~120 px. Empilées, les mêmes informations
+          en faisaient plus du double. */}
+      <div className="mx-auto grid max-w-5xl gap-6 px-4 py-5 text-xs md:grid-cols-3">
+        <div>
+          <p className="font-heading text-foreground text-sm">{t("app.name")}</p>
+          <p className="text-muted-foreground mt-0.5">{t("app.tagline")}</p>
+          <p className="text-muted-foreground mt-2">
+            {/* L'année est calculée au rendu : le serveur rend cette page à la
+                demande, elle ne se figera pas sur l'année du build. */}
+            {t("footer.copyright", {
+              // En CHAÎNE et non en nombre : passé en nombre, ICU le formaterait
+              // comme un montant et le français afficherait « 2 026 ».
+              year: String(new Date().getFullYear()),
+              name: t("app.name"),
+            })}
+            <span className="mx-1.5" aria-hidden>
+              ·
+            </span>
+            <span className="tabular">{t("footer.version", { version: pkg.version })}</span>
+          </p>
         </div>
 
-        <div className="border-nav-border text-nav-muted mt-8 flex items-center justify-between gap-4 border-t pt-4 text-xs">
-          {/* L'année est calculée au rendu : le serveur rend cette page à la
-              demande, elle ne se figera pas sur l'année du build. */}
-          <p>{t("footer.copyright", {
-            // En CHAÎNE et non en nombre : passé en nombre, ICU le formaterait
-            // comme un montant et le français afficherait « 2 026 ».
-            year: String(new Date().getFullYear()),
-            name: t("app.name"),
-          })}</p>
-          {/* Utile le jour où quelqu'un signale un défaut : on saura de quelle
-              version il parle. Lue dans package.json, donc jamais désynchronisée. */}
-          <p className="tabular shrink-0">{t("footer.version", { version: pkg.version })}</p>
-        </div>
+        <nav aria-labelledby="footer-nav">
+          <h2 id="footer-nav" className="text-foreground font-medium">
+            {t("footer.navTitle")}
+          </h2>
+          {/* Liens au fil, pas en colonnes : six entrées empilées faisaient à
+              elles seules la hauteur du pied de page. */}
+          <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {links.map(({ href, label }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className="text-muted-foreground hover:text-gold-strong transition-colors hover:underline"
+                >
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <section aria-labelledby="footer-tips">
+          <h2 id="footer-tips" className="text-foreground font-medium">
+            {t("footer.tipsTitle")}
+          </h2>
+          <ul className="text-muted-foreground mt-2 space-y-1">
+            {tips.map((text) => (
+              <li key={text}>{text}</li>
+            ))}
+          </ul>
+        </section>
       </div>
     </footer>
   );

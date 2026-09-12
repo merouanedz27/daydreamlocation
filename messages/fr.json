@@ -263,9 +263,9 @@
   "footer": {
     "navTitle": "Navigation",
     "tipsTitle": "Repères",
-    "tipDates": "Une seule date à saisir : celle de l'événement. Le retrait et le retour en découlent.",
-    "tipCleaning": "Un battement de nettoyage sépare deux locations d'une même pièce.",
-    "tipUnits": "La disponibilité se compte par pièce, jamais par costume.",
+    "tipDates": "Une seule date saisie : l'événement. Retrait et retour en découlent.",
+    "tipCleaning": "Un battement de nettoyage entre deux locations.",
+    "tipUnits": "Disponibilité comptée à la pièce, jamais au costume.",
     "copyright": "© {year} {name}",
     "version": "Version {version}"
   }

@@ -52,6 +52,7 @@
   --color-gold-strong: var(--gold-strong);
   --color-cream: var(--cream);
   --color-cream-foreground: var(--cream-foreground);
+  --color-brown-soft: var(--brown-soft);
 
   /* Surface des BARRES (en-tête, barre basse, pied de page). Un seul jeu de
      quatre variables : changer d'avis sur la couleur des barres ne doit
