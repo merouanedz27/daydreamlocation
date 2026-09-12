@@ -35,7 +35,7 @@ export default async function AppLayout({
 
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</div>
 
-      <AppFooter />
+      <AppFooter showOwnerLinks={isOwner(profile)} />
 
       <BottomNav showDashboard={isOwner(profile)} />
     </div>
