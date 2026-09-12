@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { PackageOpen, Plus, Shirt } from "lucide-react";
+import { ArrowLeft, PackageOpen, PackageX, Plus, Shirt } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { StockFilters } from "@/components/stock-filters";
-import { getCategories, getModels, countStock } from "@/lib/queries/stock";
+import {
+  countArchivedModels,
+  countStock,
+  getCategories,
+  getModels,
+} from "@/lib/queries/stock";
 import { getProfile, isOwner } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { photoUrl } from "@/lib/storage";
@@ -24,19 +30,25 @@ export default async function StockPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ categorie?: string; q?: string }>;
+  searchParams: Promise<{ categorie?: string; q?: string; archives?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const { categorie, q } = await searchParams;
+  const { categorie, q, archives } = await searchParams;
   const l = locale as Locale;
   const t = await getTranslations();
 
-  const [categories, models, profile] = await Promise.all([
+  // Les modèles retirés du catalogue ont leur propre vue, sur la même page :
+  // mêmes cartes, mêmes filtres, mais une liste qui ne se mélange jamais à
+  // celle des costumes louables.
+  const archived = archives === "1";
+
+  const [categories, models, profile, archivedCount] = await Promise.all([
     getCategories(),
-    getModels({ categorySlug: categorie, search: q }),
+    getModels({ categorySlug: categorie, search: q, archived }),
     getProfile(),
+    archived ? Promise.resolve(0) : countArchivedModels(),
   ]);
 
   const canEdit = isOwner(profile);
@@ -46,15 +58,29 @@ export default async function StockPage({
       {/* Titre reporté en `sr-only` : la barre de navigation dit déjà où l'on
           est. On le garde dans le DOM — un écran sans `h1` casse la navigation
           par titres des lecteurs d'écran. */}
-      <div className="flex items-center justify-end gap-4">
-        <h1 className="sr-only">{t("stock.title")}</h1>
-        {canEdit && (
-          <Button asChild className="hidden md:inline-flex">
-            <Link href="/stock/nouveau">
-              <Plus className="size-4" aria-hidden />
-              {t("stock.newModel")}
-            </Link>
-          </Button>
+      <div className="flex items-center justify-between gap-4">
+        {archived ? (
+          <>
+            <h1 className="text-xl">{t("stock.archivedTitle")}</h1>
+            <Button asChild variant="ghost" className="h-11">
+              <Link href="/stock">
+                <ArrowLeft className="icon-directional size-4" aria-hidden />
+                {t("stock.backToCatalogue")}
+              </Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            <h1 className="sr-only">{t("stock.title")}</h1>
+            {canEdit && (
+              <Button asChild className="ms-auto hidden md:inline-flex">
+                <Link href="/stock/nouveau">
+                  <Plus className="size-4" aria-hidden />
+                  {t("stock.newModel")}
+                </Link>
+              </Button>
+            )}
+          </>
         )}
       </div>
 
@@ -66,9 +92,13 @@ export default async function StockPage({
         <div className="border-border mt-8 flex flex-col items-center rounded-lg border border-dashed px-6 py-16 text-center">
           <PackageOpen className="text-muted-foreground size-8" aria-hidden />
           <p className="text-muted-foreground mt-4 text-sm">
-            {q || categorie ? t("stock.noMatch") : t("common.empty")}
+            {q || categorie
+              ? t("stock.noMatch")
+              : archived
+                ? t("stock.archivedEmpty")
+                : t("common.empty")}
           </p>
-          {canEdit && !q && !categorie && (
+          {canEdit && !archived && !q && !categorie && (
             <Button asChild className="mt-6">
               <Link href="/stock/nouveau">
                 <Plus className="size-4" aria-hidden />
@@ -134,6 +164,11 @@ export default async function StockPage({
                           total: stock.total,
                         })}
                       </span>
+                      {archived && (
+                        <Badge className="bg-muted text-muted-foreground border-transparent">
+                          {t("stock.retired")}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -141,6 +176,20 @@ export default async function StockPage({
             );
           })}
         </ul>
+      )}
+
+      {/* Unique porte d'entrée vers les modèles retirés. Discrète — et
+          présente seulement s'il y en a : sans elle, un retrait serait un
+          aller sans retour. */}
+      {!archived && archivedCount > 0 && (
+        <div className="mt-8 text-center">
+          <Button asChild variant="ghost" className="text-muted-foreground h-11">
+            <Link href="/stock?archives=1">
+              <PackageX className="size-4" aria-hidden />
+              {t("stock.archivedLink", { count: archivedCount })}
+            </Link>
+          </Button>
+        </div>
       )}
     </div>
   );

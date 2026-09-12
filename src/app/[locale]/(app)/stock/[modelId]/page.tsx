@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowLeft, Plus, Shirt } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Shirt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
+import { ModelRestoreButton } from "@/components/model-danger-zone";
 import { getModel, isUnitFreeToday } from "@/lib/queries/stock";
 import { getProfile, isOwner } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
@@ -58,12 +59,38 @@ export default async function ModelPage({
 
   return (
     <div>
-      <Button asChild variant="ghost" size="sm" className="-ms-2 mb-2">
-        <Link href="/stock">
-          <ArrowLeft className="icon-directional size-4" aria-hidden />
-          {t("common.back")}
-        </Link>
-      </Button>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <Button asChild variant="ghost" size="sm" className="-ms-2">
+          <Link href="/stock">
+            <ArrowLeft className="icon-directional size-4" aria-hidden />
+            {t("common.back")}
+          </Link>
+        </Button>
+
+        {canEdit && (
+          <Button asChild variant="outline" className="h-11">
+            <Link href={`/stock/${model.id}/modifier`}>
+              <Pencil className="size-4" aria-hidden />
+              {t("common.edit")}
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      {/* Un modèle retiré reste consultable par son adresse — c'est la seule
+          façon de le retrouver, et donc de le remettre. La bannière dit
+          pourquoi il ne figure plus nulle part ailleurs. */}
+      {!model.is_active && (
+        <div className="border-border bg-muted mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{t("stock.archivedBanner")}</p>
+            <p className="text-muted-foreground text-sm">
+              {t("stock.archivedBannerHint")}
+            </p>
+          </div>
+          {canEdit && <ModelRestoreButton modelId={model.id} />}
+        </div>
+      )}
 
       <div className="flex gap-4">
         <div className="bg-muted relative size-24 shrink-0 overflow-hidden rounded-lg sm:size-32">

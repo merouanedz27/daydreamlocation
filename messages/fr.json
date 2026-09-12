@@ -156,7 +156,26 @@
       "bon": "Bon",
       "use": "Usé",
       "retire": "Retiré"
-    }
+    },
+    "editModel": "Modifier le modèle",
+    "refCodeEditHint": "Les pièces déjà créées gardent leur référence. Seules les nouvelles suivront le nouveau code.",
+    "dangerZone": "Supprimer ce modèle",
+    "deleteModel": "Supprimer définitivement",
+    "deleteModelHint": "Ce modèle n'a jamais servi dans une commande : il peut être effacé, avec ses {count} pièce(s).",
+    "deleteConfirmTitle": "Supprimer « {name} » ?",
+    "deleteConfirmBody": "Le modèle et ses {count} pièce(s) seront effacés définitivement. Cette action ne peut pas être annulée.",
+    "archiveModel": "Retirer du catalogue",
+    "archiveModelHint": "Ce modèle figure dans des commandes : l'effacer fausserait vos comptes. Le retirer du catalogue le fait disparaître du stock et des nouvelles commandes, sans rien perdre.",
+    "archiveConfirmTitle": "Retirer « {name} » du catalogue ?",
+    "archiveConfirmBody": "Le modèle disparaît du stock et de la saisie des commandes. Les commandes passées ne changent pas. Vous pourrez le remettre à tout moment.",
+    "archivedAndUsed": "Ce modèle est retiré du catalogue. Ses locations passées empêchent une suppression définitive.",
+    "archivedBanner": "Modèle retiré du catalogue",
+    "archivedBannerHint": "Il n'apparaît plus dans le stock ni dans les nouvelles commandes.",
+    "restoreModel": "Remettre au catalogue",
+    "archivedTitle": "Modèles retirés",
+    "archivedLink": "{count} modèle(s) retiré(s)",
+    "archivedEmpty": "Aucun modèle retiré du catalogue.",
+    "backToCatalogue": "Catalogue"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -208,7 +227,8 @@
     "externalLabelRequired": "Décrivez la pièce louée chez le confrère.",
     "duplicateLine": "Cette pièce est déjà dans la commande.",
     "datesIncoherent": "Le retour ne peut pas précéder le retrait.",
-    "dateInvalid": "Cette date n'est pas valide."
+    "dateInvalid": "Cette date n'est pas valide.",
+    "modelInUse": "Ce modèle figure dans des commandes : retirez-le du catalogue au lieu de le supprimer."
   },
   "roles": {
     "owner": "Propriétaire",

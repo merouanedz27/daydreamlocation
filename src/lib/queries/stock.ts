@@ -21,6 +21,14 @@ export type ModelWithStock = ArticleModel & {
 export async function getModels(options?: {
   categorySlug?: string;
   search?: string;
+  /**
+   * `true` = les modèles RETIRÉS du catalogue, et eux seuls.
+   *
+   * Les deux listes s'excluent : mêler un costume vendu aux costumes
+   * louables ferait promettre à un client une pièce qui n'est plus dans la
+   * boutique. Le retrait n'a d'intérêt que s'il retire vraiment.
+   */
+  archived?: boolean;
 }): Promise<ModelWithStock[]> {
   const supabase = await createClient();
 
@@ -32,7 +40,7 @@ export async function getModels(options?: {
        categories ( id, slug, name_fr, name_ar ),
        article_units ( id, size, status )`,
     )
-    .eq("is_active", true)
+    .eq("is_active", !options?.archived)
     .order("ref_code");
 
   if (options?.categorySlug) {
@@ -55,6 +63,22 @@ export async function getModels(options?: {
   // parente : il met la relation à `null`. On termine donc côté serveur.
   const rows = (data ?? []) as unknown as ModelWithStock[];
   return options?.categorySlug ? rows.filter((m) => m.categories) : rows;
+}
+
+/**
+ * Combien de modèles sont retirés du catalogue.
+ *
+ * Sert l'unique porte d'entrée vers ces modèles, en bas du stock. Sans elle,
+ * un modèle retiré serait introuvable — et le geste, irréversible pour
+ * l'utilisateur. `head: true` ne rapatrie aucune ligne, juste le compte.
+ */
+export async function countArchivedModels(): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("article_models")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", false);
+  return count ?? 0;
 }
 
 export async function getCategories(): Promise<Category[]> {

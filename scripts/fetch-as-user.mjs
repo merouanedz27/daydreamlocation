@@ -90,5 +90,8 @@ for (const path of paths) {
     (html.match(/<main[\s\S]*?<\/main>/) ?? html.match(/<body[\s\S]*<\/body>/) ?? [""])[0]
       .replace(/<script[\s\S]*?<\/script>/g, ""),
   );
-  console.log("  texte :", body.slice(0, 320));
+  // 320 caractères suffisent à reconnaître une page ; une vérification fine
+  // en demande plus. `MAX_TEXT=0` affiche tout.
+  const max = Number(process.env.MAX_TEXT ?? 320);
+  console.log("  texte :", max > 0 ? body.slice(0, max) : body);
 }

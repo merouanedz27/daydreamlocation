@@ -72,3 +72,16 @@ export const unitSchema = z.object({
 });
 
 export type UnitInput = z.infer<typeof unitSchema>;
+
+/**
+ * Modification d'un modèle : les mêmes règles que la création, plus l'`id`.
+ *
+ * On repart volontairement du MÊME schéma. Une modification qui accepterait ce
+ * que la création refuse (une référence vide, un prix négatif) laisserait
+ * entrer par la porte de derrière exactement ce qu'on garde dehors.
+ */
+export const modelUpdateSchema = modelSchema.extend({
+  id: z.coerce.number().int().positive(),
+});
+
+export type ModelUpdateInput = z.infer<typeof modelUpdateSchema>;
