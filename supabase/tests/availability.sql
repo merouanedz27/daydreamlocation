@@ -318,6 +318,197 @@ begin
     end;
   end;
 
+  -- --- 13. set_order_cancelled : annuler, puis tenter de revenir ------------
+  -- Le test 7 prouve que le STATUT libere la piece. Celui-ci prouve que le
+  -- point d'entree de l'application fait la meme chose, et surtout qu'il refuse
+  -- BIEN la reactivation d'une commande dont la piece est repartie ailleurs.
+  declare
+    v_m3      bigint;
+    v_u3      bigint;
+    v_a       bigint;
+    v_b       bigint;
+    v_statut  text;
+    v_actives int;
+    v_msg     text;
+    v_ok      boolean;
+  begin
+    insert into public.article_models (ref_code, name_fr, category_id, base_price)
+    values ('TEST-ANNUL', 'Veste annulable',
+            (select id from public.categories where slug = 'veste'), 3000)
+    returning id into v_m3;
+
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_m3, 'TEST-ANNUL-01', '50') returning id into v_u3;
+
+    insert into public.orders (customer_name, event_date)
+    values ('Rachid', '2026-10-10') returning id into v_a;
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_a, v_u3, 3000);
+
+    -- 13a. la fonction annule ET desactive les lignes
+    select public.set_order_cancelled(v_a, true) into v_statut;
+    select count(*)::int into v_actives
+    from public.order_lines where order_id = v_a and is_active;
+
+    insert into test_results values (
+      '13a. set_order_cancelled desactive les lignes',
+      'annulee / 0 active',
+      v_statut || ' / ' || v_actives || ' active(s)',
+      v_statut = 'annulee' and v_actives = 0);
+
+    -- La piece doit etre REELLEMENT relouable : une autre commande la prend.
+    insert into public.orders (customer_name, event_date)
+    values ('Samir', '2026-10-11') returning id into v_b;
+    begin
+      insert into public.order_lines (order_id, unit_id, unit_price)
+      values (v_b, v_u3, 3000);
+      v_ok := true;
+    exception when exclusion_violation then
+      v_ok := false;
+    end;
+
+    insert into test_results values (
+      '13b. la piece liberee est relouable',
+      'accepte', case when v_ok then 'accepte' else 'ENCORE BLOQUEE' end, v_ok);
+
+    -- 13c. revenir en arriere devient impossible, et le dit en NOMMANT la piece
+    begin
+      select public.set_order_cancelled(v_a, false) into v_statut;
+      v_ok := false;
+      v_msg := 'ACCEPTE A TORT';
+    exception when exclusion_violation then
+      v_ok := sqlerrm like '%unit_unavailable:TEST-ANNUL-01%';
+      v_msg := sqlerrm;
+    end;
+
+    insert into test_results values (
+      '13c. reactivation refusee, piece nommee',
+      'unit_unavailable:TEST-ANNUL-01', v_msg, v_ok);
+
+    -- 13d. et l'echec ne laisse rien derriere lui : la commande reste annulee
+    select status into v_statut from public.orders where id = v_a;
+    insert into test_results values (
+      '13d. echec sans effet de bord',
+      'annulee', v_statut, v_statut = 'annulee');
+
+    -- 13e. le creneau redevenu libre, la reactivation repasse
+    perform public.set_order_cancelled(v_b, true);
+    select public.set_order_cancelled(v_a, false) into v_statut;
+    select count(*)::int into v_actives
+    from public.order_lines where order_id = v_a and is_active;
+
+    insert into test_results values (
+      '13e. reactivation sur creneau libre',
+      'reservee / 1 active',
+      v_statut || ' / ' || v_actives || ' active(s)',
+      v_statut = 'reservee' and v_actives = 1);
+  end;
+
+  -- --- 14. « bloquee ce jour-la » : la regle du compteur du stock ------------
+  -- La liste du stock ne remonte plus l'historique sous chaque piece : elle
+  -- demande a la base les pieces bloquees UN JOUR donne, en faisant chevaucher
+  -- la plage de location avec [jour, jour+1). Ce test prouve que ce
+  -- chevauchement vaut exactement « la plage contient ce jour », battement de
+  -- nettoyage compris.
+  declare
+    v_plage daterange := daterange('2026-08-25', '2026-08-29', '[)');
+    v_jour  date;
+    v_got   text := '';
+  begin
+    foreach v_jour in array array[
+      '2026-08-24',  -- la veille du retrait     -> libre
+      '2026-08-25',  -- retrait                  -> bloquee
+      '2026-08-27',  -- retour prevu             -> bloquee
+      '2026-08-28',  -- battement de nettoyage   -> bloquee
+      '2026-08-29'   -- borne haute EXCLUSIVE    -> libre
+    ]::date[]
+    loop
+      v_got := v_got || case
+        when v_plage && daterange(v_jour, v_jour + 1, '[)') then 'X'
+        else '.'
+      end;
+    end loop;
+
+    insert into test_results values (
+      '14. jour bloque = chevauchement [j, j+1)',
+      '.XXX.', v_got, v_got = '.XXX.');
+  end;
+
+  -- --- 15. les deux cases : le statut se DEDUIT ------------------------------
+  -- La regle du projet : « Allez Valid » / « Retour Val » restent deux cases,
+  -- le statut n'est jamais saisi. Ce test prouve les quatre transitions, la
+  -- date de retour reelle, et le garde qui protege une commande annulee.
+  declare
+    v_m4     bigint;
+    v_u4     bigint;
+    v_c      bigint;
+    v_statut text;
+    v_date   date;
+    v_rec2   record;
+  begin
+    insert into public.article_models (ref_code, name_fr, category_id, base_price)
+    values ('TEST-CASES', 'Veste a cocher',
+            (select id from public.categories where slug = 'veste'), 3000)
+    returning id into v_m4;
+
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_m4, 'TEST-CASES-01', '50') returning id into v_u4;
+
+    insert into public.orders (customer_name, event_date)
+    values ('Bilal', '2026-11-14') returning id into v_c;
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_c, v_u4, 3000);
+
+    -- 15a. a la creation, rien n'est coche
+    select status into v_statut from public.orders where id = v_c;
+    insert into test_results values (
+      '15a. a la creation : reservee', 'reservee', v_statut, v_statut = 'reservee');
+
+    -- 15b. « Aller valide » -> en_cours
+    update public.orders set picked_up = true where id = v_c;
+    select status, actual_return_date into v_rec2
+    from public.orders where id = v_c;
+    insert into test_results values (
+      '15b. aller valide -> en_cours',
+      'en_cours / retour null',
+      v_rec2.status || ' / retour ' || coalesce(v_rec2.actual_return_date::text, 'null'),
+      v_rec2.status = 'en_cours' and v_rec2.actual_return_date is null);
+
+    -- 15c. « Retour valide » -> retournee, ET la date de retour reelle se pose
+    update public.orders set returned = true where id = v_c;
+    select status, actual_return_date into v_rec2
+    from public.orders where id = v_c;
+    insert into test_results values (
+      '15c. retour valide -> retournee + date',
+      'retournee / date posee',
+      v_rec2.status || ' / ' || coalesce(v_rec2.actual_return_date::text, 'null'),
+      v_rec2.status = 'retournee' and v_rec2.actual_return_date is not null);
+
+    -- 15d. case decochee par erreur : aucun retour fantome ne subsiste
+    update public.orders set returned = false where id = v_c;
+    select status, actual_return_date into v_rec2
+    from public.orders where id = v_c;
+    insert into test_results values (
+      '15d. retour decoche : date effacee',
+      'en_cours / retour null',
+      v_rec2.status || ' / retour ' || coalesce(v_rec2.actual_return_date::text, 'null'),
+      v_rec2.status = 'en_cours' and v_rec2.actual_return_date is null);
+
+    -- 15e. une commande ANNULEE ne ressuscite pas parce qu'on coche une case
+    perform public.set_order_cancelled(v_c, true);
+    update public.orders set picked_up = false, returned = true where id = v_c;
+    select status into v_statut from public.orders where id = v_c;
+    insert into test_results values (
+      '15e. annulee reste annulee malgre les cases',
+      'annulee', v_statut, v_statut = 'annulee');
+
+    -- 15f. et la remise en service repart du statut deduit des cases
+    select public.set_order_cancelled(v_c, false) into v_statut;
+    insert into test_results values (
+      '15f. remise en service = statut deduit',
+      'retournee', v_statut, v_statut = 'retournee');
+  end;
+
 end $$;
 
 select

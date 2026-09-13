@@ -41,9 +41,13 @@ begin
      'rlstest-staff@daydream.test', 'x', now(), '{}'::jsonb, '{}'::jsonb,
      '', '', '', '', '', '', '', '', now(), now());
 
-  -- le trigger handle_new_user a créé les profils : on fixe les rôles
-  update public.profiles set role = 'owner', full_name = 'RLS owner' where id = v_owner;
-  update public.profiles set role = 'staff', full_name = 'RLS staff' where id = v_staff;
+  -- Le trigger handle_new_user a créé les profils : on fixe les rôles.
+  -- `is_active = true` est OBLIGATOIRE depuis 20260913100000_equipe.sql — un
+  -- profil naît désormais INACTIF, et `private.is_staff()` refuserait tout.
+  -- Le propriétaire EN PREMIER : le garde-fou `profiles_keep_one_active_owner`
+  -- interdit de retirer le dernier administrateur actif.
+  update public.profiles set role = 'owner', is_active = true, full_name = 'RLS owner' where id = v_owner;
+  update public.profiles set role = 'staff', is_active = true, full_name = 'RLS staff' where id = v_staff;
 
   insert into public.expenses (category, amount, description)
   values ('loyer', 5000, 'RLS TEST');
@@ -78,6 +82,31 @@ exception when others then
   -- Un refus de policy renvoie 0 ligne ; une ERREUR (droits manquants sur un
   -- helper, par exemple) est un bug, pas une protection. On la distingue.
   raise notice 'ERREUR sur %: %', p_table, sqlerrm;
+  return -1;
+end $$;
+
+-- --- helper : modifier les réglages sous l'identité d'un utilisateur ---------
+-- Rend le nombre de lignes MODIFIÉES. Une policy d'écriture qui refuse ne lève
+-- pas d'erreur : elle filtre la ligne, et l'`update` en touche zéro.
+create or replace function pg_temp.update_settings_as(p_user uuid)
+returns integer
+language plpgsql
+as $$
+declare
+  v_count integer;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_user::text, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+
+  update public.settings set shop_address = 'RLS TEST' where id;
+  get diagnostics v_count = row_count;
+
+  perform set_config('role', 'postgres', true);
+  return v_count;
+exception when others then
+  perform set_config('role', 'postgres', true);
+  raise notice 'ERREUR sur settings: %', sqlerrm;
   return -1;
 end $$;
 
@@ -124,6 +153,25 @@ begin
   insert into test_results values (
     '6. proprietaire voit l equipe', '>= 2',
     case when n < 0 then 'ERREUR SQL' else n::text end, n >= 2);
+
+  -- 7. l'employé LIT les réglages : il imprime des bons, qui portent
+  --    l'adresse et les conditions de la boutique
+  n := pg_temp.count_as(v_staff, 'settings');
+  insert into test_results values (
+    '7. employe lit les reglages', '1',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n = 1);
+
+  -- 8. l'employé NE MODIFIE PAS les coordonnées de la boutique
+  n := pg_temp.update_settings_as(v_staff);
+  insert into test_results values (
+    '8. employe ne modifie PAS la boutique', '0',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n = 0);
+
+  -- 9. le propriétaire les modifie
+  n := pg_temp.update_settings_as(v_owner);
+  insert into test_results values (
+    '9. proprietaire modifie la boutique', '1',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n = 1);
 end $$;
 
 select case when ok then 'OK  ' else 'ECHEC' end as resultat,

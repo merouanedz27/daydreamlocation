@@ -183,6 +183,19 @@ begin
          jsonb_array_length(v_after->'monthly')::text,
          jsonb_array_length(v_after->'monthly') = 12;
 
+  -- --- reservations a venir --------------------------------------------------
+  -- Ce qui explique un mois a zero. Seule O3 a un retrait posterieur au jour
+  -- de reference (25/09) : O1 sort AUJOURD HUI (donc deja compte en recette),
+  -- O2, O4 et O6 sont passees, O5 est annulee.
+  insert into test_results
+  select '13. A venir : 1 commande, 2000', '1 / 2000',
+         ((v_after->'upcoming'->>'count')::int - (v_before->'upcoming'->>'count')::int)::text
+           || ' / ' ||
+         ((v_after->'upcoming'->>'total')::numeric - (v_before->'upcoming'->>'total')::numeric)::text,
+         (v_after->'upcoming'->>'count')::int - (v_before->'upcoming'->>'count')::int = 1
+         and (v_after->'upcoming'->>'total')::numeric
+             - (v_before->'upcoming'->>'total')::numeric = 2000;
+
   insert into test_results
   select '12. Seau 2025-11 (annee precedente) present', 'present',
          coalesce((select 'present' from jsonb_array_elements(v_after->'monthly') m
