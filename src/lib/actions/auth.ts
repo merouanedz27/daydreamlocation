@@ -42,13 +42,34 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
 
-  if (error) {
+  if (error || !data.user) {
     return { ok: false, error: "errors.invalidCredentials" };
+  }
+
+  /**
+   * GoTrue ne connaît pas `is_active` : il accepte volontiers les identifiants
+   * d'un membre désactivé. Sans ce contrôle, celui-ci se connecterait
+   * correctement, puis `requireProfile` le renverrait ici depuis le layout —
+   * il retomberait donc sur ce formulaire AVEC LE BON MOT DE PASSE et SANS LA
+   * MOINDRE EXPLICATION. On referme la session et on le dit.
+   *
+   * Ce n'est pas une énumération de comptes : il a déjà prouvé qu'il connaît
+   * le mot de passe.
+   */
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_active")
+    .eq("id", data.user.id)
+    .single();
+
+  if (!profile?.is_active) {
+    await supabase.auth.signOut();
+    return { ok: false, error: "errors.accountDisabled" };
   }
 
   // `redirect` lève une exception par conception : rien ne s'exécute après.

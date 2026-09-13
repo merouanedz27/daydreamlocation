@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   PAGE_SIZE,
   SORTABLE,
-  sanitizeSearch,
+  ordersFilters,
   type OrderRow,
   type OrdersQuery,
 } from "@/lib/orders-query";
@@ -28,20 +28,15 @@ export async function getOrdersPage(query: OrdersQuery): Promise<{
     .from("orders")
     .select(
       `id, order_no, customer_name, customer_phone, event_date, pickup_date,
-       status, total_price, amount_paid, balance, caution_amount`,
+       return_due_date, status, total_price, amount_paid, balance,
+       caution_amount`,
       { count: "exact" },
     );
 
-  const term = sanitizeSearch(query.q);
-  if (term) {
-    // On cherche sur ce que l'équipe a sous les yeux quand le client appelle :
-    // son nom, le numéro de commande, son téléphone.
-    request = request.or(
-      `customer_name.ilike.%${term}%,order_no.ilike.%${term}%,customer_phone.ilike.%${term}%`,
-    );
-  }
-
-  if (query.status) request = request.eq("status", query.status);
+  // Mêmes filtres que l'export Excel : voir `ordersFilters`.
+  const { search, status } = ordersFilters(query);
+  if (search) request = request.or(search);
+  if (status) request = request.eq("status", status);
 
   const from = (query.page - 1) * PAGE_SIZE;
 

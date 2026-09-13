@@ -7,8 +7,15 @@
  * L'inscription publique est DÉSACTIVÉE sur le projet, et c'est voulu : la clé
  * publiable est visible dans le navigateur, donc un formulaire d'inscription
  * ouvert laisserait n'importe qui se créer un accès. Les comptes sont créés par
- * le propriétaire. Tant qu'il n'existe pas d'écran d'administration, ce script
- * en tient lieu.
+ * le propriétaire.
+ *
+ * DEPUIS L'ÉCRAN ÉQUIPE, ce script ne sert plus qu'à AMORCER le premier
+ * administrateur — ensuite, les comptes se créent depuis l'application.
+ *
+ * Le rôle n'est PAS écrit dans `raw_user_meta_data` : `handle_new_user` ne l'y
+ * lit plus (il vaudrait sinon élévation de privilège, la clé publiable étant
+ * visible dans chaque navigateur). Il est posé explicitement sur `profiles`
+ * par la requête d'upsert plus bas, avec `is_active = true`.
  *
  * L'endpoint `/auth/v1/signup` est donc inutilisable, et l'API Admin exigerait
  * la clé secrète. On écrit directement dans `auth.users` et `auth.identities`,
@@ -96,7 +103,7 @@ const INSERT_USER = `
     'authenticated', 'authenticated', $1,
     extensions.crypt($2, extensions.gen_salt('bf')), now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
-    jsonb_build_object('full_name', $3::text, 'role', $4::text),
+    jsonb_build_object('full_name', $3::text),
     '', '', '', '', '', '', '', '',
     now(), now()
   ) returning id`;
@@ -105,7 +112,7 @@ const UPDATE_USER = `
   update auth.users
      set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf')),
          email_confirmed_at = coalesce(email_confirmed_at, now()),
-         raw_user_meta_data = jsonb_build_object('full_name', $3::text, 'role', $4::text),
+         raw_user_meta_data = jsonb_build_object('full_name', $3::text),
          updated_at = now(),
          ${EMPTY_TOKEN_COLUMNS}
    where id = $1::uuid returning id`;
@@ -140,10 +147,10 @@ try {
 
   if (existing.rows.length) {
     userId = existing.rows[0].id;
-    await client.query(UPDATE_USER, [userId, password, fullName, role]);
+    await client.query(UPDATE_USER, [userId, password, fullName]);
     created = false;
   } else {
-    const inserted = await client.query(INSERT_USER, [email, password, fullName, role]);
+    const inserted = await client.query(INSERT_USER, [email, password, fullName]);
     userId = inserted.rows[0].id;
     created = true;
   }

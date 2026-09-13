@@ -7,6 +7,15 @@ import type { Tables } from "@/lib/supabase/database.types";
 export type Profile = Tables<"profiles">;
 
 /**
+ * Les deux seules valeurs admises par la contrainte `profiles_role_valid`.
+ *
+ * Le generateur de types ne lit pas les contraintes `check` : `database.types`
+ * decrit `role` comme un `string` nu, et `profile.role === "ownr"` compilerait
+ * sans broncher. Ce type ferme la porte.
+ */
+export type Role = "owner" | "staff";
+
+/**
  * Profil de l'utilisateur connecté, ou `null`.
  *
  * `cache()` déduplique l'appel sur un même rendu : le layout, la barre de

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Receipt, TrendingUp } from "lucide-react";
+import { CalendarClock, Receipt, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "@/i18n/navigation";
@@ -70,13 +70,46 @@ export default async function DashboardPage({
             </div>
           ))}
         </dl>
+
+        {/* CE QUI RÉPOND AU « POURQUOI 0 ? ».
+            Les quatre cartes ci-dessus ne comptent que ce qui SORT du magasin
+            pendant la période. Un registre entièrement fait de mariages de
+            décembre affiche donc quatre zéros en septembre, tout en étant
+            parfaitement juste — et ressemble à un écran cassé.
+            Cette ligne dit ce qui est déjà réservé. Elle reste SÉPARÉE des
+            cartes et ne s'additionne à aucune : ce n'est pas encore du chiffre
+            d'affaires, et l'annoncer comme tel serait le mensonge inverse. */}
+        {stats.upcoming.count > 0 && (
+          <p className="border-border bg-gold-soft/40 text-foreground mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border px-4 py-3 text-sm">
+            <CalendarClock className="text-gold-strong size-4 self-center" aria-hidden />
+            <span className="font-medium">{t("dashboard.upcomingTitle")}</span>
+            <span className="tabular">
+              {t("dashboard.upcomingCount", {
+                count: formatNumber(stats.upcoming.count, l),
+              })}
+              {" — "}
+              {formatMoney(stats.upcoming.total, l)}
+            </span>
+            {stats.upcoming.nextDate && (
+              <span className="text-muted-foreground">
+                {t("dashboard.upcomingNext", {
+                  date: formatDate(stats.upcoming.nextDate, l),
+                })}
+              </span>
+            )}
+          </p>
+        )}
       </section>
 
       {/* 2. Le chiffre qu'il a demandé : recettes moins dépenses. */}
       <section className="mt-8">
         <h2 className="text-lg">{t("dashboard.result")}</h2>
         <div className="mt-3">
-          <DashboardResult revenue={stats.revenue} expenses={stats.expenses} />
+          <DashboardResult
+            revenue={stats.revenue}
+            expenses={stats.expenses}
+            upcoming={stats.upcoming}
+          />
         </div>
       </section>
 

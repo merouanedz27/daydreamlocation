@@ -1,3 +1,4 @@
+import { withSerwist } from "@serwist/turbopack";
 import createNextIntlPlugin from "next-intl/plugin";
 import type { NextConfig } from "next";
 
@@ -16,4 +17,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+// `withSerwist` déclare `esbuild` comme paquet serveur externe : il construit
+// le service worker (`src/app/serwist/[path]/route.ts`).
+export default withSerwist(withNextIntl(nextConfig));

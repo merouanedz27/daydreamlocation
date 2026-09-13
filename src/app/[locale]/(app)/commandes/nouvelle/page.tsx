@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { OrderWizard } from "@/components/order-wizard";
+import { OrderForm } from "@/components/order-form";
 import { requireProfile } from "@/lib/auth";
 import { getOrderCatalogue, getSettings } from "@/lib/queries/orders";
 import type { Locale } from "@/i18n/routing";
@@ -45,7 +45,7 @@ export default async function NewOrderPage({
 
       <h1 className="sr-only">{t("orders.newTitle")}</h1>
 
-      <OrderWizard models={models} ensembles={ensembles} settings={settings} />
+      <OrderForm models={models} ensembles={ensembles} settings={settings} />
     </div>
   );
 }

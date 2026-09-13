@@ -56,12 +56,14 @@ export function BottomNav({ showDashboard }: { showDashboard: boolean }) {
           active ? "text-nav-foreground font-medium" : "text-nav-muted hover:text-nav-foreground",
         )}
       >
-        {/* L'onglet actif se signale par un TRAIT jaune, pas par un
-            libellé jaune : sur ce brun le jaune vif ne vaut que 3,17:1,
-            assez pour un élément graphique, pas pour du texte.
+        {/* L'onglet actif se signale par un TRAIT, jamais par un libellé
+            coloré. Le trait est en `gold-soft` et NON en jaune vif : depuis
+            que la barre a été éclaircie, le jaune vif n'y vaut plus que
+            2,74:1 — sous le minimum de 3:1 d'un élément graphique, il se
+            serait dissous dans le brun. `gold-soft` y tient 4,89:1.
             `inset-x` porte sur les deux côtés — rien à miroiter en RTL. */}
         {active && (
-          <span className="bg-primary absolute inset-x-3 top-0 h-0.5 rounded-full" aria-hidden />
+          <span className="bg-gold-soft absolute inset-x-3 top-0 h-0.5 rounded-full" aria-hidden />
         )}
         <Icon className="size-5 shrink-0" aria-hidden />
         <span className="max-w-full truncate">{label}</span>

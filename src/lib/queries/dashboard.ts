@@ -32,6 +32,21 @@ export type StockState = {
   retire: number;
 };
 
+/**
+ * Ce qui est réservé mais pas encore sorti.
+ *
+ * Ce n'est PAS du chiffre d'affaires et l'écran ne doit jamais l'y ajouter :
+ * c'est ce qui explique un mois à zéro quand toutes les commandes du registre
+ * sont des mariages de décembre. Non borné par l'année — un mariage de janvier
+ * prochain est réservé pour de bon.
+ */
+export type Upcoming = {
+  count: number;
+  total: number;
+  /** Premier RETRAIT à venir, ou `null` s'il n'y a rien de réservé. */
+  nextDate: string | null;
+};
+
 export type DashboardStats = {
   today: string;
   revenue: PeriodTotals;
@@ -39,6 +54,7 @@ export type DashboardStats = {
   monthly: MonthlyPoint[];
   stock: StockState;
   unpaid: { count: number; total: number };
+  upcoming: Upcoming;
 };
 
 /** Postgres rend les `numeric` en JSON sous forme de nombres ; on sécurise. */
@@ -61,6 +77,7 @@ const EMPTY: DashboardStats = {
   monthly: [],
   stock: { louee: 0, disponible: 0, nettoyage: 0, reparation: 0, retire: 0 },
   unpaid: { count: 0, total: 0 },
+  upcoming: { count: 0, total: 0, nextDate: null },
 };
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -74,6 +91,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const raw = data as Record<string, unknown>;
   const stock = (raw.stock ?? {}) as Record<string, unknown>;
   const unpaid = (raw.unpaid ?? {}) as Record<string, unknown>;
+  const upcoming = (raw.upcoming ?? {}) as Record<string, unknown>;
 
   return {
     today: String(raw.today ?? EMPTY.today),
@@ -92,6 +110,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       retire: num(stock.retire),
     },
     unpaid: { count: num(unpaid.count), total: num(unpaid.total) },
+    upcoming: {
+      count: num(upcoming.count),
+      total: num(upcoming.total),
+      // `min()` sur un registre vide rend `null` : aucune réservation à venir.
+      nextDate: upcoming.nextDate ? String(upcoming.nextDate) : null,
+    },
   };
 }
 

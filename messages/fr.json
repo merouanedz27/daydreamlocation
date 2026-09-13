@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "DayDream Location",
+    "name": "DD Location",
     "tagline": "Gestion des locations de costumes"
   },
   "nav": {
@@ -10,7 +10,11 @@
     "dashboard": "Tableau de bord",
     "dashboardShort": "Bilan",
     "primary": "Navigation principale",
-    "expenses": "Dépenses"
+    "expenses": "Dépenses",
+    "team": "Équipe",
+    "shop": "Boutique",
+    "account": "Mon compte",
+    "admin": "Administration"
   },
   "common": {
     "save": "Enregistrer",
@@ -23,7 +27,9 @@
     "loading": "Chargement…",
     "empty": "Rien à afficher",
     "language": "Langue",
-    "switchTo": "Passer en {language}"
+    "switchTo": "Passer en {language}",
+    "pickDate": "Choisir une date",
+    "close": "Fermer"
   },
   "orders": {
     "title": "Commandes",
@@ -48,10 +54,6 @@
       "cancelled": "Annulée"
     },
     "newTitle": "Nouvelle commande",
-    "stepDates": "Dates et client",
-    "stepPieces": "Les pièces",
-    "stepAmounts": "Montants",
-    "stepOf": "Étape {current} sur {total}",
     "eventDateHint": "Seule date à saisir. Le retrait et le retour en sont déduits.",
     "window": "Du {pickup} au {returnDue}",
     "editDates": "Modifier le retrait et le retour",
@@ -110,7 +112,43 @@
     "notesTitle": "Note",
     "amounts": "Montants",
     "actualReturn": "Rendu le {date}",
-    "viewInStock": "Voir dans le stock"
+    "viewInStock": "Voir dans le stock",
+    "lateBy": "En retard de {count} j",
+    "cancelSection": "Annuler cette commande",
+    "cancelHint": "Un mariage reporté, une erreur de saisie : l'annulation libère les pièces et sort la commande du chiffre d'affaires. Rien n'est effacé, et le geste se défait.",
+    "cancelOrder": "Annuler la commande",
+    "keepOrder": "Garder la commande",
+    "cancelConfirmTitle": "Annuler la commande de {name} ?",
+    "cancelConfirmBody": "{count} pièce(s) redeviennent disponibles immédiatement. La commande reste dans le registre, mais quitte le chiffre d'affaires. Vous pourrez la remettre en service.",
+    "cancelConfirmBodyNoUnit": "Cette commande ne contient que des pièces louées chez un confrère : aucune date de votre stock n'est libérée. Elle reste dans le registre, mais quitte le chiffre d'affaires.",
+    "cancelledBanner": "Commande annulée",
+    "cancelledBannerHint": "Ses pièces sont libres et elle ne compte plus dans le chiffre d'affaires. La remise en service revérifie leur disponibilité.",
+    "deleteSection": "Supprimer cette commande",
+    "deleteHint": "Pour un doublon ou une saisie de test. La commande est effacée du registre et ne se récupère pas — pour un mariage reporté, annulez-la plutôt.",
+    "deleteOrder": "Supprimer définitivement",
+    "deleteConfirmTitle": "Supprimer la commande de {name} ?",
+    "deleteConfirmBody": "La commande <no>{orderNo}</no> et toutes ses pièces sont effacées : elle disparaît du registre et du chiffre d’affaires, et ses pièces redeviennent disponibles. Cette action est irréversible.",
+    "deleteConfirmExpenses": "Ses {count} dépense(s) restent dans vos comptes, sans lien avec une commande.",
+    "restoreOrder": "Remettre en service",
+    "stepDone": "Validé",
+    "collectBalance": "Encaisser le reste",
+    "addPayment": "Enregistrer un versement",
+    "addPaymentHint": "Le montant que le client vient de remettre. Il s'ajoute aux versements déjà enregistrés.",
+    "correctPayment": "Corriger",
+    "correctPaymentHint": "Montant à retirer des versements, pour rattraper une saisie erronée.",
+    "amountReceived": "Montant reçu",
+    "amountToRemove": "Montant à retirer",
+    "collect": "Encaisser",
+    "cautionGiveBack": "Rendre la caution",
+    "cautionTakeBack": "Annuler le retour de la caution",
+    "customerName": "Nom et prénom",
+    "phoneHint": "Mobile : 05, 06 ou 07 suivi de 8 chiffres.",
+    "sectionDate": "Date",
+    "requiredLegend": "Champs obligatoires",
+    "pickDateFirst": "Choisissez d'abord la date de l'événement : la disponibilité des pièces en dépend.",
+    "fieldsToFix": "Champs à compléter : {count}",
+    "zeroAllowed": "Saisissez 0 si le client n'a rien versé.",
+    "export": "Exporter"
   },
   "stock": {
     "title": "Stock",
@@ -195,13 +233,20 @@
     "unpaidCount": "{count} commande(s)",
     "unpaidMore": "et {count} autre(s)",
     "allPaid": "Tout est réglé.",
-    "noExpensesYet": "Aucune dépense enregistrée sur cette période : le bénéfice est donc égal au chiffre d'affaires."
+    "noExpensesYet": "Aucune dépense enregistrée sur cette période : le bénéfice est donc égal au chiffre d'affaires.",
+    "upcomingTitle": "Réservations à venir",
+    "upcomingCount": "{count} commande(s)",
+    "upcomingNext": "premier retrait le {date}",
+    "noRevenueYet": "Aucune location sur cette période : la recette se compte à la date de retrait. {count} commande(s) déjà réservée(s) plus tard, pour {total}."
   },
   "auth": {
     "signIn": "Se connecter",
     "signOut": "Se déconnecter",
     "email": "E-mail",
-    "password": "Mot de passe"
+    "password": "Mot de passe",
+    "signOutConfirmTitle": "Se déconnecter ?",
+    "signOutConfirmBody": "Vous quittez la session de {name}. Il faudra le mot de passe du compte pour revenir.",
+    "stayConnected": "Rester connecté"
   },
   "errors": {
     "unitUnavailable": "Cette pièce est déjà réservée sur ces dates.",
@@ -228,11 +273,62 @@
     "duplicateLine": "Cette pièce est déjà dans la commande.",
     "datesIncoherent": "Le retour ne peut pas précéder le retrait.",
     "dateInvalid": "Cette date n'est pas valide.",
-    "modelInUse": "Ce modèle figure dans des commandes : retirez-le du catalogue au lieu de le supprimer."
+    "modelInUse": "Ce modèle figure dans des commandes : retirez-le du catalogue au lieu de le supprimer.",
+    "paymentZero": "Saisissez un montant.",
+    "paymentTooLarge": "Ce retrait dépasse les versements déjà enregistrés.",
+    "paymentOnCancelled": "Commande annulée : remettez-la en service avant d'encaisser.",
+    "emailTaken": "Cet e-mail est déjà utilisé par un compte.",
+    "passwordTooShort": "Le mot de passe doit faire au moins 8 caractères.",
+    "passwordTooLong": "Mot de passe trop long (72 caractères maximum).",
+    "lastOwner": "C'est le dernier administrateur : nommez-en un autre avant de lui retirer son rôle.",
+    "cannotEditSelf": "Vous ne pouvez pas modifier votre propre accès. Demandez-le à un autre administrateur.",
+    "adminUnavailable": "La gestion des comptes n'est pas configurée sur ce serveur.",
+    "accountDisabled": "Ce compte a été désactivé. Contactez l'administrateur.",
+    "phoneInvalid": "Numéro de mobile attendu : 05, 06 ou 07 suivi de 8 chiffres.",
+    "linesTaken": "Pièces déjà prises sur ces dates : {count}. Retirez-les ou changez les dates.",
+    "textTooLong": "Ce texte est trop long."
   },
   "roles": {
-    "owner": "Propriétaire",
-    "staff": "Équipe"
+    "owner": "Administrateur",
+    "staff": "Membre"
+  },
+  "team": {
+    "title": "Équipe",
+    "hint": "Les comptes qui peuvent utiliser l'application.",
+    "add": "Ajouter un membre",
+    "addHint": "Choisissez son mot de passe et communiquez-le lui : il pourra s'en servir tout de suite.",
+    "fullName": "Nom complet",
+    "email": "E-mail",
+    "emailHint": "C'est son identifiant de connexion.",
+    "password": "Mot de passe",
+    "passwordHint": "8 caractères minimum.",
+    "role": "Rôle",
+    "roleHint": "Un membre gère les commandes et consulte le stock. Un administrateur voit en plus le bilan, les dépenses et l'équipe.",
+    "create": "Créer le compte",
+    "you": "(vous)",
+    "inactive": "Désactivé",
+    "empty": "Aucun compte pour l'instant.",
+    "actionsFor": "Actions pour {name}",
+    "promote": "Passer administrateur",
+    "demote": "Repasser membre",
+    "promoteTitle": "Passer {name} administrateur ?",
+    "promoteBody": "Il verra le bilan et les dépenses, et pourra gérer l'équipe.",
+    "demoteTitle": "Repasser {name} en membre ?",
+    "demoteBody": "Il garde les commandes et le stock, mais perd le bilan, les dépenses et l'équipe.",
+    "deactivate": "Désactiver l'accès",
+    "activate": "Réactiver l'accès",
+    "deactivateTitle": "Désactiver l'accès de {name} ?",
+    "deactivateBody": "Il ne pourra plus se connecter. Ses commandes restent à son nom — rien n'est effacé.",
+    "activateTitle": "Réactiver l'accès de {name} ?",
+    "activateBody": "Il pourra se reconnecter avec son mot de passe habituel.",
+    "resetPassword": "Changer le mot de passe",
+    "resetPasswordBody": "Choisissez un nouveau mot de passe pour {name} et communiquez-le lui.",
+    "newPassword": "Nouveau mot de passe",
+    "createdToast": "Compte de {name} créé",
+    "roleChangedToast": "Rôle de {name} modifié",
+    "deactivatedToast": "Accès de {name} désactivé",
+    "activatedToast": "Accès de {name} réactivé",
+    "passwordChangedToast": "Mot de passe de {name} changé"
   },
   "expenses": {
     "add": "Ajouter une dépense",
@@ -245,7 +341,6 @@
     "linkedOrderHint": "Facultatif. Renseignée, la dépense compte comme frais de cette commande.",
     "noOrder": "Charge générale",
     "empty": "Aucune dépense ce mois-ci.",
-    "confirmDelete": "Supprimer cette dépense ?",
     "total": "Total",
     "previousMonth": "Mois précédent",
     "nextMonth": "Mois suivant",
@@ -258,7 +353,10 @@
       "salaire": "Salaire",
       "transport": "Transport",
       "autre": "Autre"
-    }
+    },
+    "deleteThis": "Supprimer « {label} »",
+    "deleteConfirmTitle": "Supprimer « {label} » ?",
+    "deleteConfirmBody": "{amount} du {date}. Le bénéfice du mois sera recalculé sans cette dépense."
   },
   "footer": {
     "navTitle": "Navigation",
@@ -266,7 +364,54 @@
     "tipDates": "Une seule date saisie : l'événement. Retrait et retour en découlent.",
     "tipCleaning": "Un battement de nettoyage entre deux locations.",
     "tipUnits": "Disponibilité comptée à la pièce, jamais au costume.",
-    "copyright": "© {year} {name}",
+    "copyright": "© {year}",
     "version": "Version {version}"
+  },
+  "shop": {
+    "title": "Boutique",
+    "hint": "Ce qui s'imprime sur chaque bon de location. Un champ laissé vide n'apparaît pas sur le bon.",
+    "address": "Adresse de la boutique",
+    "phone": "Téléphone de la boutique",
+    "termsFr": "Conditions de location — français",
+    "termsAr": "Conditions de location — arabe",
+    "termsHint": "Caution, retard, dégâts, nettoyage… Le bon imprime le texte de sa langue.",
+    "saved": "Informations de la boutique enregistrées."
+  },
+  "print": {
+    "print": "Imprimer / PDF",
+    "pdfHint": "Pour envoyer le document au client, choisissez « Enregistrer au format PDF » comme imprimante.",
+    "slipButton": "Bon de location",
+    "slipTitle": "Bon de location",
+    "issuedOn": "Commande du {date}",
+    "cancelled": "Commande annulée — ce bon n'est plus valable",
+    "designation": "Désignation",
+    "cautionNotIncluded": "Non comprise dans le prix, rendue au retour.",
+    "conditions": "Conditions de location",
+    "customerSignature": "Signature du client",
+    "shopSignature": "Pour la boutique",
+    "daySheetButton": "Feuille du jour",
+    "daySheetTitle": "Feuille du jour",
+    "pickupsTitle": "Retraits à préparer",
+    "returnsTitle": "Retours attendus",
+    "noPickups": "Aucun retrait à préparer.",
+    "noReturns": "Aucun retour attendu.",
+    "pickupPlanned": "Retrait prévu le {date}",
+    "returnPlanned": "Retour prévu le {date}",
+    "eventOn": "Événement le {date}",
+    "toCollect": "Reste à encaisser",
+    "cautionToReturn": "Caution à rendre"
+  },
+  "offline": {
+    "title": "Pas de connexion",
+    "body": "Vérifiez le Wi-Fi ou les données mobiles, puis réessayez.",
+    "retry": "Réessayer"
+  },
+  "install": {
+    "action": "Installer l'application",
+    "iosTitle": "Ajouter à l'écran d'accueil",
+    "iosIntro": "L'application s'ouvrira d'un tap, comme les autres.",
+    "iosStep1": "Touchez le bouton Partager de Safari.",
+    "iosStep2": "Choisissez « Sur l'écran d'accueil », puis « Ajouter ».",
+    "section": "Application"
   }
 }

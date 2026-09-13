@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAlgerianMobile, normalizePhone } from "@/lib/phone";
 
 /** Messages = CLÉS i18n, jamais des phrases. Voir `daydream-i18n`. */
 
@@ -24,8 +25,53 @@ const money = z.coerce
   .min(0, { message: "errors.numberNegative" })
   .max(99_999_999);
 
+/**
+ * Montant OBLIGATOIRE : versement et caution.
+ *
+ * Décision du client : ces deux champs doivent être SAISIS, même à 0. Un champ
+ * vide ne vaut donc plus 0 — c'est ce qui distingue « le client n'a rien
+ * versé » de « l'employé a oublié de demander ». Le formulaire les présente
+ * vides, pas pré-remplis à 0, sinon l'obligation ne voudrait rien dire.
+ *
+ * `z.unknown()` d'abord : `formData.get` rend `null` pour un champ absent, et
+ * ce `null` doit produire « obligatoire », pas « saisissez un nombre ».
+ */
+const requiredMoney = z
+  .unknown()
+  .transform((v) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v)))
+  .pipe(z.string().min(1, { message: "errors.required" }))
+  // `Number("abc")` vaut NaN, que `z.number` refuse : « saisissez un nombre ».
+  .transform(Number)
+  .pipe(
+    z
+      .number({ message: "errors.numberInvalid" })
+      .min(0, { message: "errors.numberNegative" })
+      .max(99_999_999),
+  );
+
+/**
+ * Téléphone du client : obligatoire, mobile algérien, enregistré NORMALISÉ.
+ * Voir `src/lib/phone.ts`.
+ *
+ * Obligatoire dans l'APPLICATION seulement — pas de `not null` en base : les
+ * commandes déjà saisies sans numéro, et l'import du Google Sheet, doivent
+ * rester valides.
+ */
+const requiredPhone = z
+  .unknown()
+  .transform((v) => (typeof v === "string" ? normalizePhone(v) : ""))
+  .pipe(
+    z
+      .string()
+      .min(1, { message: "errors.required" })
+      .refine(isAlgerianMobile, { message: "errors.phoneInvalid" }),
+  );
+
+// `min(1)` avant le motif : une date VIDE est un oubli (« obligatoire »), pas
+// une date mal formée.
 const isoDate = z
-  .string()
+  .string({ message: "errors.required" })
+  .min(1, { message: "errors.required" })
   .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "errors.dateInvalid" });
 
 /**
@@ -61,13 +107,13 @@ export const orderSchema = z
       .trim()
       .min(1, { message: "errors.required" })
       .max(120),
-    customer_phone: optionalText,
+    customer_phone: requiredPhone,
     event_date: isoDate,
     pickup_date: isoDate,
     return_due_date: isoDate,
     discount: money,
-    amount_paid: money,
-    caution_amount: money,
+    amount_paid: requiredMoney,
+    caution_amount: requiredMoney,
     notes: z.string().trim().max(1000).optional().transform((v) => (v ? v : null)),
     lines: z
       .array(draftLineSchema)
@@ -93,3 +139,49 @@ export const orderSchema = z
   );
 
 export type OrderInput = z.infer<typeof orderSchema>;
+
+/**
+ * TOUTES les erreurs d'un envoi, une par champ — et non la première seule.
+ *
+ * Le formulaire de commande tient sur une page qui défile : s'il ne signalait
+ * qu'un champ à la fois, l'employé corrigerait, renverrait, découvrirait le
+ * suivant plus bas, et recommencerait. Sur un téléphone, c'est ce va-et-vient
+ * que le client reprochait à l'assistant.
+ *
+ * La clé est le champ de PREMIER niveau : une erreur dans
+ * `lines[2].label` s'affiche sur la section des pièces, pas sur une ligne
+ * qu'aucun champ ne représente. Le premier message rencontré par champ gagne.
+ *
+ * Partagé par le navigateur et la Server Action : les deux côtés parlent
+ * exactement la même langue d'erreurs.
+ */
+export function fieldErrorsOf(error: z.ZodError): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = String(issue.path[0] ?? "");
+    if (key && !(key in errors)) errors[key] = issue.message;
+  }
+  return errors;
+}
+
+/**
+ * Un mouvement d'argent sur une commande déjà créée.
+ *
+ * `direction` plutôt qu'un montant signé : un « - » devant un chiffre se voit
+ * mal, se tape par erreur, et se lit encore plus mal sur un écran de 390 px.
+ * Le signe vient donc d'un choix explicite à l'écran, et le montant reste
+ * toujours positif — y compris pour une correction.
+ */
+export const paymentSchema = z.object({
+  amount: z.coerce
+    .number({ message: "errors.numberInvalid" })
+    .gt(0, { message: "errors.paymentZero" })
+    .max(99_999_999, { message: "errors.numberInvalid" }),
+  // `formData.get` rend `null` quand le champ est absent : on ne peut pas se
+  // reposer sur un `.default()`, qui ne s'applique qu'à `undefined`.
+  direction: z
+    .unknown()
+    .transform((v) => (v === "refund" ? ("refund" as const) : ("payment" as const))),
+});
+
+export type PaymentInput = z.infer<typeof paymentSchema>;

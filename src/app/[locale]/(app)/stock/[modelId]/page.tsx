@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ModelRestoreButton } from "@/components/model-danger-zone";
-import { getModel, isUnitFreeToday } from "@/lib/queries/stock";
+import { getBlockedUnitIds, getModel, isUnitFree } from "@/lib/queries/stock";
+import { todayIso } from "@/lib/rental-range";
 import { getProfile, isOwner } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { photoUrl } from "@/lib/storage";
@@ -39,7 +40,11 @@ export default async function ModelPage({
   const id = Number(modelId);
   if (!Number.isFinite(id)) notFound();
 
-  const [model, profile] = await Promise.all([getModel(id), getProfile()]);
+  const [model, profile, blocked] = await Promise.all([
+    getModel(id),
+    getProfile(),
+    getBlockedUnitIds(todayIso()),
+  ]);
   if (!model) notFound();
 
   const l = locale as Locale;
@@ -147,7 +152,7 @@ export default async function ModelPage({
           disponibilité se calcule — jamais au niveau du modèle. */}
       <ul className="mt-4 space-y-2">
         {units.map((unit) => {
-          const free = isUnitFreeToday(unit);
+          const free = isUnitFree(unit, blocked);
           const price = unit.price_override ?? model.base_price;
 
           return (

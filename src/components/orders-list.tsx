@@ -15,6 +15,7 @@ import {
 } from "@/components/orders-columns";
 import { PAGE_SIZE, SORTABLE, type OrderRow, type SortKey } from "@/lib/orders-query";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { daysBetween, todayIso } from "@/lib/rental-range";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
@@ -113,12 +114,30 @@ export function OrdersList({
         return formatDate(order.event_date, locale);
       case "pickup_date":
         return formatDate(order.pickup_date, locale);
-      case "status":
+      case "status": {
+        // Le retard REMPLACE le statut : « En cours » ne dit rien de plus que
+        // « En retard de 3 j », et deux pastilles ne tiennent pas dans une
+        // cellule de liste. Il ne se stocke nulle part — c'est le calendrier
+        // qui le dit, à chaque affichage.
+        const late = order.status === "en_cours"
+          && daysBetween(todayIso(), order.return_due_date) < 0;
+
         return (
-          <Badge className={STATUS_STYLES[order.status]}>
-            {t(`orders.status.${STATUS_KEYS[order.status]}`)}
+          <Badge
+            className={
+              late
+                ? "bg-warning-soft text-warning-foreground border-transparent"
+                : STATUS_STYLES[order.status]
+            }
+          >
+            {late
+              ? t("orders.lateBy", {
+                  count: formatNumber(-daysBetween(todayIso(), order.return_due_date), locale),
+                })
+              : t(`orders.status.${STATUS_KEYS[order.status]}`)}
           </Badge>
         );
+      }
       case "total_price":
         return formatMoney(order.total_price, locale);
       case "amount_paid":

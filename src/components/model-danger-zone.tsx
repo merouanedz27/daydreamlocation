@@ -3,18 +3,9 @@
 import { useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { AlertCircle, ArchiveRestore, PackageX, Trash2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArchiveRestore, PackageX, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "@/i18n/navigation";
 import { deleteModel, setModelActive } from "@/lib/actions/stock";
@@ -42,9 +33,9 @@ type Props = {
  * qui l'explique. Proposer « Supprimer » puis refuser au clic apprendrait à
  * l'utilisateur que le bouton ment.
  *
- * La confirmation est un `Drawer`, pas un `window.confirm` : il faut la place
- * de dire ce qui va disparaître, et une cible de 44 px sous le pouce. Voir
- * `daydream-ui`.
+ * La confirmation passe par `ConfirmDialog`, commun à tout le produit : il
+ * faut la place de dire ce qui va disparaître, et une cible de 44 px sous le
+ * pouce. Voir `daydream-ui`.
  */
 export function ModelDangerZone({
   modelId,
@@ -57,40 +48,38 @@ export function ModelDangerZone({
   const { locale } = useParams<{ locale: Locale }>();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
 
   // Retiré du catalogue ET porteur d'un historique : il n'y a plus rien à
   // faire ici. On le dit, plutôt que de laisser un bouton sans effet.
   if (hasHistory && !isActive) {
     return (
-      <p className="text-muted-foreground text-sm">{t("stock.archivedAndUsed")}</p>
+      <p className="text-muted-foreground text-sm">
+        {t("stock.archivedAndUsed")}
+      </p>
     );
   }
 
   const mode = hasHistory ? "archive" : "delete";
 
-  function onConfirm() {
-    setError(null);
+  async function onConfirm() {
     const data = new FormData();
     data.set("id", String(modelId));
     data.set("locale", locale);
+    if (mode === "archive") data.set("active", "0");
 
-    startTransition(async () => {
-      if (mode === "archive") data.set("active", "0");
-      const result = await (mode === "archive" ? setModelActive : deleteModel)(data);
-      // La suppression redirige d'elle-même : on n'arrive ici qu'en cas
-      // d'échec, ou après un retrait réussi.
-      if (result?.ok) {
-        setOpen(false);
-        // Le modèle vient de quitter le catalogue : rester sur sa page de
-        // modification laisserait douter que le geste ait pris. On revient là
-        // où son absence se constate.
-        router.push("/stock");
-        return;
-      }
-      if (result) setError(result.error);
-    });
+    const result = await (mode === "archive" ? setModelActive : deleteModel)(
+      data,
+    );
+
+    // La suppression redirige d'elle-même : on n'arrive ici qu'en cas d'échec,
+    // ou après un retrait réussi.
+    if (result?.ok) {
+      // Le modèle vient de quitter le catalogue : rester sur sa page de
+      // modification laisserait douter que le geste ait pris. On revient là
+      // où son absence se constate.
+      router.push("/stock");
+    }
+    return result;
   }
 
   return (
@@ -115,47 +104,35 @@ export function ModelDangerZone({
         {mode === "archive" ? t("stock.archiveModel") : t("stock.deleteModel")}
       </Button>
 
-      {error && (
-        <Alert variant="destructive" className="mt-3">
-          <AlertCircle />
-          <AlertDescription>{t(error)}</AlertDescription>
-        </Alert>
-      )}
-
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent>
-          <DrawerHeader className="text-start">
-            <DrawerTitle>
-              {mode === "archive"
-                ? t("stock.archiveConfirmTitle", { name })
-                : t("stock.deleteConfirmTitle", { name })}
-            </DrawerTitle>
-            <DrawerDescription>
-              {mode === "archive"
-                ? t("stock.archiveConfirmBody")
-                : t("stock.deleteConfirmBody", { count: pieceCount })}
-            </DrawerDescription>
-          </DrawerHeader>
-
-          <DrawerFooter>
-            <Button
-              type="button"
-              variant={mode === "archive" ? "default" : "destructive"}
-              disabled={isPending}
-              onClick={onConfirm}
-              className="h-12 w-full text-base"
-            >
-              {isPending && <Spinner />}
-              {mode === "archive" ? t("stock.archiveModel") : t("stock.deleteModel")}
-            </Button>
-            <DrawerClose asChild>
-              <Button type="button" variant="ghost" className="h-12 w-full text-base">
-                {t("common.cancel")}
-              </Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+      {/* Le RETRAIT du catalogue se défait ; la SUPPRESSION non. Les deux ne
+          portent donc pas le même ton : le rouge n'est mis qu'au geste sans
+          retour. */}
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        tone={mode === "archive" ? "default" : "danger"}
+        icon={
+          mode === "archive" ? (
+            <PackageX className="size-4" />
+          ) : (
+            <Trash2 className="size-4" />
+          )
+        }
+        title={
+          mode === "archive"
+            ? t("stock.archiveConfirmTitle", { name })
+            : t("stock.deleteConfirmTitle", { name })
+        }
+        description={
+          mode === "archive"
+            ? t("stock.archiveConfirmBody")
+            : t("stock.deleteConfirmBody", { count: pieceCount })
+        }
+        confirmLabel={
+          mode === "archive" ? t("stock.archiveModel") : t("stock.deleteModel")
+        }
+        onConfirm={onConfirm}
+      />
     </>
   );
 }
@@ -187,7 +164,11 @@ export function ModelRestoreButton({ modelId }: { modelId: number }) {
       }}
       className="h-11 shrink-0"
     >
-      {isPending ? <Spinner /> : <ArchiveRestore className="size-4" aria-hidden />}
+      {isPending ? (
+        <Spinner />
+      ) : (
+        <ArchiveRestore className="size-4" aria-hidden />
+      )}
       {t("stock.restoreModel")}
     </Button>
   );

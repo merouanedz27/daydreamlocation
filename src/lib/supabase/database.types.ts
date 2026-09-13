@@ -387,6 +387,7 @@ export type Database = {
           role: string;
           is_active: boolean;
           created_at: string;
+          email: string | null;
         };
         Insert: {
           id: string;
@@ -394,6 +395,7 @@ export type Database = {
           role?: string;
           is_active?: boolean;
           created_at?: string;
+          email?: string | null;
         };
         Update: {
           id?: string;
@@ -401,6 +403,7 @@ export type Database = {
           role?: string;
           is_active?: boolean;
           created_at?: string;
+          email?: string | null;
         };
         Relationships: [
           {
@@ -419,6 +422,10 @@ export type Database = {
           days_after_event: number;
           cleaning_buffer_days: number;
           updated_at: string;
+          shop_address: string | null;
+          shop_phone: string | null;
+          rental_terms_fr: string | null;
+          rental_terms_ar: string | null;
         };
         Insert: {
           id?: boolean;
@@ -426,6 +433,10 @@ export type Database = {
           days_after_event?: number;
           cleaning_buffer_days?: number;
           updated_at?: string;
+          shop_address?: string | null;
+          shop_phone?: string | null;
+          rental_terms_fr?: string | null;
+          rental_terms_ar?: string | null;
         };
         Update: {
           id?: boolean;
@@ -433,12 +444,23 @@ export type Database = {
           days_after_event?: number;
           cleaning_buffer_days?: number;
           updated_at?: string;
+          shop_address?: string | null;
+          shop_phone?: string | null;
+          rental_terms_fr?: string | null;
+          rental_terms_ar?: string | null;
         };
         Relationships: [];
       };
     };
     Views: { [_ in never]: never };
     Functions: {
+      add_order_payment: {
+        Args: {
+          p_order_id: number;
+          p_amount: number;
+        };
+        Returns: number;
+      };
       create_order: {
         Args: {
           p_customer_name: string;
@@ -459,6 +481,13 @@ export type Database = {
           p_today?: string;
         };
         Returns: Json;
+      };
+      set_order_cancelled: {
+        Args: {
+          p_order_id: number;
+          p_cancelled: boolean;
+        };
+        Returns: string;
       };
     };
     Enums: { [_ in never]: never };

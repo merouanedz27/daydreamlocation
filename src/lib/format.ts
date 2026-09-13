@@ -12,8 +12,24 @@ const NUMBER_LOCALE: Record<Locale, string> = {
   ar: "ar-DZ-u-nu-latn",
 };
 
-/** Monnaie affichée « DA », comme sur le tableur du client. */
-const CURRENCY_SUFFIX = "DA";
+/**
+ * Monnaie, dans l'écriture de chaque langue : « DA » en français comme sur le
+ * tableur du client, « دج » en arabe.
+ *
+ * On n'utilise PAS `style: "currency"` d'`Intl` : il rendrait « د.ج.‏ » avec
+ * ses points et sa marque de direction invisible, et surtout il placerait le
+ * symbole AVANT le nombre en arabe. Le loueur écrit le montant puis l'unité,
+ * dans les deux langues — c'est son geste, et la colonne de prix doit rester
+ * lisible de haut en bas.
+ *
+ * Le sens d'affichage se règle tout seul : les chiffres latins forment un îlot
+ * neutre dans un paragraphe arabe, donc « 7 000 دج » se lit bien de droite à
+ * gauche sans aucune marque de direction.
+ */
+const CURRENCY_SUFFIX: Record<Locale, string> = {
+  fr: "DA",
+  ar: "دج",
+};
 
 /**
  * Séparateur de milliers imposé : espace fine insécable.
@@ -39,12 +55,13 @@ function formatGrouped(
 }
 
 /**
- * « 7 000 DA ». Pas de décimales : les montants sont en dinars entiers.
+ * « 7 000 DA », « 7 000 دج ». Pas de décimales : les montants sont en dinars
+ * entiers.
  * Ne jamais appeler `Intl` directement dans un composant — passer par ici.
  */
 export function formatMoney(amount: number, locale: Locale): string {
   const n = formatGrouped(amount, locale, { maximumFractionDigits: 0 });
-  return `${n} ${CURRENCY_SUFFIX}`;
+  return `${n} ${CURRENCY_SUFFIX[locale]}`;
 }
 
 /**

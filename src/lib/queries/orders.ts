@@ -18,6 +18,10 @@ export async function getSettings(): Promise<Settings> {
       days_after_event: 1,
       cleaning_buffer_days: 1,
       updated_at: new Date().toISOString(),
+      shop_address: null,
+      shop_phone: null,
+      rental_terms_fr: null,
+      rental_terms_ar: null,
     }
   );
 }
@@ -226,4 +230,23 @@ export async function getOrder(id: number): Promise<OrderDetail | null> {
 
   if (error) return null;
   return data as unknown as OrderDetail;
+}
+
+/**
+ * Nombre de dépenses rattachées à une commande (retouche, pressing…).
+ *
+ * Ne sert qu'à la confirmation de SUPPRESSION : ces frais ne partent pas avec
+ * la commande (`on delete set null`), ils deviennent des charges générales. Le
+ * propriétaire doit le savoir avant d'appuyer.
+ *
+ * Réservé au propriétaire par la RLS de `expenses` : pour `staff`, la requête
+ * rend simplement zéro — et `staff` ne voit de toute façon pas le bouton.
+ */
+export async function countOrderExpenses(orderId: number): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("expenses")
+    .select("id", { count: "exact", head: true })
+    .eq("order_id", orderId);
+  return count ?? 0;
 }

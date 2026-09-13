@@ -9,11 +9,13 @@ import { StockFilters } from "@/components/stock-filters";
 import {
   countArchivedModels,
   countStock,
+  getBlockedUnitIds,
   getCategories,
   getModels,
 } from "@/lib/queries/stock";
 import { getProfile, isOwner } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
+import { todayIso } from "@/lib/rental-range";
 import { photoUrl } from "@/lib/storage";
 import type { Locale } from "@/i18n/routing";
 
@@ -44,11 +46,14 @@ export default async function StockPage({
   // celle des costumes louables.
   const archived = archives === "1";
 
-  const [categories, models, profile, archivedCount] = await Promise.all([
+  // Une seule requête de disponibilité pour la page entière : la demander par
+  // modèle referait un aller-retour par carte.
+  const [categories, models, profile, archivedCount, blocked] = await Promise.all([
     getCategories(),
     getModels({ categorySlug: categorie, search: q, archived }),
     getProfile(),
     archived ? Promise.resolve(0) : countArchivedModels(),
+    getBlockedUnitIds(todayIso()),
   ]);
 
   const canEdit = isOwner(profile);
@@ -110,7 +115,7 @@ export default async function StockPage({
       ) : (
         <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {models.map((model) => {
-            const stock = countStock(model.article_units ?? []);
+            const stock = countStock(model.article_units ?? [], blocked);
             const name = l === "ar" && model.name_ar ? model.name_ar : model.name_fr;
             const category = model.categories
               ? l === "ar"

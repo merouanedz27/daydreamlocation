@@ -3,9 +3,9 @@
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { PeriodTotals } from "@/lib/queries/dashboard";
+import { formatMoney, formatNumber } from "@/lib/format";
+import type { PeriodTotals, Upcoming } from "@/lib/queries/dashboard";
 import type { Locale } from "@/i18n/routing";
 
 /**
@@ -18,9 +18,11 @@ import type { Locale } from "@/i18n/routing";
 export function DashboardResult({
   revenue,
   expenses,
+  upcoming,
 }: {
   revenue: PeriodTotals;
   expenses: PeriodTotals;
+  upcoming: Upcoming;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
@@ -59,7 +61,25 @@ export function DashboardResult({
               />
             </dl>
 
-            {exp === 0 && (
+            {/* UN ZÉRO DOIT S'EXPLIQUER. « Ce mois : 0 » à côté de
+                « Cette année : 11 300 » s'est lu comme une panne, alors que
+                les deux chiffres étaient justes : les mariages du registre
+                tombent tous en décembre. La recette se compte à la date de
+                RETRAIT, et c'est ce que cette phrase dit — sans quoi le patron
+                doute de l'écran et retourne à son tableur. */}
+            {rev === 0 && upcoming.count > 0 && (
+              <p className="text-muted-foreground mt-3 text-xs">
+                {t("dashboard.noRevenueYet", {
+                  // En chaîne déjà formatée : un nombre brut passé à ICU
+                  // s'écrirait en chiffres arabes-indiens côté `ar`, alors que
+                  // tout le produit affiche des chiffres latins.
+                  count: formatNumber(upcoming.count, locale),
+                  total: formatMoney(upcoming.total, locale),
+                })}
+              </p>
+            )}
+
+            {exp === 0 && rev > 0 && (
               <p className="text-muted-foreground mt-3 text-xs">
                 {t("dashboard.noExpensesYet")}
               </p>

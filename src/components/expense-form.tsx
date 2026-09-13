@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { DatePicker } from "@/components/date-picker";
 import {
   Select,
   SelectContent,
@@ -34,6 +35,7 @@ import {
 import { createExpense } from "@/lib/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/validation/expenses";
 import { formatDate } from "@/lib/format";
+import { todayIso } from "@/lib/rental-range";
 import type { Locale } from "@/i18n/routing";
 
 export type OrderOption = {
@@ -51,7 +53,15 @@ export function ExpenseForm({ orders }: { orders: OrderOption[] }) {
   const [error, setError] = useState<string | null>(null);
   const [field, setField] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  // `todayIso` et non `toISOString()` : entre minuit et 1 h à Alger, l'heure
+  // UTC est encore la veille.
+  const [spentOn, setSpentOn] = useState(todayIso);
+
+  function onOpenChange(next: boolean) {
+    // Chaque nouvelle dépense repart d'aujourd'hui.
+    if (next) setSpentOn(todayIso());
+    setOpen(next);
+  }
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -68,7 +78,7 @@ export function ExpenseForm({ orders }: { orders: OrderOption[] }) {
   }
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerTrigger asChild>
         <Button className="h-11">
           <Plus className="size-4" aria-hidden />
@@ -122,14 +132,13 @@ export function ExpenseForm({ orders }: { orders: OrderOption[] }) {
 
               <Field data-invalid={field === "spent_on" || undefined}>
                 <FieldLabel htmlFor="spent_on">{t("expenses.date")}</FieldLabel>
-                <Input
+                <DatePicker
                   id="spent_on"
                   name="spent_on"
-                  type="date"
-                  defaultValue={today}
-                  required
+                  value={spentOn}
+                  onChange={setSpentOn}
                   disabled={isPending}
-                  className="h-12 text-base"
+                  invalid={field === "spent_on"}
                 />
                 {field === "spent_on" && error && <FieldError>{t(error)}</FieldError>}
               </Field>

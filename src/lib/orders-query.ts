@@ -39,6 +39,8 @@ export type OrderRow = {
   customer_phone: string | null;
   event_date: string;
   pickup_date: string;
+  /** Sert au retard, qui se déduit du calendrier — il ne se stocke nulle part. */
+  return_due_date: string;
   status: string;
   total_price: number;
   amount_paid: number;
@@ -83,4 +85,28 @@ export function parseOrdersQuery(params: {
 /** Échappe ce qui casserait la syntaxe `or(...)` de PostgREST. */
 export function sanitizeSearch(term: string): string {
   return term.replace(/[(),"*\\]/g, " ").trim();
+}
+
+/**
+ * Les FILTRES de la liste, traduits en paramètres PostgREST — sans le tri ni
+ * la pagination.
+ *
+ * Partagés par l'écran et par l'export Excel : un fichier exporté doit
+ * contenir EXACTEMENT les commandes qu'on voit filtrées à l'écran. Deux copies
+ * de cette logique finiraient par diverger, et l'export mentirait sans bruit.
+ */
+export function ordersFilters(query: OrdersQuery): {
+  /** Argument de `.or(...)`, ou `null` sans recherche. */
+  search: string | null;
+  status: OrderStatus | null;
+} {
+  const term = sanitizeSearch(query.q);
+  return {
+    // On cherche sur ce que l'équipe a sous les yeux quand le client appelle :
+    // son nom, le numéro de commande, son téléphone.
+    search: term
+      ? `customer_name.ilike.%${term}%,order_no.ilike.%${term}%,customer_phone.ilike.%${term}%`
+      : null,
+    status: query.status,
+  };
 }

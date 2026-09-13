@@ -46,7 +46,11 @@ export function LocaleSwitcher({ className }: { className?: string }) {
         startTransition(() => {
           // `usePathname` de `@/i18n/navigation` renvoie le chemin SANS préfixe
           // de locale ; `replace` le re-préfixe. On reste donc sur la page.
-          router.replace(pathname, { locale: target });
+          // La requête (`?date=`, `?q=&statut=`) est GARDÉE : changer de langue
+          // ne doit ni vider les filtres de la liste, ni ramener la feuille du
+          // jour à aujourd'hui. Lue au clic et non via `useSearchParams`, qui
+          // imposerait une frontière Suspense à la page de connexion.
+          router.replace(`${pathname}${window.location.search}`, { locale: target });
         })
       }
       className={cn(

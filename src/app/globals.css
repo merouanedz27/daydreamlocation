@@ -146,24 +146,47 @@
   --cream: oklch(0.9710 0.0155 86.42);
   --cream-foreground: var(--foreground);
 
-  /* BARRES DE NAVIGATION — BRUN #6B4F3A.
+  /* BARRES DE NAVIGATION — BRUN CLAIRCI #765A44.
      Une barre SOMBRE inverse le risque de la translucidité : le danger n'est
      plus un aplat sombre qui passerait dessous, mais le fond BLANC de la page
-     — c'est-à-dire le cas ordinaire — qui la délave. D'où 92 % d'opacité ici,
-     contre 85 % du temps du crème. MESURÉ sur neuf fonds ; au pire (brun 92 %
-     sur blanc) :
-       nav-foreground blanc        6,09:1
-       nav-muted #E9DFD5           4,63:1  — le beige le plus sombre qui
-                                             tienne encore AA
-       pastille gold-soft          5,67:1 contre la barre,
+     — c'est-à-dire le cas ordinaire — qui la délave. D'où 92 % d'opacité ici.
+     Toutes les mesures ci-dessous sont prises à ce PIRE CAS, barre à 92 % sur
+     la page blanche, soit #816753 :
+       nav-foreground blanc        5,25:1   (6,09 avant l'éclaircissement)
+       nav-muted #F7EDE2           4,54:1   — voir juste en dessous
+       pastille gold-soft          4,89:1 contre la barre,
                                    encre dessus 14,65:1
-       jaune vif #EAB308           3,17:1  — assez pour un TRAIT ou une
-                                             pastille, JAMAIS pour du texte
-     Corollaire à ne pas oublier : muted-foreground tombe à 1,09:1 sur ce
-     brun. Aucun texte de la barre ne doit hériter des couleurs de la page. */
-  --nav: oklch(0.4518 0.0497 57.96); /* #6B4F3A */
+       jaune vif #EAB308           2,74:1   — NE TIENT PLUS LES 3:1 exigés
+                                              d'un élément graphique. C'est
+                                              pourquoi le trait d'onglet actif
+                                              de la barre basse est passé à
+                                              `gold-soft`. Le disque « + »
+                                              reste jaune : ce n'est pas son
+                                              contour qui porte le sens mais
+                                              le « + » encre posé dessus
+                                              (8,21:1 sur le jaune).
+
+     CE QUE L'ÉCLAIRCISSEMENT A COÛTÉ, ET POURQUOI IL S'ARRÊTE LÀ.
+     Éclaircir une barre sombre écrase le texte clair qu'elle porte. À
+     oklch(0.51) — à peine plus haut — PLUS AUCUN beige ne tient 4,5:1, pas
+     même un beige quasi blanc (4,46 au mieux) : `nav-muted` cesse alors
+     d'exister en tant que couleur « en retrait ». 0,49 est donc le dernier
+     palier où la barre garde ses deux niveaux de texte. Pour aller plus clair
+     il faudrait BASCULER la barre en texte encre — une autre décision, qui
+     coûterait le disque jaune du « + » (le jaune ne dépasse jamais 1,9:1 sur
+     un fond clair).
+
+     Corollaire à ne pas oublier : muted-foreground de la page tombe à 1,2:1
+     sur ce brun. Aucun texte de la barre ne doit hériter des couleurs de la
+     page. */
+  --nav: oklch(0.49 0.0497 57.96); /* #765A44 */
   --nav-foreground: oklch(1 0 0);
-  --nav-muted: oklch(0.9088 0.0174 67.61); /* #E9DFD5 */
+  /* Éclairci en même temps que la barre : l'ancien #E9DFD5 y tombait à
+     3,72:1. Le nouveau ne garde qu'une marge mince sur le blanc (4,54 contre
+     5,25) — c'est le prix d'une barre plus claire, et la raison pour laquelle
+     elle ne peut pas l'être davantage. L'onglet actif reste en outre
+     distingué par sa graisse et sa pastille, pas par la seule couleur. */
+  --nav-muted: oklch(0.95 0.0174 67.61); /* #F7EDE2 */
   /* Filet décoratif, pas du texte : aucun minimum de contraste à tenir. */
   --nav-border: oklch(1 0 0 / 18%);
 
@@ -317,6 +340,23 @@
   .ornament > .ornament-diamond {
     @apply size-1.5 rotate-45 bg-current;
   }
+}
+
+/* Coller un élément JUSTE AU-DESSUS de la barre d'onglets basse.
+   La barre est elle-même `sticky bottom-0` : une barre d'action de formulaire
+   en `bottom-0` se glissait donc DESSOUS, masquée sur téléphone. Sa hauteur :
+   `min-h-14` + filet de 1 px + `pb-safe`. À garder synchronisé avec
+   `bottom-nav.tsx`. Sur `md:`, la barre basse disparaît : reprendre `bottom-0`. */
+/* Documents imprimables (groupe de routes `(print)`) : A4 et marges FIXES.
+   Sans `@page`, chaque navigateur applique les siennes, et Chrome sur Android
+   imprime en Letter selon la région — le pied du bon partait sur une 2ᵉ page. */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@utility bottom-above-nav {
+  bottom: calc(3.5rem + 1px + max(env(safe-area-inset-bottom), 0.5rem));
 }
 
 @layer utilities {

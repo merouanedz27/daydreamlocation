@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { rangeContains } from "@/lib/rental-range";
+import { addDays, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
 
 export type Category = Tables<"categories">;
@@ -91,13 +91,19 @@ export async function getCategories(): Promise<Category[]> {
   return data ?? [];
 }
 
-export type UnitWithBookings = ArticleUnit & {
-  order_lines: { rental_range: string | null; is_active: boolean }[];
+export type UnitWithHistory = ArticleUnit & {
+  /**
+   * Sert UNIQUEMENT à savoir si la pièce a déjà servi — donc si le modèle peut
+   * encore s'effacer ou seulement se retirer du catalogue. Rien à voir avec la
+   * disponibilité : on compte ici TOUTES les lignes, annulées comprises, parce
+   * qu'une commande annulée reste dans les comptes de l'an dernier.
+   */
+  order_lines: { id: number }[];
 };
 
 export type ModelDetail = ArticleModel & {
   categories: Category | null;
-  article_units: UnitWithBookings[];
+  article_units: UnitWithHistory[];
 };
 
 export async function getModel(id: number): Promise<ModelDetail | null> {
@@ -108,7 +114,7 @@ export async function getModel(id: number): Promise<ModelDetail | null> {
     .select(
       `*, categories (*),
        article_units (
-         *, order_lines ( rental_range, is_active )
+         *, order_lines ( id )
        )`,
     )
     .eq("id", id)
@@ -119,25 +125,63 @@ export async function getModel(id: number): Promise<ModelDetail | null> {
 }
 
 /**
- * Une pièce est louable si son état matériel le permet ET si aucune commande
- * active ne la bloque aujourd'hui.
+ * Pièces bloquées un jour donné — UNE requête pour tout un écran.
  *
- * ATTENTION : ceci répond à « disponible MAINTENANT », pour l'affichage du
- * stock. La disponibilité sur des DATES données se décide en base, via la
+ * Remonter les lignes de commande imbriquées sous chaque pièce ferait grossir
+ * la liste du stock avec tout l'historique de la boutique pour n'en retenir
+ * qu'une poignée de jours. On demande donc l'inverse : les seules lignes
+ * actives qui couvrent CE jour-là. C'est la base qui compare les plages
+ * (`ov`, l'opérateur de chevauchement de Postgres), jamais le JavaScript.
+ *
+ * « Bloquée » et non « louée » : la plage inclut le battement de nettoyage,
+ * une pièce rendue hier peut donc figurer ici.
+ *
+ * ATTENTION — ceci répond à « disponible CE JOUR-LÀ », pour l'affichage. La
+ * disponibilité sur une fenêtre de location se décide en base, via la
  * contrainte d'exclusion — jamais ici. Voir `daydream-db`.
  */
-export function isUnitFreeToday(unit: UnitWithBookings): boolean {
-  if (unit.status !== "disponible") return false;
+export async function getBlockedUnitIds(day: IsoDate): Promise<Set<number>> {
+  const supabase = await createClient();
 
-  const today = new Date().toISOString().slice(0, 10);
-  return !unit.order_lines?.some(
-    (line) => line.is_active && rangeContains(line.rental_range, today),
-  );
+  const { data, error } = await supabase
+    .from("order_lines")
+    .select("unit_id")
+    .eq("is_active", true)
+    .not("unit_id", "is", null)
+    // Une journée en plage demi-ouverte : chevaucher `[j, j+1)`, c'est
+    // exactement contenir `j`.
+    .filter("rental_range", "ov", `[${day},${addDays(day, 1)})`);
+
+  if (error) throw error;
+
+  const ids = new Set<number>();
+  for (const row of data ?? []) {
+    if (row.unit_id !== null) ids.add(row.unit_id);
+  }
+  return ids;
 }
 
-/** Compte les pièces d'un modèle par état, pour l'affichage en liste. */
-export function countStock(units: Pick<ArticleUnit, "status">[]) {
+/**
+ * Une pièce est louable si son état matériel le permet ET si aucune commande
+ * active ne la bloque ce jour-là.
+ *
+ * Règle UNIQUE, partagée par la liste du stock et la fiche modèle. Les deux
+ * l'ont longtemps portée séparément — la liste ne regardait que `status` et
+ * annonçait « 2/2 disponibles » alors qu'une veste était réservée.
+ */
+export function isUnitFree(
+  unit: Pick<ArticleUnit, "id" | "status">,
+  blockedUnitIds: ReadonlySet<number>,
+): boolean {
+  return unit.status === "disponible" && !blockedUnitIds.has(unit.id);
+}
+
+/** Compte les pièces d'un modèle, pour l'affichage en liste. */
+export function countStock(
+  units: Pick<ArticleUnit, "id" | "status">[],
+  blockedUnitIds: ReadonlySet<number>,
+) {
   const total = units.length;
-  const available = units.filter((u) => u.status === "disponible").length;
+  const available = units.filter((u) => isUnitFree(u, blockedUnitIds)).length;
   return { total, available, unavailable: total - available };
 }

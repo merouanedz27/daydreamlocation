@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Cairo, Inter } from "next/font/google";
+import { SerwistProvider } from "@serwist/turbopack/react";
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
 import { localeDirection, routing, type Locale } from "@/i18n/routing";
@@ -102,8 +103,26 @@ export default async function LocaleLayout({
         {/* DirectionProvider informe les primitives Radix du sens d'écriture
             (menus, sliders, carrousels ouvrent du bon côté). */}
         <DirectionProvider dir={dir}>
-          <NextIntlClientProvider>{children}</NextIntlClientProvider>
-          <Toaster position="top-center" dir={dir} />
+          {/* Service worker de l'application installée (`src/app/sw.ts`).
+              Coupé en développement : un worker actif servirait d'anciens
+              fichiers pendant qu'on modifie le code.
+              `cacheOnNavigation` coupé : il demanderait au worker de garder
+              chaque page visitée — des commandes et des clients.
+              `reloadOnOnline` coupé : au retour du réseau, il rechargerait la
+              page et viderait une commande en cours de saisie. */}
+          <SerwistProvider
+            swUrl="/serwist/sw.js"
+            disable={process.env.NODE_ENV === "development"}
+            cacheOnNavigation={false}
+            reloadOnOnline={false}
+          >
+            <NextIntlClientProvider>{children}</NextIntlClientProvider>
+          </SerwistProvider>
+          {/* `theme="light"` : `ui/sonner.tsx` lit le thème via next-themes, mais
+              aucun ThemeProvider n'est monté — il vaudrait donc « system », et un
+              téléphone réglé en sombre afficherait des toasts noirs sur une
+              application blanche. Le mode sombre n'est pas exposé en v1. */}
+          <Toaster position="top-center" dir={dir} theme="light" />
         </DirectionProvider>
       </body>
     </html>

@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { flushSync } from "react-dom";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   AlertCircle,
-  ArrowLeft,
-  ArrowRight,
+  AlertTriangle,
   CalendarRange,
   Layers,
   Plus,
@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker, toCalendarDate } from "@/components/date-picker";
 import { Spinner } from "@/components/ui/spinner";
-import { Separator } from "@/components/ui/separator";
 import { OrderPiecePicker, type PickedUnit } from "@/components/order-piece-picker";
 import {
   OrderEnsemblePicker,
@@ -41,8 +41,9 @@ import {
   unitIdsIn,
   type DraftLine,
 } from "@/lib/order-draft";
+import { fieldErrorsOf, orderSchema } from "@/lib/validation/orders";
 import { defaultWindow } from "@/lib/rental-range";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
   PickerEnsemble,
@@ -52,9 +53,42 @@ import type {
 } from "@/lib/queries/orders";
 import type { Locale } from "@/i18n/routing";
 
-const TOTAL_STEPS = 3;
+/** Une erreur à afficher : une clé i18n, et ses valeurs éventuelles. */
+type FieldIssue = { key: string; values?: Record<string, string> };
+type Issues = Partial<Record<string, FieldIssue>>;
 
-export function OrderWizard({
+/**
+ * Ordre des champs À L'ÉCRAN, de haut en bas, avec l'élément qui reçoit le
+ * focus. C'est lui qui décide vers quel champ on défile quand l'envoi échoue :
+ * le premier fautif dans l'ordre de lecture, pas dans l'ordre du schéma.
+ */
+const FIELD_TARGETS = [
+  ["customer_name", "customer_input"],
+  ["customer_phone", "phone_input"],
+  ["event_date", "event_date_input"],
+  ["pickup_date", "pickup_input"],
+  ["return_due_date", "return_input"],
+  ["lines", "section-pieces"],
+  ["discount", "discount"],
+  ["amount_paid", "amount_paid"],
+  ["caution_amount", "caution_amount"],
+  ["notes", "notes"],
+] as const;
+
+/**
+ * Saisie d'une commande — UNE page qui défile.
+ *
+ * Elle remplace un assistant en trois étapes (« Suivant », « Suivant »,
+ * « Créer ») que le client a refusé à l'usage : on ne voyait jamais la
+ * commande entière, et une erreur découverte à la dernière étape renvoyait en
+ * arrière sans dire où. Ici tout est visible, les champs obligatoires sont
+ * marqués d'un astérisque, et chaque erreur s'affiche SOUS son champ.
+ *
+ * Ce que les étapes imposaient par leur ordre est désormais dit en clair : on
+ * ne peut pas ajouter de pièce avant d'avoir la date, car la disponibilité
+ * n'a pas de sens sans elle.
+ */
+export function OrderForm({
   models,
   ensembles,
   settings,
@@ -68,32 +102,40 @@ export function OrderWizard({
   const [isPending, startTransition] = useTransition();
   const [isChecking, startChecking] = useTransition();
 
-  const [step, setStep] = useState(1);
-  const [error, setError] = useState<string | null>(null);
-  const [errorValues, setErrorValues] = useState<Record<string, string> | undefined>();
-  const [field, setField] = useState<string | null>(null);
-
-  // --- étape 1 -------------------------------------------------------------
+  // --- client et dates -----------------------------------------------------
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [datesTouched, setDatesTouched] = useState(false);
   const [pickup, setPickup] = useState("");
   const [returnDue, setReturnDue] = useState("");
   const [showDates, setShowDates] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
 
-  // --- étape 2 -------------------------------------------------------------
+  // --- pièces --------------------------------------------------------------
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [unavailable, setUnavailable] = useState<Map<number, Unavailability>>(new Map());
   const [piecesOpen, setPiecesOpen] = useState(false);
   const [ensemblesOpen, setEnsemblesOpen] = useState(false);
   const [externalOpen, setExternalOpen] = useState(false);
+  /** Compteur de requêtes : une réponse périmée ne doit pas écraser la dernière. */
+  const availabilityRequest = useRef(0);
 
-  // --- étape 3 -------------------------------------------------------------
+  // --- montants ------------------------------------------------------------
   const [discount, setDiscount] = useState("0");
-  const [amountPaid, setAmountPaid] = useState("0");
-  const [caution, setCaution] = useState("0");
+  // VIDES, et non « 0 » : ces deux champs sont obligatoires. Pré-remplis à 0,
+  // l'obligation ne voudrait plus rien dire — on ne distinguerait plus « rien
+  // versé » d'« oublié de demander ».
+  const [amountPaid, setAmountPaid] = useState("");
+  const [caution, setCaution] = useState("");
   const [notes, setNotes] = useState("");
+
+  // --- erreurs -------------------------------------------------------------
+  /** Rien ne s'affiche avant le premier envoi : on ne crie pas pendant la frappe. */
+  const [attempted, setAttempted] = useState(false);
+  /** Ce que seul le serveur sait : conflit de réservation, erreur générique. */
+  const [serverIssue, setServerIssue] = useState<FieldIssue | null>(null);
+  /** Erreur sans champ (réseau, droits) : un bandeau au-dessus du bouton. */
+  const [generalError, setGeneralError] = useState<FieldIssue | null>(null);
 
   const unitsById = useMemo(() => {
     const map = new Map<number, { model: PickerModel; unit: PickerModel["units"][number] }>();
@@ -107,6 +149,84 @@ export function OrderWizard({
   const subtotal = linesSubtotal(lines);
   const total = Math.max(subtotal - (Number(discount) || 0), 0);
   const balance = total - (Number(amountPaid) || 0);
+  const windowValid = Boolean(pickup && returnDue && returnDue >= pickup);
+
+  /** Lignes du brouillon devenues indisponibles après un changement de dates. */
+  const takenLines = lines.filter(
+    (l): l is Extract<DraftLine, { kind: "unit" }> =>
+      l.kind === "unit" && unavailable.has(l.unitId),
+  );
+
+  /**
+   * Le brouillon passé au MÊME schéma que la Server Action.
+   *
+   * Calculé à chaque rendu une fois le premier envoi tenté, et non stocké :
+   * une erreur disparaît donc à l'instant où le champ est corrigé, sans effet
+   * de synchronisation à maintenir.
+   */
+  function collectIssues(): Issues {
+    const parsed = orderSchema.safeParse({
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      event_date: eventDate,
+      pickup_date: pickup,
+      return_due_date: returnDue,
+      discount: discount || 0,
+      amount_paid: amountPaid,
+      caution_amount: caution,
+      notes,
+      lines: toPayload(lines),
+    });
+
+    const issues: Issues = {};
+    if (!parsed.success) {
+      for (const [field, key] of Object.entries(fieldErrorsOf(parsed.error))) {
+        issues[field] = { key };
+      }
+    }
+
+    // Sans date d'événement, retrait et retour sont vides par construction :
+    // les signaler aussi ferait trois erreurs pour un seul oubli.
+    if (issues.event_date) {
+      delete issues.pickup_date;
+      delete issues.return_due_date;
+    }
+
+    if (!issues.lines && takenLines.length > 0) {
+      issues.lines = {
+        key: "errors.linesTaken",
+        values: { count: formatNumber(takenLines.length, locale) },
+      };
+    }
+
+    return issues;
+  }
+
+  const issues: Issues = attempted ? collectIssues() : {};
+  if (serverIssue && !issues.lines) issues.lines = serverIssue;
+  const issueCount = Object.keys(issues).length;
+
+  const issueText = (field: string) => {
+    const issue = issues[field];
+    return issue ? t(issue.key, issue.values) : null;
+  };
+
+  /**
+   * Relit les pièces prises sur la fenêtre. Appelée par les GESTES qui
+   * changent les dates, pas par un effet : c'est le geste qui fait la requête.
+   *
+   * Ceci ne décide rien — la contrainte `EXCLUDE` tranche à l'écriture. On
+   * grise, et on prévient si une pièce déjà ajoutée n'est plus libre.
+   */
+  function refreshAvailability(nextPickup: string, nextReturn: string) {
+    if (!nextPickup || !nextReturn || nextReturn < nextPickup) return;
+    const request = ++availabilityRequest.current;
+    startChecking(async () => {
+      const busy = await checkAvailability(nextPickup, nextReturn);
+      if (request !== availabilityRequest.current) return;
+      setUnavailable(new Map(busy.map((b) => [b.unitId, b])));
+    });
+  }
 
   /**
    * La date de l'événement pilote tout. Le client n'en saisit qu'une — l'app en
@@ -115,42 +235,33 @@ export function OrderWizard({
    */
   function onEventDateChange(value: string) {
     setEventDate(value);
-    if (!value || datesTouched) return;
+    setServerIssue(null);
+    if (!value || datesTouched) {
+      refreshAvailability(pickup, returnDue);
+      return;
+    }
     const w = defaultWindow(value, settings.days_before_event, settings.days_after_event);
     setPickup(w.pickup);
     setReturnDue(w.returnDue);
+    refreshAvailability(w.pickup, w.returnDue);
   }
 
-  function goToPieces() {
-    setError(null);
-    setField(null);
+  function onPickupChange(value: string) {
+    setDatesTouched(true);
+    setPickup(value);
+    setServerIssue(null);
+    refreshAvailability(value, returnDue);
+  }
 
-    if (!eventDate) {
-      setError("errors.required");
-      setField("event_date");
-      return;
-    }
-    if (!customerName.trim()) {
-      setError("errors.required");
-      setField("customer_name");
-      return;
-    }
-    if (returnDue < pickup) {
-      setError("errors.datesIncoherent");
-      setField("return_due_date");
-      return;
-    }
-
-    // La disponibilité n'a de sens qu'une fois les dates connues : c'est
-    // pourquoi cette étape vient en premier.
-    startChecking(async () => {
-      const busy = await checkAvailability(pickup, returnDue);
-      setUnavailable(new Map(busy.map((b) => [b.unitId, b])));
-      setStep(2);
-    });
+  function onReturnChange(value: string) {
+    setDatesTouched(true);
+    setReturnDue(value);
+    setServerIssue(null);
+    refreshAvailability(pickup, value);
   }
 
   function addUnit(u: PickedUnit) {
+    setServerIssue(null);
     setLines((prev) =>
       prev.some((l) => l.kind === "unit" && l.unitId === u.unitId)
         ? prev
@@ -176,6 +287,7 @@ export function OrderWizard({
    * les voir refusées à la validation.
    */
   function addEnsemble(ensemble: PickerEnsemble) {
+    setServerIssue(null);
     const added: DraftLine[] = [];
     for (const unitId of ensemble.unit_ids) {
       if (picked.has(unitId)) continue;
@@ -210,6 +322,7 @@ export function OrderWizard({
   }
 
   function addExternal(draft: ExternalDraft) {
+    setServerIssue(null);
     setLines((prev) => [
       ...prev,
       {
@@ -225,6 +338,7 @@ export function OrderWizard({
   }
 
   function removeLine(index: number) {
+    setServerIssue(null);
     setLines((prev) => prev.filter((_, i) => i !== index));
   }
 
@@ -234,36 +348,73 @@ export function OrderWizard({
     );
   }
 
-  function submit(formData: FormData) {
-    setError(null);
-    setErrorValues(undefined);
-    setField(null);
+  /**
+   * Défile jusqu'au PREMIER champ fautif dans l'ordre de lecture et lui donne
+   * le focus. `flushSync` d'abord : le panneau des dates doit être rendu avant
+   * qu'on cherche son champ dans le DOM.
+   */
+  function revealFirst(found: Issues) {
+    flushSync(() => {
+      setAttempted(true);
+      if (found.pickup_date || found.return_due_date) setShowDates(true);
+    });
+    const target = FIELD_TARGETS.find(([field]) => found[field]);
+    const el = target ? document.getElementById(target[1]) : null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus({ preventScroll: true });
+  }
+
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const found = collectIssues();
+    if (Object.keys(found).length > 0) {
+      revealFirst(found);
+      return;
+    }
+
+    setServerIssue(null);
+    setGeneralError(null);
+    const formData = new FormData(event.currentTarget);
     formData.set("lines", JSON.stringify(toPayload(lines)));
+
     startTransition(async () => {
       const result = await createOrder(formData);
       // Succès = redirection : on n'arrive ici que sur erreur.
-      if (result && !result.ok) {
-        setError(result.error);
-        setErrorValues(result.values);
-        setField(result.field ?? null);
-        // Une pièce devenue indisponible entre l'affichage et la validation :
-        // on renvoie l'employé sur la liste des pièces, sinon il ne voit pas
-        // ce qu'il doit corriger.
-        if (result.error.startsWith("errors.unitUnavailable")) setStep(2);
+      if (!result || result.ok) return;
+
+      // Une pièce réservée par un collègue entre l'affichage et l'envoi : on
+      // relit la disponibilité pour que la ligne fautive se marque d'elle-même,
+      // et on ramène l'employé sur les pièces.
+      if (result.error.startsWith("errors.unitUnavailable")) {
+        refreshAvailability(pickup, returnDue);
+        setServerIssue({ key: result.error, values: result.values });
+        revealFirst({ lines: { key: result.error } });
+        return;
       }
+
+      if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
+        const fromServer: Issues = {};
+        for (const [field, key] of Object.entries(result.fieldErrors)) {
+          fromServer[field] = { key };
+        }
+        revealFirst(fromServer);
+        return;
+      }
+
+      setGeneralError({ key: result.error, values: result.values });
     });
   }
 
-  const windowLabel =
-    pickup && returnDue
-      ? t("orders.window", {
-          pickup: formatDate(pickup, locale),
-          returnDue: formatDate(returnDue, locale),
-        })
-      : "";
+  const windowLabel = windowValid
+    ? t("orders.window", {
+        pickup: formatDate(pickup, locale),
+        returnDue: formatDate(returnDue, locale),
+      })
+    : "";
 
   return (
-    <form action={submit} noValidate>
+    <form onSubmit={onSubmit} noValidate>
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="event_date" value={eventDate} />
       <input type="hidden" name="pickup_date" value={pickup} />
@@ -271,89 +422,35 @@ export function OrderWizard({
       <input type="hidden" name="customer_name" value={customerName} />
       <input type="hidden" name="customer_phone" value={customerPhone} />
 
-      <Stepper step={step} />
+      <p className="text-muted-foreground mb-6 text-sm">
+        <RequiredMark /> {t("orders.requiredLegend")}
+      </p>
 
-      {step === 1 && (
+      {/* --- 1. Client ------------------------------------------------------ */}
+      <Section id="section-client" title={t("orders.customer")}>
         <FieldGroup>
-          <Field data-invalid={field === "event_date" || undefined}>
-            <FieldLabel htmlFor="event_date_input">{t("orders.eventDate")}</FieldLabel>
-            <Input
-              id="event_date_input"
-              type="date"
-              value={eventDate}
-              onChange={(e) => onEventDateChange(e.target.value)}
-              className="h-12 text-base"
-            />
-            <FieldDescription>{t("orders.eventDateHint")}</FieldDescription>
-            {field === "event_date" && error && <FieldError>{t(error)}</FieldError>}
-          </Field>
-
-          {eventDate && (
-            <div className="border-border bg-muted/40 rounded-lg border p-3">
-              <p className="flex items-center gap-2 text-sm">
-                <CalendarRange className="text-gold-strong size-4 shrink-0" aria-hidden />
-                <span className="tabular">{windowLabel}</span>
-              </p>
-
-              <button
-                type="button"
-                onClick={() => setShowDates((v) => !v)}
-                className="text-gold-strong mt-2 min-h-9 text-sm underline underline-offset-4"
-              >
-                {t("orders.editDates")}
-              </button>
-
-              {showDates && (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="pickup_input">{t("orders.pickupDate")}</FieldLabel>
-                    <Input
-                      id="pickup_input"
-                      type="date"
-                      value={pickup}
-                      onChange={(e) => {
-                        setDatesTouched(true);
-                        setPickup(e.target.value);
-                      }}
-                      className="h-12 text-base"
-                    />
-                  </Field>
-
-                  <Field data-invalid={field === "return_due_date" || undefined}>
-                    <FieldLabel htmlFor="return_input">{t("orders.returnDate")}</FieldLabel>
-                    <Input
-                      id="return_input"
-                      type="date"
-                      value={returnDue}
-                      onChange={(e) => {
-                        setDatesTouched(true);
-                        setReturnDue(e.target.value);
-                      }}
-                      className="h-12 text-base"
-                    />
-                    {field === "return_due_date" && error && (
-                      <FieldError>{t(error)}</FieldError>
-                    )}
-                  </Field>
-                </div>
-              )}
-            </div>
-          )}
-
-          <Field data-invalid={field === "customer_name" || undefined}>
-            <FieldLabel htmlFor="customer_input">{t("orders.customer")}</FieldLabel>
+          <Field data-invalid={!!issues.customer_name || undefined}>
+            <FieldLabel htmlFor="customer_input">
+              {t("orders.customerName")}
+              <RequiredMark />
+            </FieldLabel>
             <Input
               id="customer_input"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               className="h-12 text-base"
               autoComplete="name"
+              aria-required
+              aria-invalid={!!issues.customer_name || undefined}
             />
-            {field === "customer_name" && error && <FieldError>{t(error)}</FieldError>}
+            {issues.customer_name && <FieldError>{issueText("customer_name")}</FieldError>}
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="phone_input">{t("orders.phone")}</FieldLabel>
+          <Field data-invalid={!!issues.customer_phone || undefined}>
+            <FieldLabel htmlFor="phone_input">
+              {t("orders.phone")}
+              <RequiredMark />
+            </FieldLabel>
             <Input
               id="phone_input"
               type="tel"
@@ -363,84 +460,187 @@ export function OrderWizard({
               className="h-12 text-base"
               autoComplete="tel"
               dir="ltr"
+              aria-required
+              aria-invalid={!!issues.customer_phone || undefined}
             />
+            <FieldDescription>{t("orders.phoneHint")}</FieldDescription>
+            {issues.customer_phone && <FieldError>{issueText("customer_phone")}</FieldError>}
           </Field>
         </FieldGroup>
-      )}
+      </Section>
 
-      {step === 2 && (
-        <div>
+      {/* --- 2. Date -------------------------------------------------------- */}
+      <Section id="section-date" title={t("orders.sectionDate")}>
+        <FieldGroup>
+          <Field data-invalid={!!issues.event_date || undefined}>
+            <FieldLabel htmlFor="event_date_input">
+              {t("orders.eventDate")}
+              <RequiredMark />
+            </FieldLabel>
+            <DatePicker
+              id="event_date_input"
+              value={eventDate}
+              onChange={onEventDateChange}
+              placeholder={t("common.pickDate")}
+              invalid={!!issues.event_date}
+            />
+            <FieldDescription>{t("orders.eventDateHint")}</FieldDescription>
+            {issues.event_date && <FieldError>{issueText("event_date")}</FieldError>}
+          </Field>
+
+          {eventDate && (
+            <div className="border-border bg-muted/40 rounded-lg border p-3">
+              {windowLabel && (
+                <p className="flex items-center gap-2 text-sm">
+                  <CalendarRange className="text-gold-strong size-4 shrink-0" aria-hidden />
+                  <span className="tabular">{windowLabel}</span>
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowDates((v) => !v)}
+                aria-expanded={showDates}
+                className="text-gold-strong mt-2 min-h-11 text-sm underline underline-offset-4"
+              >
+                {t("orders.editDates")}
+              </button>
+
+              {showDates && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field data-invalid={!!issues.pickup_date || undefined}>
+                    <FieldLabel htmlFor="pickup_input">{t("orders.pickupDate")}</FieldLabel>
+                    <DatePicker
+                      id="pickup_input"
+                      value={pickup}
+                      onChange={onPickupChange}
+                      placeholder={t("common.pickDate")}
+                      invalid={!!issues.pickup_date}
+                      // Le retrait ne peut pas suivre le retour.
+                      disabledDays={returnDue ? { after: toCalendarDate(returnDue) } : undefined}
+                    />
+                    {issues.pickup_date && <FieldError>{issueText("pickup_date")}</FieldError>}
+                  </Field>
+
+                  <Field data-invalid={!!issues.return_due_date || undefined}>
+                    <FieldLabel htmlFor="return_input">{t("orders.returnDate")}</FieldLabel>
+                    <DatePicker
+                      id="return_input"
+                      value={returnDue}
+                      onChange={onReturnChange}
+                      placeholder={t("common.pickDate")}
+                      invalid={!!issues.return_due_date}
+                      disabledDays={pickup ? { before: toCalendarDate(pickup) } : undefined}
+                    />
+                    {issues.return_due_date && (
+                      <FieldError>{issueText("return_due_date")}</FieldError>
+                    )}
+                  </Field>
+                </div>
+              )}
+            </div>
+          )}
+        </FieldGroup>
+      </Section>
+
+      {/* --- 3. Pièces ------------------------------------------------------ */}
+      <Section
+        id="section-pieces"
+        title={
+          <>
+            {t("orders.pieces")}
+            <RequiredMark />
+          </>
+        }
+        invalid={!!issues.lines}
+        aside={isChecking ? <Spinner className="text-muted-foreground" /> : null}
+      >
+        {/* Les pièces AVANT la date n'ont pas de sens : la disponibilité se
+            calcule sur une fenêtre. L'assistant l'imposait par l'ordre des
+            étapes ; une page unique doit le dire en clair. */}
+        {!windowValid && (
           <p className="text-muted-foreground flex items-center gap-2 text-sm">
             <CalendarRange className="size-4 shrink-0" aria-hidden />
-            <span className="tabular">{windowLabel}</span>
+            {t("orders.pickDateFirst")}
           </p>
+        )}
 
-          {lines.length === 0 ? (
-            <div className="border-border mt-4 rounded-lg border border-dashed px-6 py-10 text-center">
+        {lines.length === 0 ? (
+          windowValid && (
+            <div className="border-border rounded-lg border border-dashed px-6 py-8 text-center">
               <p className="font-medium">{t("orders.noLines")}</p>
-              <p className="text-muted-foreground mt-1 text-sm">
-                {t("orders.noLinesHint")}
-              </p>
+              <p className="text-muted-foreground mt-1 text-sm">{t("orders.noLinesHint")}</p>
             </div>
-          ) : (
-            <ul className="mt-4 space-y-2">
-              {lines.map((line, i) => (
-                <li key={line.kind === "unit" ? `u${line.unitId}` : `e${i}`}>
-                  <LineCard
-                    line={line}
-                    locale={locale}
-                    onRemove={() => removeLine(i)}
-                    onPrice={(v) => setLinePrice(i, v)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+          )
+        ) : (
+          <ul className="space-y-2">
+            {lines.map((line, i) => (
+              <li key={line.kind === "unit" ? `u${line.unitId}` : `e${i}`}>
+                <LineCard
+                  line={line}
+                  locale={locale}
+                  taken={line.kind === "unit" ? unavailable.get(line.unitId) : undefined}
+                  onRemove={() => removeLine(i)}
+                  onPrice={(v) => setLinePrice(i, v)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPiecesOpen(true)}
-              className="h-12 text-base"
-            >
-              <Plus className="size-4" aria-hidden />
-              {t("orders.addPiece")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setEnsemblesOpen(true)}
-              className="h-12 text-base"
-            >
-              <Layers className="size-4" aria-hidden />
-              {t("orders.addEnsemble")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setExternalOpen(true)}
-              className="h-12 text-base"
-            >
-              <Store className="size-4" aria-hidden />
-              {t("orders.addExternal")}
-            </Button>
-          </div>
+        {issues.lines && (
+          <p role="alert" className="text-destructive mt-3 text-sm">
+            {issueText("lines")}
+          </p>
+        )}
 
-          {lines.length > 0 && (
-            <p className="text-muted-foreground mt-4 flex items-center justify-between text-sm">
-              <span>{t("orders.subtotal")}</span>
-              <span className="tabular text-foreground font-medium">
-                {formatMoney(subtotal, locale)}
-              </span>
-            </p>
-          )}
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPiecesOpen(true)}
+            disabled={!windowValid}
+            className="h-12 text-base"
+          >
+            <Plus className="size-4" aria-hidden />
+            {t("orders.addPiece")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setEnsemblesOpen(true)}
+            disabled={!windowValid}
+            className="h-12 text-base"
+          >
+            <Layers className="size-4" aria-hidden />
+            {t("orders.addEnsemble")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setExternalOpen(true)}
+            disabled={!windowValid}
+            className="h-12 text-base"
+          >
+            <Store className="size-4" aria-hidden />
+            {t("orders.addExternal")}
+          </Button>
         </div>
-      )}
 
-      {step === 3 && (
+        {lines.length > 0 && (
+          <p className="text-muted-foreground mt-4 flex items-center justify-between text-sm">
+            <span>{t("orders.subtotal")}</span>
+            <span className="tabular text-foreground font-medium">
+              {formatMoney(subtotal, locale)}
+            </span>
+          </p>
+        )}
+      </Section>
+
+      {/* --- 4. Montants ---------------------------------------------------- */}
+      <Section id="section-amounts" title={t("orders.amounts")}>
         <FieldGroup>
-          <Field>
+          <Field data-invalid={!!issues.discount || undefined}>
             <FieldLabel htmlFor="discount">{t("orders.discount")}</FieldLabel>
             <Input
               id="discount"
@@ -452,11 +652,16 @@ export function OrderWizard({
               value={discount}
               onChange={(e) => setDiscount(e.target.value)}
               className="h-12 text-base"
+              aria-invalid={!!issues.discount || undefined}
             />
+            {issues.discount && <FieldError>{issueText("discount")}</FieldError>}
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="amount_paid">{t("orders.paid")}</FieldLabel>
+          <Field data-invalid={!!issues.amount_paid || undefined}>
+            <FieldLabel htmlFor="amount_paid">
+              {t("orders.paid")}
+              <RequiredMark />
+            </FieldLabel>
             <Input
               id="amount_paid"
               name="amount_paid"
@@ -467,11 +672,18 @@ export function OrderWizard({
               value={amountPaid}
               onChange={(e) => setAmountPaid(e.target.value)}
               className="h-12 text-base"
+              aria-required
+              aria-invalid={!!issues.amount_paid || undefined}
             />
+            <FieldDescription>{t("orders.zeroAllowed")}</FieldDescription>
+            {issues.amount_paid && <FieldError>{issueText("amount_paid")}</FieldError>}
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="caution_amount">{t("orders.caution")}</FieldLabel>
+          <Field data-invalid={!!issues.caution_amount || undefined}>
+            <FieldLabel htmlFor="caution_amount">
+              {t("orders.caution")}
+              <RequiredMark />
+            </FieldLabel>
             <Input
               id="caution_amount"
               name="caution_amount"
@@ -482,99 +694,76 @@ export function OrderWizard({
               value={caution}
               onChange={(e) => setCaution(e.target.value)}
               className="h-12 text-base"
+              aria-required
+              aria-invalid={!!issues.caution_amount || undefined}
             />
             <FieldDescription>{t("orders.cautionNotRevenue")}</FieldDescription>
+            {issues.caution_amount && <FieldError>{issueText("caution_amount")}</FieldError>}
           </Field>
-
-          <Field>
-            <FieldLabel htmlFor="notes">{t("orders.summary")}</FieldLabel>
-            <Textarea
-              id="notes"
-              name="notes"
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="text-base"
-            />
-          </Field>
-
-          <Separator />
-
-          <dl className="space-y-2 text-sm">
-            <Row label={t("orders.subtotal")} value={formatMoney(subtotal, locale)} />
-            <Row
-              label={t("orders.discount")}
-              value={formatMoney(Number(discount) || 0, locale)}
-            />
-            <Row
-              label={t("orders.total")}
-              value={formatMoney(total, locale)}
-              strong
-            />
-            <Row label={t("orders.paid")} value={formatMoney(Number(amountPaid) || 0, locale)} />
-            <Row
-              label={t("orders.balance")}
-              value={formatMoney(balance, locale)}
-              warning={balance > 0}
-            />
-          </dl>
         </FieldGroup>
-      )}
+      </Section>
 
-      {error && !field && (
-        <Alert variant="destructive" className="mt-4">
+      {/* --- 5. Note -------------------------------------------------------- */}
+      <Section id="section-note" title={t("orders.notesTitle")}>
+        <Field data-invalid={!!issues.notes || undefined}>
+          <FieldLabel htmlFor="notes" className="sr-only">
+            {t("orders.notesTitle")}
+          </FieldLabel>
+          <Textarea
+            id="notes"
+            name="notes"
+            rows={3}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="text-base"
+          />
+          {issues.notes && <FieldError>{issueText("notes")}</FieldError>}
+        </Field>
+      </Section>
+
+      {generalError && (
+        <Alert variant="destructive" className="mt-6">
           <AlertCircle />
-          <AlertDescription>{t(error, errorValues)}</AlertDescription>
+          <AlertDescription>{t(generalError.key, generalError.values)}</AlertDescription>
         </Alert>
       )}
 
-      {/* Barre d'action collante : sur téléphone le bouton ne doit jamais se
-          perdre en bas d'un long défilement. Voir `daydream-ui`. */}
-      <div className="bg-background border-border pb-safe sticky bottom-0 mt-6 flex gap-2 border-t py-3">
-        {step > 1 && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setStep((s) => s - 1)}
-            disabled={isPending}
-            className="h-12 text-base"
-          >
-            <ArrowLeft className="size-4 rtl:-scale-x-100" aria-hidden />
-            {t("common.back")}
-          </Button>
+      {/* BARRE D'ACTION COLLANTE — au-dessus de la barre d'onglets sur
+          téléphone (`bottom-above-nav`), pas dessous comme l'ancien assistant.
+          Elle porte le total et le reste : l'employé voit le montant bouger
+          pendant qu'il défile, sans devoir descendre jusqu'en bas. */}
+      <div className="bg-background border-border bottom-above-nav sticky z-30 mt-8 border-t py-3 md:bottom-0">
+        <div className="mb-3 flex items-baseline justify-between gap-4 text-sm">
+          <span className="text-muted-foreground">
+            {t("orders.total")}{" "}
+            <span className="tabular text-foreground text-base font-medium">
+              {formatMoney(total, locale)}
+            </span>
+          </span>
+          <span className="text-muted-foreground">
+            {t("orders.balance")}{" "}
+            <span
+              className={cn(
+                "tabular font-medium",
+                balance > 0 ? "text-warning-foreground" : "text-foreground",
+              )}
+            >
+              {formatMoney(balance, locale)}
+            </span>
+          </span>
+        </div>
+
+        {issueCount > 0 && (
+          <p className="text-destructive mb-2 flex items-center gap-2 text-sm" role="status">
+            <AlertCircle className="size-4 shrink-0" aria-hidden />
+            {t("orders.fieldsToFix", { count: formatNumber(issueCount, locale) })}
+          </p>
         )}
 
-        {step === 1 && (
-          <Button
-            type="button"
-            onClick={goToPieces}
-            disabled={isChecking}
-            className="h-12 flex-1 text-base"
-          >
-            {isChecking && <Spinner />}
-            {t("common.next")}
-            <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
-          </Button>
-        )}
-
-        {step === 2 && (
-          <Button
-            type="button"
-            onClick={() => setStep(3)}
-            disabled={lines.length === 0}
-            className="h-12 flex-1 text-base"
-          >
-            {t("common.next")}
-            <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden />
-          </Button>
-        )}
-
-        {step === 3 && (
-          <Button type="submit" disabled={isPending} className="h-12 flex-1 text-base">
-            {isPending && <Spinner />}
-            {t("orders.create")}
-          </Button>
-        )}
+        <Button type="submit" disabled={isPending} className="h-12 w-full text-base">
+          {isPending && <Spinner />}
+          {t("orders.create")}
+        </Button>
       </div>
 
       <OrderPiecePicker
@@ -600,74 +789,77 @@ export function OrderWizard({
   );
 }
 
-function Stepper({ step }: { step: number }) {
-  const t = useTranslations();
-  const labels = [t("orders.stepDates"), t("orders.stepPieces"), t("orders.stepAmounts")];
-
+/**
+ * L'astérisque des champs obligatoires. `aria-hidden` : le lecteur d'écran
+ * entend « obligatoire » par `aria-required`, et non « étoile ».
+ */
+function RequiredMark() {
   return (
-    <div className="mb-6">
-      <p className="text-muted-foreground text-sm">
-        {t("orders.stepOf", { current: step, total: TOTAL_STEPS })}
-      </p>
-      <h2 className="mt-1 text-xl">{labels[step - 1]}</h2>
-
-      <div className="mt-3 flex gap-1.5" aria-hidden>
-        {labels.map((_, i) => (
-          <span
-            key={i}
-            className={cn(
-              "h-1 flex-1 rounded-full",
-              i < step ? "bg-primary" : "bg-border",
-            )}
-          />
-        ))}
-      </div>
-    </div>
+    <span className="text-destructive ms-0.5" aria-hidden>
+      *
+    </span>
   );
 }
 
-function Row({
-  label,
-  value,
-  strong,
-  warning,
+/**
+ * Une section de la page. Filet en tête plutôt qu'une carte : sur 390 px, des
+ * cartes empilées mangent la largeur de leurs marges intérieures.
+ *
+ * `tabIndex={-1}` : la section des pièces n'a pas de champ à focaliser quand
+ * elle est en erreur — c'est la section elle-même qui reçoit le focus.
+ */
+function Section({
+  id,
+  title,
+  aside,
+  invalid,
+  children,
 }: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  warning?: boolean;
+  id: string;
+  title: React.ReactNode;
+  aside?: React.ReactNode;
+  invalid?: boolean;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd
-        className={cn(
-          "tabular",
-          strong && "text-base font-medium",
-          warning && "text-warning-foreground font-medium",
-        )}
-      >
-        {value}
-      </dd>
-    </div>
+    <section
+      id={id}
+      tabIndex={-1}
+      aria-labelledby={`${id}-title`}
+      className="border-border scroll-mt-20 border-t pt-5 pb-6 outline-none first-of-type:border-t-0 first-of-type:pt-0"
+    >
+      <div className="mb-4 flex items-center gap-2">
+        <h2
+          id={`${id}-title`}
+          className={cn("text-lg font-medium", invalid && "text-destructive")}
+        >
+          {title}
+        </h2>
+        {aside && <span className="ms-auto">{aside}</span>}
+      </div>
+      {children}
+    </section>
   );
 }
 
 function LineCard({
   line,
   locale,
+  taken,
   onRemove,
   onPrice,
 }: {
   line: DraftLine;
   locale: Locale;
+  /** La pièce est prise sur les dates ACTUELLES : les dates ont changé depuis l'ajout. */
+  taken?: Unavailability;
   onRemove: () => void;
   onPrice: (value: string) => void;
 }) {
   const t = useTranslations();
 
   return (
-    <div className="border-border rounded-lg border p-3">
+    <div className={cn("rounded-lg border p-3", taken ? "border-warning" : "border-border")}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           {line.kind === "unit" ? (
@@ -688,6 +880,16 @@ function LineCard({
               </p>
             </>
           )}
+
+          {/* Le mot porte l'information, pas la seule bordure colorée. */}
+          {taken && (
+            <p className="text-warning-foreground mt-1 flex items-center gap-1.5 text-sm font-medium">
+              <AlertTriangle className="size-4 shrink-0" aria-hidden />
+              {taken.freeFrom
+                ? t("orders.freeFrom", { date: formatDate(taken.freeFrom, locale) })
+                : t("orders.takenOnDates")}
+            </p>
+          )}
         </div>
 
         <Button
@@ -705,9 +907,9 @@ function LineCard({
       {/* Quatrième et dernier niveau de prix : ce que l'employé a réellement
           négocié avec le client, toujours modifiable. */}
       <div className="mt-2 flex items-center gap-2">
-        <label className="text-muted-foreground text-sm" htmlFor={`price-${line.kind}`}>
+        <span className="text-muted-foreground text-sm" aria-hidden>
           {t("orders.linePrice")}
-        </label>
+        </span>
         <Input
           type="number"
           inputMode="numeric"
@@ -715,6 +917,7 @@ function LineCard({
           step={100}
           value={String(line.unitPrice)}
           onChange={(e) => onPrice(e.target.value)}
+          aria-label={t("orders.linePrice")}
           className="tabular h-11 max-w-36 text-base"
         />
       </div>
