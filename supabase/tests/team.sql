@@ -100,13 +100,27 @@ declare
   v_staff uuid;
   v_msg text;
 begin
-  -- Base de test vierge d'administrateur : on en fabrique un.
+  -- La base testée est la VRAIE base, qui a déjà ses administrateurs. Le test
+  -- fabrique donc lui-même l'état voulu, et le rollback final le défait.
+  -- (Première version : elle supposait une base vide, et 3b / 3c échouaient
+  -- dès qu'un vrai administrateur existait — à juste titre côté base.)
   v_owner := pg_temp.make_user('team-owner1@daydream.test');
   v_staff := pg_temp.make_user('team-staff1@daydream.test');
 
-  -- 3a. Un UPDATE sur un simple membre passe, même sans aucun administrateur
-  --     actif en base. C'est la clause `WHEN` qui l'autorise : sans elle, le
-  --     tout premier compte créé sur une base vide échouerait.
+  -- v_owner devient le SEUL administrateur actif : les autres sont désactivés,
+  -- ce que le garde-fou accepte puisqu'il en reste un.
+  update public.profiles set role = 'owner', is_active = true where id = v_owner;
+  update public.profiles set is_active = false
+   where role = 'owner' and is_active and id <> v_owner;
+
+  -- 3a. Un UPDATE sur un simple membre passe, même sans AUCUN administrateur
+  --     actif. C'est la clause `WHEN` qui l'autorise : sans elle, le tout
+  --     premier compte créé sur une base vide échouerait. Pour atteindre cet
+  --     état, le garde-fou est suspendu le temps de retirer le dernier.
+  alter table public.profiles disable trigger profiles_keep_one_active_owner_trg;
+  update public.profiles set is_active = false where id = v_owner;
+  alter table public.profiles enable trigger profiles_keep_one_active_owner_trg;
+
   begin
     update public.profiles set full_name = 'Membre' where id = v_staff;
     perform pg_temp.check('3a. membre modifiable sans admin en base', 'ok', 'ok');
@@ -114,8 +128,9 @@ begin
     perform pg_temp.check('3a. membre modifiable sans admin en base', 'ok', sqlerrm);
   end;
 
-  update public.profiles set role = 'owner', is_active = true where id = v_owner;
-  update public.profiles set is_active = true where id = v_staff;
+  -- Réactiver v_owner : sa ligne n'était pas un administrateur ACTIF, la
+  -- clause `WHEN` ne déclenche rien. Il redevient le seul.
+  update public.profiles set is_active = true where id in (v_owner, v_staff);
 
   -- 3b. Le rétrograder échoue : c'est le dernier.
   begin
