@@ -269,7 +269,14 @@
     "password": "Mot de passe",
     "signOutConfirmTitle": "Se déconnecter ?",
     "signOutConfirmBody": "Vous quittez la session de {name}. Il faudra le mot de passe du compte pour revenir.",
-    "stayConnected": "Rester connecté"
+    "stayConnected": "Rester connecté",
+    "welcome": "Bienvenue",
+    "welcomeHint": "Connectez-vous pour accéder aux commandes et au stock.",
+    "emailPlaceholder": "nom@exemple.com",
+    "signingIn": "Connexion…",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "noAccount": "Pas encore de compte ? C’est le responsable de la boutique qui les crée."
   },
   "errors": {
     "unitUnavailable": "Cette pièce est déjà réservée sur ces dates.",

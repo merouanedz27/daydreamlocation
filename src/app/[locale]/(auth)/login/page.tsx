@@ -56,24 +56,41 @@ export default async function LoginPage({
               priority
               /* Largeur d'affichage FIXE. Sans cette indication, next/image
                  raisonne sur la largeur de l'écran et sert un fichier de
-                 1080 px pour une image de 176 px — sur un forfait mobile
-                 algérien, c'est du gâchis pur. */
-              sizes="176px"
-              className="mx-auto h-auto w-44"
+                 1080 px pour une image de 112 px — sur un forfait mobile
+                 algérien, c'est du gâchis pur.
+                 112 px et non plus 176 : à 390 px de large, l'ancien logo
+                 poussait le bouton « Se connecter » sous le clavier ouvert. */
+              sizes="112px"
+              className="mx-auto h-auto w-28"
             />
           </h1>
-          <p className="text-muted-foreground mt-4 text-sm">{t("app.tagline")}</p>
+          <p className="text-muted-foreground mt-3 text-sm">{t("app.tagline")}</p>
         </header>
 
-        <div className="ornament my-8" aria-hidden>
+        <div className="ornament my-6" aria-hidden>
           <span className="ornament-diamond" />
         </div>
 
-        <div className="border-border bg-card rounded-lg border p-6">
+        <section
+          aria-labelledby="login-title"
+          className="border-border bg-card rounded-lg border p-6"
+        >
+          <div className="mb-6">
+            <h2 id="login-title" className="font-heading text-xl font-medium">
+              {t("auth.welcome")}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">{t("auth.welcomeHint")}</p>
+          </div>
           <SignInForm />
-        </div>
+        </section>
 
-        <div className="mt-8 flex justify-center">
+        {/* Pas d'inscription publique : sans cette ligne, un nouvel employé
+            cherche en vain un lien « Créer un compte ». */}
+        <p className="text-muted-foreground mt-6 text-center text-sm text-balance">
+          {t("auth.noAccount")}
+        </p>
+
+        <div className="mt-6 flex justify-center">
           <LocaleSwitcher />
         </div>
       </div>

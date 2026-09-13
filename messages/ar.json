@@ -269,7 +269,14 @@
     "password": "كلمة المرور",
     "signOutConfirmTitle": "تسجيل الخروج؟",
     "signOutConfirmBody": "ستغادر جلسة {name}. ستحتاج إلى كلمة مرور الحساب للعودة.",
-    "stayConnected": "البقاء متصلاً"
+    "stayConnected": "البقاء متصلاً",
+    "welcome": "مرحبًا بك",
+    "welcomeHint": "سجّل الدخول للوصول إلى الطلبات والمخزون.",
+    "emailPlaceholder": "name@example.com",
+    "signingIn": "جارٍ تسجيل الدخول…",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور",
+    "noAccount": "ليس لديك حساب بعد؟ اطلبه من مسؤول المحل."
   },
   "errors": {
     "unitUnavailable": "هذه القطعة محجوزة بالفعل في هذه التواريخ.",
