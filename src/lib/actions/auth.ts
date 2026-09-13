@@ -1,13 +1,18 @@
 "use server";
 
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { redirectTo } from "@/i18n/navigation";
-import { signInSchema } from "@/lib/validation/auth";
+import { changePasswordSchema, signInSchema } from "@/lib/validation/auth";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type ActionResult =
   | { ok: true }
   | { ok: false; error: string; field?: "email" | "password" };
+
+export type PasswordResult =
+  | { ok: true }
+  | { ok: false; error: string; field?: "current" | "password" | "confirm" };
 
 function resolveLocale(value: FormDataEntryValue | null): Locale {
   return routing.locales.includes(value as Locale)
@@ -83,4 +88,69 @@ export async function signOut(formData: FormData): Promise<void> {
   await supabase.auth.signOut();
 
   redirectTo("/login", locale);
+}
+
+/**
+ * Changer SON PROPRE mot de passe.
+ *
+ * `resetMemberPassword` (écran Équipe) refuse d'agir sur son propre compte :
+ * sans cette action, le propriétaire n'avait aucun moyen de changer le sien.
+ *
+ * L'ANCIEN MOT DE PASSE EST EXIGÉ. `updateUser` n'en demande aucun : un
+ * téléphone laissé déverrouillé au comptoir suffirait sinon à s'approprier le
+ * compte du patron. On le vérifie par une connexion sur un client JETABLE —
+ * sans cookies, sans session persistée — pour ne pas toucher à la session en
+ * cours, puis on referme la session de vérification.
+ */
+export async function changeOwnPassword(formData: FormData): Promise<PasswordResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { ok: false, error: "errors.forbidden" };
+
+  const parsed = changePasswordSchema.safeParse({
+    current: formData.get("current"),
+    password: formData.get("password"),
+    confirm: formData.get("confirm"),
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      ok: false,
+      error: issue.message.startsWith("errors.") ? issue.message : "errors.generic",
+      field: issue.path[0] as "current" | "password" | "confirm",
+    };
+  }
+
+  const verifier = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+  );
+
+  const { error: checkError } = await verifier.auth.signInWithPassword({
+    email: user.email,
+    password: parsed.data.current,
+  });
+  if (checkError) {
+    return { ok: false, error: "errors.currentPasswordWrong", field: "current" };
+  }
+  // `local` : ne ferme QUE la session de vérification, pas celle du téléphone.
+  await verifier.auth.signOut({ scope: "local" });
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+
+  if (error) {
+    if (error.code === "weak_password") {
+      return { ok: false, error: "errors.passwordTooShort", field: "password" };
+    }
+    if (error.code === "same_password") {
+      return { ok: false, error: "errors.passwordSame", field: "password" };
+    }
+    return { ok: false, error: "errors.generic" };
+  }
+
+  return { ok: true };
 }

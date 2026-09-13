@@ -13,3 +13,25 @@ export const signInSchema = z.object({
 });
 
 export type SignInInput = z.infer<typeof signInSchema>;
+
+/**
+ * Changer SON PROPRE mot de passe. Mêmes bornes que `resetPasswordSchema`
+ * (`validation/team.ts`) : ≥ 8 pour GoTrue, ≤ 72 parce que bcrypt tronque.
+ */
+export const changePasswordSchema = z
+  .object({
+    current: z.string().min(1, { message: "errors.passwordRequired" }),
+    password: z
+      .string()
+      .min(8, { message: "errors.passwordTooShort" })
+      .max(72, { message: "errors.passwordTooLong" }),
+    confirm: z.string(),
+  })
+  .refine((v) => v.password === v.confirm, {
+    message: "errors.passwordMismatch",
+    path: ["confirm"],
+  })
+  .refine((v) => v.password !== v.current, {
+    message: "errors.passwordSame",
+    path: ["password"],
+  });

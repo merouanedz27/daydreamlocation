@@ -14,7 +14,8 @@
     "team": "الفريق",
     "shop": "المحل",
     "account": "حسابي",
-    "admin": "الإدارة"
+    "admin": "الإدارة",
+    "myAccount": "حسابي"
   },
   "common": {
     "save": "حفظ",
@@ -213,7 +214,29 @@
     "archivedTitle": "النماذج المسحوبة",
     "archivedLink": "{count} نموذج مسحوب",
     "archivedEmpty": "لا يوجد أي نموذج مسحوب من الكتالوج.",
-    "backToCatalogue": "الكتالوج"
+    "backToCatalogue": "الكتالوج",
+    "tabModels": "الموديلات",
+    "tabEnsembles": "الأطقم",
+    "newEnsemble": "طقم جديد",
+    "newEnsembleHint": "اختصار للإدخال: اختيار الطقم في طلبية يضيف كل قطعه دفعة واحدة. الطقم نفسه لا يُحجز أبدًا.",
+    "editEnsemble": "تعديل الطقم",
+    "ensembleName": "اسم الطقم",
+    "ensembleNamePlaceholder": "بدلة رقم 12",
+    "ensemblePiecesLabel": "القطع",
+    "ensemblePiecesHint": "سترة، سروال، قميص… يمكن للقطعة نفسها أن تكون في عدة أطقم.",
+    "noPiecesYet": "لا توجد قطع بعد.",
+    "removePiece": "إزالة {ref}",
+    "piecesTotal": "مجموع القطع: {amount}",
+    "packagePrice": "سعر الطقم (اختياري)",
+    "packagePriceHint": "سعر الطقم كاملاً. إن تُرك فارغًا فهو مجموع أسعار قطعه.",
+    "packageLabel": "سعر الطقم {amount}",
+    "ensembleDescription": "الوصف (اختياري)",
+    "ensemblesEmpty": "لا توجد أطقم. أنشئ «بدلة رقم 12» لإضافة كل قطعها دفعة واحدة في طلبية.",
+    "ensembleHasRetired": "سُحبت قطعة من المخزون: عدّل الطقم.",
+    "pieceRetiredInEnsemble": "مسحوبة من المخزون — أزلها",
+    "deleteEnsemble": "حذف الطقم",
+    "deleteEnsembleHint": "يختفي الاختصار فقط: تبقى القطع في المخزون ولا تتغير الطلبيات.",
+    "deleteEnsembleConfirmTitle": "حذف «{name}»؟"
   },
   "dashboard": {
     "title": "لوحة القيادة",
@@ -286,7 +309,12 @@
     "accountDisabled": "هذا الحساب معطّل. اتصل بالمسؤول.",
     "phoneInvalid": "رقم هاتف نقال مطلوب: 05 أو 06 أو 07 متبوعًا بـ 8 أرقام.",
     "linesTaken": "قطع محجوزة في هذه التواريخ: {count}. احذفها أو غيّر التواريخ.",
-    "textTooLong": "هذا النص طويل جدًا."
+    "textTooLong": "هذا النص طويل جدًا.",
+    "passwordMismatch": "كلمتا المرور غير متطابقتين.",
+    "passwordSame": "اختر كلمة مرور مختلفة عن الحالية.",
+    "currentPasswordWrong": "كلمة المرور الحالية غير صحيحة.",
+    "ensembleUnitsRequired": "أضف قطعة واحدة على الأقل.",
+    "ensembleUnitInvalid": "لا يمكن أن تكون قطعة مسحوبة من المخزون ضمن طقم."
   },
   "roles": {
     "owner": "مسؤول",
@@ -413,5 +441,14 @@
     "iosStep1": "اضغط على زر المشاركة في Safari.",
     "iosStep2": "اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة».",
     "section": "التطبيق"
+  },
+  "account": {
+    "changePassword": "تغيير كلمة المرور",
+    "changePasswordHint": "الحساب: {email}. تُستعمل كلمة المرور الجديدة من الدخول القادم، على كل الهواتف.",
+    "currentPassword": "كلمة المرور الحالية",
+    "newPassword": "كلمة المرور الجديدة",
+    "newPasswordHint": "8 أحرف على الأقل.",
+    "confirmPassword": "تأكيد كلمة المرور الجديدة",
+    "passwordChanged": "تم تغيير كلمة المرور."
   }
 }

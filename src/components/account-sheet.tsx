@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronRight, Download, LogOut, Receipt, Store, User, Users, X } from "lucide-react";
+import { ChevronRight, Download, KeyRound, LogOut, Receipt, Store, User, Users, X } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -155,6 +155,30 @@ export function AccountSheet({
               </ul>
             </>
           )}
+
+          {/* Pour TOUS les rôles : chacun change son propre mot de passe. */}
+          <p className="text-muted-foreground px-3 pt-3 pb-1 text-xs font-medium">
+            {t("nav.myAccount")}
+          </p>
+          <SheetClose asChild>
+            <Link
+              href="/mot-de-passe"
+              aria-current={pathname.startsWith("/mot-de-passe") ? "page" : undefined}
+              className={cn(
+                "flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm transition-colors",
+                pathname.startsWith("/mot-de-passe")
+                  ? "bg-gold-soft text-foreground font-medium"
+                  : "text-foreground hover:bg-muted",
+              )}
+            >
+              <KeyRound className="text-muted-foreground size-5 shrink-0" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{t("account.changePassword")}</span>
+              <ChevronRight
+                className="text-muted-foreground size-4 shrink-0 rtl:-scale-x-100"
+                aria-hidden
+              />
+            </Link>
+          </SheetClose>
 
           {onInstall && (
             <>

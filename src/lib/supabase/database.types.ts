@@ -482,6 +482,16 @@ export type Database = {
         };
         Returns: Json;
       };
+      save_ensemble: {
+        Args: {
+          p_id?: number;
+          p_name?: string;
+          p_description?: string;
+          p_package_price?: number;
+          p_unit_ids?: number[];
+        };
+        Returns: number;
+      };
       set_order_cancelled: {
         Args: {
           p_order_id: number;

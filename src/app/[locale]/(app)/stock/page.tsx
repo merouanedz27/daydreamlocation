@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { StockFilters } from "@/components/stock-filters";
+import { StockTabs } from "@/components/stock-tabs";
 import {
   countArchivedModels,
   countStock,
@@ -88,6 +89,12 @@ export default async function StockPage({
           </>
         )}
       </div>
+
+      {!archived && (
+        <div className="mt-4">
+          <StockTabs active="models" />
+        </div>
+      )}
 
       <div className="mt-4">
         <StockFilters categories={categories} locale={l} />

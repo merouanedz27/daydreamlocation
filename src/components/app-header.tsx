@@ -3,6 +3,7 @@
 import {
   ClipboardList,
   Download,
+  KeyRound,
   LayoutGrid,
   LogOut,
   Receipt,
@@ -225,6 +226,14 @@ export function AppHeader({
                   <DropdownMenuSeparator />
                 </>
               )}
+
+              <DropdownMenuItem asChild>
+                <Link href="/mot-de-passe">
+                  <KeyRound className="size-4" aria-hidden />
+                  {t("account.changePassword")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
 
               {/* Visible pour TOUS les rôles : chaque employé installe
                   l'application sur son propre téléphone. */}

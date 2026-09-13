@@ -14,7 +14,8 @@
     "team": "Équipe",
     "shop": "Boutique",
     "account": "Mon compte",
-    "admin": "Administration"
+    "admin": "Administration",
+    "myAccount": "Mon compte"
   },
   "common": {
     "save": "Enregistrer",
@@ -213,7 +214,29 @@
     "archivedTitle": "Modèles retirés",
     "archivedLink": "{count} modèle(s) retiré(s)",
     "archivedEmpty": "Aucun modèle retiré du catalogue.",
-    "backToCatalogue": "Catalogue"
+    "backToCatalogue": "Catalogue",
+    "tabModels": "Modèles",
+    "tabEnsembles": "Ensembles",
+    "newEnsemble": "Nouvel ensemble",
+    "newEnsembleHint": "Un raccourci de saisie : choisir l'ensemble dans une commande ajoute toutes ses pièces d'un coup. Il ne se réserve jamais lui-même.",
+    "editEnsemble": "Modifier l'ensemble",
+    "ensembleName": "Nom de l'ensemble",
+    "ensembleNamePlaceholder": "Costume n°12",
+    "ensemblePiecesLabel": "Pièces",
+    "ensemblePiecesHint": "Veste, pantalon, chemise… Une même pièce peut figurer dans plusieurs ensembles.",
+    "noPiecesYet": "Aucune pièce pour l'instant.",
+    "removePiece": "Retirer {ref}",
+    "piecesTotal": "Somme des pièces : {amount}",
+    "packagePrice": "Forfait (facultatif)",
+    "packagePriceHint": "Prix de l'ensemble pris entier. Laissé vide, il vaut la somme de ses pièces.",
+    "packageLabel": "forfait {amount}",
+    "ensembleDescription": "Description (facultatif)",
+    "ensemblesEmpty": "Aucun ensemble. Créez « Costume n°12 » pour ajouter toutes ses pièces d'un geste dans une commande.",
+    "ensembleHasRetired": "Une pièce a été retirée du stock : modifiez l'ensemble.",
+    "pieceRetiredInEnsemble": "Retirée du stock — enlevez-la",
+    "deleteEnsemble": "Supprimer l'ensemble",
+    "deleteEnsembleHint": "Seul le raccourci disparaît : les pièces restent au stock et les commandes ne changent pas.",
+    "deleteEnsembleConfirmTitle": "Supprimer « {name} » ?"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -286,7 +309,12 @@
     "accountDisabled": "Ce compte a été désactivé. Contactez l'administrateur.",
     "phoneInvalid": "Numéro de mobile attendu : 05, 06 ou 07 suivi de 8 chiffres.",
     "linesTaken": "Pièces déjà prises sur ces dates : {count}. Retirez-les ou changez les dates.",
-    "textTooLong": "Ce texte est trop long."
+    "textTooLong": "Ce texte est trop long.",
+    "passwordMismatch": "Les deux mots de passe ne sont pas identiques.",
+    "passwordSame": "Choisissez un mot de passe différent de l'actuel.",
+    "currentPasswordWrong": "Mot de passe actuel incorrect.",
+    "ensembleUnitsRequired": "Ajoutez au moins une pièce.",
+    "ensembleUnitInvalid": "Une pièce retirée du stock ne peut pas faire partie d'un ensemble."
   },
   "roles": {
     "owner": "Administrateur",
@@ -413,5 +441,14 @@
     "iosStep1": "Touchez le bouton Partager de Safari.",
     "iosStep2": "Choisissez « Sur l'écran d'accueil », puis « Ajouter ».",
     "section": "Application"
+  },
+  "account": {
+    "changePassword": "Changer mon mot de passe",
+    "changePasswordHint": "Compte : {email}. Le nouveau mot de passe servira dès la prochaine connexion, sur tous les téléphones.",
+    "currentPassword": "Mot de passe actuel",
+    "newPassword": "Nouveau mot de passe",
+    "newPasswordHint": "8 caractères au minimum.",
+    "confirmPassword": "Confirmer le nouveau mot de passe",
+    "passwordChanged": "Mot de passe changé."
   }
 }
