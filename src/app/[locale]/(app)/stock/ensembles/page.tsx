@@ -45,18 +45,12 @@ export default async function EnsemblesPage({
     <div>
       <h1 className="sr-only">{t("stock.tabEnsembles")}</h1>
 
-      <StockTabs active="ensembles" />
-
-      {canEdit && ensembles.length > 0 && (
-        <div className="mt-4 flex justify-end">
-          <Button asChild className="h-11 w-full sm:w-auto">
-            <Link href="/stock/ensembles/nouveau">
-              <Plus className="size-4" aria-hidden />
-              {t("stock.newEnsemble")}
-            </Link>
-          </Button>
-        </div>
-      )}
+      <StockTabs
+        active="ensembles"
+        action={
+          canEdit ? { href: "/stock/ensembles/nouveau", label: t("stock.newEnsemble") } : undefined
+        }
+      />
 
       {!ensembles.length ? (
         <div className="border-border mt-6 flex flex-col items-center rounded-lg border border-dashed px-6 py-16 text-center">

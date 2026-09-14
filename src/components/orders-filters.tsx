@@ -102,7 +102,7 @@ export function OrdersFilters() {
         )}
       </form>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 max-md:scrollbar-none">
         <Chip
           label={t("orders.allStatuses")}
           active={!currentStatus}

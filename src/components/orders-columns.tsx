@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { Check, SlidersHorizontal } from "lucide-react";
 import {
@@ -11,16 +11,19 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { createDeviceSetting, useMediaQuery } from "@/lib/device-setting";
 import { cn } from "@/lib/utils";
+import type { ListView } from "@/components/view-toggle";
 
 /**
  * Colonnes réglables de la liste des commandes.
  *
- * Sur téléphone la liste reste en CARTES — un `<table>` ne passe pas à 390 px
- * (règle `daydream-ui`). Le réglage pilote donc les champs affichés sur la
- * carte en mobile, et les colonnes du tableau en `md:` et au-delà. C'est la
- * seule façon honnête de rendre « des colonnes » utiles au pouce.
+ * Elles pilotent les deux affichages : les lignes de chaque carte en mode
+ * Liste, les colonnes en mode Tableau. Le tableau ne défile JAMAIS de côté :
+ * il n'affiche que les premières colonnes cochées quand l'écran est étroit
+ * (voir `TABLE_LIMITS`).
  */
 export const ORDER_COLUMNS = [
   "order_no",
@@ -62,85 +65,52 @@ export const COLUMN_LABEL_KEYS: Record<OrderColumn, string> = {
   caution_amount: "orders.caution",
 };
 
-const STORAGE_KEY = "daydream.orders.columns";
+/**
+ * Libellés COURTS des en-têtes du tableau, comme dans un tableur : « Date de
+ * l'événement » coupé en trois lignes sur une colonne de 80 px ne se lit plus.
+ * Le libellé complet reste sur les cartes et dans le réglage des colonnes.
+ */
+export const COLUMN_SHORT_KEYS: Record<OrderColumn, string> = {
+  order_no: "orders.short.orderNo",
+  customer_name: "orders.short.customer",
+  customer_phone: "orders.short.phone",
+  event_date: "orders.short.eventDate",
+  pickup_date: "orders.short.pickupDate",
+  status: "orders.short.status",
+  total_price: "orders.short.total",
+  amount_paid: "orders.short.paid",
+  balance: "orders.short.balance",
+  caution_amount: "orders.short.caution",
+};
 
-function sanitize(value: unknown): OrderColumn[] | null {
+/**
+ * Nombre de colonnes que le tableau affiche selon la largeur : 4 sur
+ * téléphone (< 640 px), 6 sur tablette (< 1024 px), toutes au-delà.
+ * Mesuré sur la zone de contenu (`max-w-5xl`) : en deçà de ~90 px par
+ * colonne, un montant ou une date ne tient plus sur une ligne.
+ */
+export const TABLE_LIMITS = { phone: 4, tablet: 6 } as const;
+
+function sanitizeColumns(value: unknown): OrderColumn[] | null {
   if (!Array.isArray(value)) return null;
   const kept = ORDER_COLUMNS.filter((c) => value.includes(c));
   if (!kept.includes(LOCKED_COLUMN)) kept.unshift(LOCKED_COLUMN);
   return kept.length ? kept : null;
 }
 
-/* --------------------------------------------------------------------------
- * Préférence stockée PAR APPAREIL, volontairement.
- *
- * Le patron ne veut pas les mêmes colonnes sur son téléphone que sur un grand
- * écran. `localStorage` évite en plus une table et une migration pour un
- * réglage de confort.
- *
- * Implémenté en `useSyncExternalStore` plutôt qu'en `useState` + `useEffect` :
- * le serveur ne peut pas connaître ce choix, donc le rendu serveur part des
- * valeurs par défaut (`getServerSnapshot`) et le client bascule sans
- * divergence d'hydratation. Bonus : l'événement `storage` synchronise les
- * onglets ouverts.
- *
- * La valeur vit en mémoire ET dans le stockage : si le stockage est bloqué
- * (navigation privée), le réglage tient au moins pour la session au lieu de
- * paraître sans effet.
- * ------------------------------------------------------------------------ */
-
-let current: OrderColumn[] | null = null;
-const listeners = new Set<() => void>();
-
-function getSnapshot(): OrderColumn[] {
-  if (current === null) {
-    let stored: OrderColumn[] | null = null;
-    try {
-      stored = sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
-    } catch {
-      /* stockage bloqué ou contenu illisible : valeurs par défaut. */
-    }
-    current = stored ?? DEFAULT_COLUMNS;
-  }
-  return current;
-}
-
-function getServerSnapshot(): OrderColumn[] {
-  return DEFAULT_COLUMNS;
-}
-
-function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange);
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) {
-      current = null; // forcer la relecture
-      onChange();
-    }
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(onChange);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-function publish(next: OrderColumn[]): void {
-  current = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    /* le réglage vaut pour la session, faute de mieux. */
-  }
-  for (const listener of listeners) listener();
-}
+const columnsSetting = createDeviceSetting<OrderColumn[]>({
+  key: "daydream.orders.columns",
+  fallback: DEFAULT_COLUMNS,
+  sanitize: sanitizeColumns,
+});
 
 export function useOrderColumns() {
-  const columns = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const columns = columnsSetting.useValue();
 
   const toggle = useCallback((column: OrderColumn) => {
     if (column === LOCKED_COLUMN) return;
-    const prev = getSnapshot();
-    publish(
+    const prev = columnsSetting.get();
+    columnsSetting.set(
       prev.includes(column)
         ? prev.filter((c) => c !== column)
         : ORDER_COLUMNS.filter((c) => c === column || prev.includes(c)),
@@ -150,14 +120,46 @@ export function useOrderColumns() {
   return { columns, toggle };
 }
 
+/* --------------------------------------------------------------------------
+ * Affichage Liste / Tableau, lui aussi par appareil.
+ *
+ * `null` = jamais choisi : on suit alors la largeur (tableau dès 768 px,
+ * liste en dessous), comme avant l'existence du bouton.
+ * ------------------------------------------------------------------------ */
+
+const viewSetting = createDeviceSetting<ListView | null>({
+  key: "daydream.orders.view",
+  fallback: null,
+  sanitize: (value) => (value === "list" || value === "table" ? value : null),
+});
+
+/**
+ * L'affichage effectif, ou `null` tant qu'il est inconnu (rendu serveur,
+ * hydratation) : l'écran retombe alors sur la bascule CSS par largeur.
+ */
+export function useOrdersView() {
+  const stored = viewSetting.useValue();
+  const wide = useMediaQuery("(min-width: 48rem)");
+  const view: ListView | null =
+    wide === null ? null : (stored ?? (wide ? "table" : "list"));
+  return { view, setView: viewSetting.set };
+}
+
 export function OrderColumnsDrawer({
   columns,
   onToggle,
+  view,
 }: {
   columns: OrderColumn[];
   onToggle: (column: OrderColumn) => void;
+  view: ListView | null;
 }) {
   const t = useTranslations();
+  const phone = useMediaQuery("(max-width: 39.99rem)");
+  // Sur téléphone en mode Tableau, on signale les colonnes cochées qui ne
+  // tiennent pas : sinon on en coche une et rien ne change à l'écran.
+  const flagHidden = view === "table" && phone === true;
+  const checkedOrder = ORDER_COLUMNS.filter((c) => columns.includes(c));
 
   return (
     <Drawer>
@@ -178,6 +180,8 @@ export function OrderColumnsDrawer({
           {ORDER_COLUMNS.map((column) => {
             const checked = columns.includes(column);
             const locked = column === LOCKED_COLUMN;
+            const hidden =
+              flagHidden && checked && checkedOrder.indexOf(column) >= TABLE_LIMITS.phone;
             return (
               <li key={column}>
                 <button
@@ -203,6 +207,11 @@ export function OrderColumnsDrawer({
                     {checked && <Check className="size-3.5" />}
                   </span>
                   <span className="flex-1 text-sm">{t(COLUMN_LABEL_KEYS[column])}</span>
+                  {hidden && (
+                    <Badge variant="outline" className="text-muted-foreground">
+                      {t("orders.hiddenOnPhone")}
+                    </Badge>
+                  )}
                 </button>
               </li>
             );

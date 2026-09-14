@@ -359,6 +359,16 @@
   bottom: calc(3.5rem + 1px + max(env(safe-area-inset-bottom), 0.5rem));
 }
 
+/* Défilement conservé, barre masquée. Réservé aux rangées de pastilles qui
+   se balaient au doigt : sur ordinateur, la barre reste le seul indice qu'une
+   rangée défile — d'où l'usage en `max-md:scrollbar-none`. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer utilities {
   /* Les chevrons et flèches directionnelles doivent être miroités en RTL.
      Une flèche « retour » qui pointe à gauche en arabe est un bug. */

@@ -26,7 +26,7 @@ const NUMBER_LOCALE: Record<Locale, string> = {
  * neutre dans un paragraphe arabe, donc « 7 000 دج » se lit bien de droite à
  * gauche sans aucune marque de direction.
  */
-const CURRENCY_SUFFIX: Record<Locale, string> = {
+export const CURRENCY_SUFFIX: Record<Locale, string> = {
   fr: "DA",
   ar: "دج",
 };

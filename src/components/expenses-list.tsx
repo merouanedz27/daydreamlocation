@@ -6,9 +6,17 @@ import { useTranslations } from "next-intl";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { sheet } from "@/components/sheet-table";
 import { Link } from "@/i18n/navigation";
 import { deleteExpense } from "@/lib/actions/expenses";
-import { formatDate, formatDayMonth, formatMoney } from "@/lib/format";
+import {
+  CURRENCY_SUFFIX,
+  formatDate,
+  formatDayMonth,
+  formatMoney,
+  formatNumber,
+} from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { ExpenseRow } from "@/lib/queries/expenses";
 import type { Locale } from "@/i18n/routing";
 
@@ -22,28 +30,23 @@ function Dot() {
 }
 
 /**
- * Registre des dépenses — UNE LIGNE par dépense.
+ * Registre des dépenses, en tableau « façon tableur » — le même que celui des
+ * commandes et du stock (`sheet`), sans défilement horizontal.
  *
- * Ce n'est ni une carte ni une fiche : c'est un relevé de compte. Trois
- * décisions le rendent aussi court que possible sans rien perdre :
+ * Colonnes : Date · Description · Catégorie · Commande · Montant (DA) · corbeille.
  *
- * 1. **Pas de cadre.** Un bloc encadré et arrondi se lit comme une carte, donc
- *    comme quelque chose de volumineux. Il ne reste que des filets d'un
- *    cheveu entre les lignes — la structure sans l'emballage.
- * 2. **Jour et mois seulement**, pas l'année : l'en-tête au-dessus dit déjà
- *    « Septembre 2026 ». L'année répétée trente fois mangeait un tiers de la
- *    largeur utile d'un téléphone.
- * 3. **Tout sur une ligne** : date à gauche, montant à droite — les deux seules
- *    choses qu'on parcourt du regard, toujours à la même place. Entre les deux,
- *    le libellé puis le contexte (catégorie, commande liée), qui se tronquent
- *    de la fin : ce qui disparaît en premier sur un écran étroit est ce qui
- *    compte le moins.
+ * Sur téléphone (< 640 px), Catégorie et Commande quittent leurs colonnes pour
+ * une seconde ligne, en petit, sous la description : quatre colonnes tiennent
+ * à 390 px, et rien ne disparaît. Au-delà, chacune retrouve sa colonne.
  *
- * La hauteur est désormais dictée par le SEUL bouton de suppression : 44 px de
- * cible tactile (cf. `daydream-ui`). C'est le plancher, et la ligne s'y tient.
- * Réduire le bouton ferait déborder sa zone tactile sur la ligne voisine, donc
- * sur la corbeille voisine — un risque d'effacement au mauvais endroit qu'on
- * ne prend pas.
+ * - **Jour et mois seulement**, pas l'année : le navigateur de mois au-dessus
+ *   dit déjà « Septembre 2026 ».
+ * - **Montant nu**, la devise est dans l'en-tête : la colonne s'aligne et se
+ *   parcourt comme dans le tableur.
+ * - La hauteur de ligne est dictée par la corbeille : 44 px de cible tactile.
+ *   La réduire ferait déborder sa zone sur la corbeille voisine — un risque
+ *   d'effacement au mauvais endroit qu'on ne prend pas.
+ * - Pas de fiche détail : la ligne n'est pas cliquable (curseur normal).
  */
 export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
   const t = useTranslations();
@@ -70,78 +73,125 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
 
   return (
     <>
-      <ul className="border-border divide-border mt-3 divide-y border-y">
-        {expenses.map((e) => {
-          const category = t(`expenses.categories.${e.category}`);
-          return (
-            <li
-              key={e.id}
-              className="hover:bg-muted/40 flex items-center gap-2 ps-1"
-            >
-              <span className="tabular text-muted-foreground w-11 shrink-0 text-center text-xs">
-                {formatDayMonth(e.spent_on, locale)}
-              </span>
-
-              {/* Une seule ligne qui se tronque : le libellé saisi porte
-                l'information ; à défaut, la catégorie prend sa place — jamais
-                de ligne sans titre. */}
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {e.description || category}
-
-                {/* La catégorie ne se répète pas : elle ne revient en gris que
-                  lorsqu'un vrai libellé occupe la tête de ligne. */}
-                {e.description && (
-                  <span className="text-muted-foreground text-xs">
-                    <Dot />
-                    {category}
-                  </span>
-                )}
-
-                {/* Une dépense rattachée à une commande, c'est « Les frais » du
-                  tableur : on garde le lien vers la commande concernée. */}
-                {e.orders && (
-                  <span className="text-xs">
-                    <span className="text-muted-foreground">
-                      <Dot />
-                    </span>
-                    <Link
-                      href={`/commandes/${e.order_id}`}
-                      className="text-gold-strong underline-offset-4 hover:underline"
-                    >
-                      <bdi>{e.orders.order_no}</bdi> {e.orders.customer_name}
-                    </Link>
-                  </span>
-                )}
-              </span>
-
-              <span className="tabular shrink-0 text-sm font-medium">
-                {formatMoney(e.amount, locale)}
-              </span>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setToDelete(e);
-                  setConfirmOpen(true);
-                }}
-                className="text-muted-foreground hover:text-destructive size-11 shrink-0"
-              >
-                <Trash2 className="size-4" aria-hidden />
-                {/* Le nom accessible porte la dépense visée : trente
-                  « Supprimer » identiques ne se distinguent pas au lecteur
-                  d'écran. */}
-                <span className="sr-only">
-                  {t("expenses.deleteThis", {
-                    label: e.description || category,
+      <div className={cn(sheet.wrapper, "mt-3")}>
+        <table className={sheet.table}>
+          <thead>
+            <tr className={sheet.headRow}>
+              <th scope="col" className={cn(sheet.th, "text-start")}>
+                <span className={sheet.thInner}>{t("expenses.date")}</span>
+              </th>
+              <th scope="col" className={cn(sheet.th, "text-start")}>
+                <span className={sheet.thInner}>{t("expenses.description")}</span>
+              </th>
+              <th scope="col" className={cn(sheet.th, "hidden text-start sm:table-cell")}>
+                <span className={sheet.thInner}>{t("expenses.category")}</span>
+              </th>
+              <th scope="col" className={cn(sheet.th, "hidden text-start sm:table-cell")}>
+                <span className={sheet.thInner}>{t("expenses.short.order")}</span>
+              </th>
+              <th scope="col" className={cn(sheet.th, "text-end")}>
+                <span className={cn(sheet.thInner, "justify-end")}>
+                  {t("orders.withCurrency", {
+                    label: t("expenses.amount"),
+                    currency: CURRENCY_SUFFIX[locale],
                   })}
                 </span>
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+              </th>
+              <th scope="col" className={cn(sheet.th, "w-px")}>
+                <span className="sr-only">{t("common.delete")}</span>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {expenses.map((e) => {
+              const category = t(`expenses.categories.${e.category}`);
+              // Une dépense rattachée à une commande, c'est « Les frais » du
+              // tableur : on garde le lien vers la commande concernée.
+              const order = e.orders && (
+                <Link
+                  href={`/commandes/${e.order_id}`}
+                  className="text-gold-strong underline-offset-4 hover:underline"
+                >
+                  <bdi className="whitespace-nowrap">{e.orders.order_no}</bdi>{" "}
+                  <span className="wrap-anywhere">{e.orders.customer_name}</span>
+                </Link>
+              );
+
+              return (
+                <tr key={e.id} className={cn(sheet.row, "cursor-auto")}>
+                  <td
+                    className={cn(
+                      sheet.td,
+                      "text-muted-foreground tabular text-start whitespace-nowrap",
+                    )}
+                  >
+                    {formatDayMonth(e.spent_on, locale)}
+                  </td>
+
+                  {/* Le libellé saisi porte l'information ; à défaut, la
+                      catégorie prend sa place — jamais de ligne sans titre. */}
+                  <td className={cn(sheet.td, "text-start")}>
+                    <span className="block min-w-14 wrap-anywhere">
+                      {e.description || category}
+                    </span>
+
+                    {/* Téléphone : catégorie et commande en seconde ligne. La
+                        catégorie ne se répète pas quand elle sert déjà de titre. */}
+                    {(e.description || order) && (
+                      <span className="text-muted-foreground mt-0.5 block text-xs sm:hidden">
+                        {e.description && category}
+                        {e.description && order && <Dot />}
+                        {order}
+                      </span>
+                    )}
+                  </td>
+
+                  <td
+                    className={cn(
+                      sheet.td,
+                      "text-muted-foreground hidden text-start sm:table-cell",
+                    )}
+                  >
+                    {category}
+                  </td>
+
+                  <td className={cn(sheet.td, "hidden text-start sm:table-cell")}>
+                    {order ?? <span className="text-muted-foreground">—</span>}
+                  </td>
+
+                  <td className={cn(sheet.td, "tabular text-end font-medium whitespace-nowrap")}>
+                    {formatNumber(e.amount, locale)}
+                  </td>
+
+                  <td className={cn(sheet.td, "w-px p-0 sm:p-0 md:p-0")}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setToDelete(e);
+                        setConfirmOpen(true);
+                      }}
+                      className="text-muted-foreground hover:text-destructive size-11"
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                      {/* Le nom accessible porte la dépense visée : trente
+                          « Supprimer » identiques ne se distinguent pas au
+                          lecteur d'écran. */}
+                      <span className="sr-only">
+                        {t("expenses.deleteThis", {
+                          label: e.description || category,
+                        })}
+                      </span>
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* UN SEUL tiroir pour toute la liste, monté en dehors d'elle : trente
           dépenses ne doivent pas monter trente tiroirs.

@@ -30,7 +30,10 @@
     "language": "Langue",
     "switchTo": "Passer en {language}",
     "pickDate": "Choisir une date",
-    "close": "Fermer"
+    "close": "Fermer",
+    "view": "Affichage",
+    "viewList": "Liste",
+    "viewTable": "Tableau"
   },
   "orders": {
     "title": "Commandes",
@@ -90,7 +93,21 @@
     "orderNo": "N° commande",
     "statusLabel": "Statut",
     "columns": "Colonnes",
-    "columnsHint": "Choisissez ce qui s'affiche. Le réglage vaut pour cet appareil : vous pouvez en montrer moins sur le téléphone que sur l'ordinateur.",
+    "columnsHint": "Choisissez ce qui s'affiche. Le réglage vaut pour cet appareil. En tableau, un téléphone n'affiche que les 4 premières colonnes cochées.",
+    "hiddenOnPhone": "Masquée sur téléphone",
+    "withCurrency": "{label} ({currency})",
+    "short": {
+      "orderNo": "N°",
+      "customer": "Client",
+      "phone": "Tél.",
+      "eventDate": "Événement",
+      "pickupDate": "Retrait",
+      "status": "Statut",
+      "total": "Total",
+      "paid": "Versé",
+      "balance": "Reste",
+      "caution": "Caution"
+    },
     "searchPlaceholder": "Nom du client, n° de commande, téléphone",
     "clearSearch": "Effacer la recherche",
     "allStatuses": "Toutes",
@@ -213,6 +230,13 @@
     "restoreModel": "Remettre au catalogue",
     "archivedTitle": "Modèles retirés",
     "archivedLink": "{count} modèle(s) retiré(s)",
+    "modelCount": "{count} modèle(s)",
+    "short": {
+      "ref": "Réf.",
+      "model": "Modèle",
+      "category": "Catégorie",
+      "available": "Dispo."
+    },
     "archivedEmpty": "Aucun modèle retiré du catalogue.",
     "backToCatalogue": "Catalogue",
     "tabModels": "Modèles",
@@ -366,6 +390,9 @@
     "passwordChangedToast": "Mot de passe de {name} changé"
   },
   "expenses": {
+    "short": {
+      "order": "Commande"
+    },
     "add": "Ajouter une dépense",
     "addHint": "Loyer, achat de stock, pressing, retouche… Rattachez-la à une commande s'il s'agit de frais facturés pour elle.",
     "amount": "Montant",

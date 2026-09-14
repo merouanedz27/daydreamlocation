@@ -30,7 +30,10 @@
     "language": "اللغة",
     "switchTo": "التبديل إلى {language}",
     "pickDate": "اختر تاريخًا",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "view": "طريقة العرض",
+    "viewList": "قائمة",
+    "viewTable": "جدول"
   },
   "orders": {
     "title": "الطلبيات",
@@ -90,7 +93,21 @@
     "orderNo": "رقم الطلبية",
     "statusLabel": "الحالة",
     "columns": "الأعمدة",
-    "columnsHint": "اختر ما يُعرض. الإعداد خاص بهذا الجهاز : يمكنك عرض أقل على الهاتف منه على الحاسوب.",
+    "columnsHint": "اختر ما يُعرض. الإعداد خاص بهذا الجهاز. في وضع الجدول، لا يعرض الهاتف إلا أول 4 أعمدة محددة.",
+    "hiddenOnPhone": "مخفي على الهاتف",
+    "withCurrency": "{label} ({currency})",
+    "short": {
+      "orderNo": "الرقم",
+      "customer": "الزبون",
+      "phone": "الهاتف",
+      "eventDate": "المناسبة",
+      "pickupDate": "الاستلام",
+      "status": "الحالة",
+      "total": "المجموع",
+      "paid": "التسبيق",
+      "balance": "الباقي",
+      "caution": "الضمان"
+    },
     "searchPlaceholder": "اسم الزبون أو رقم الطلبية أو الهاتف",
     "clearSearch": "مسح البحث",
     "allStatuses": "الكل",
@@ -213,6 +230,13 @@
     "restoreModel": "إعادة إلى الكتالوج",
     "archivedTitle": "النماذج المسحوبة",
     "archivedLink": "{count} نموذج مسحوب",
+    "modelCount": "{count} موديل",
+    "short": {
+      "ref": "المرجع",
+      "model": "الموديل",
+      "category": "الفئة",
+      "available": "المتوفر"
+    },
     "archivedEmpty": "لا يوجد أي نموذج مسحوب من الكتالوج.",
     "backToCatalogue": "الكتالوج",
     "tabModels": "الموديلات",
@@ -366,6 +390,9 @@
     "passwordChangedToast": "تم تغيير كلمة مرور {name}"
   },
   "expenses": {
+    "short": {
+      "order": "الطلبية"
+    },
     "add": "إضافة مصروف",
     "addHint": "الإيجار، شراء المخزون، التنظيف، التعديل… اربطه بطلبية إن كان من مصاريفها.",
     "amount": "المبلغ",

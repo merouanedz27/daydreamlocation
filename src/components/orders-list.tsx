@@ -9,12 +9,17 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import {
   OrderColumnsDrawer,
   useOrderColumns,
+  useOrdersView,
   type OrderColumn,
   COLUMN_LABEL_KEYS,
+  COLUMN_SHORT_KEYS,
   ORDER_COLUMNS,
+  TABLE_LIMITS,
 } from "@/components/orders-columns";
+import { ViewToggle } from "@/components/view-toggle";
+import { sheet } from "@/components/sheet-table";
 import { PAGE_SIZE, SORTABLE, type OrderRow, type SortKey } from "@/lib/orders-query";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { CURRENCY_SUFFIX, formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { daysBetween, todayIso } from "@/lib/rental-range";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
@@ -36,6 +41,20 @@ const STATUS_KEYS: Record<string, string> = {
 /** Colonnes monétaires : alignées à la fin, en chiffres tabulaires. */
 const MONEY: OrderColumn[] = ["total_price", "amount_paid", "balance", "caution_amount"];
 
+/** Valeurs qui ne se coupent jamais dans le tableau. */
+const ATOMIC: OrderColumn[] = [...MONEY, "event_date", "pickup_date"];
+
+/**
+ * Une colonne du tableau se masque selon sa POSITION parmi les colonnes
+ * cochées : 4 sur téléphone, 6 sur tablette, toutes au-delà. Même classe sur
+ * le `th` et les `td`, sinon l'en-tête se décale.
+ */
+function visibility(index: number) {
+  if (index >= TABLE_LIMITS.tablet) return "hidden lg:table-cell";
+  if (index >= TABLE_LIMITS.phone) return "hidden sm:table-cell";
+  return undefined;
+}
+
 export function OrdersList({
   orders,
   total,
@@ -55,6 +74,7 @@ export function OrdersList({
   const params = useSearchParams();
   const { locale } = useParams<{ locale: Locale }>();
   const { columns, toggle } = useOrderColumns();
+  const { view, setView } = useOrdersView();
 
   const hasFilters = Boolean(params.get("q") || params.get("statut"));
 
@@ -102,10 +122,33 @@ export function OrdersList({
     return b < 0 ? t("orders.toRefund") : t("orders.balance");
   }
 
+  /** Montant d'une colonne monétaire, sans unité. */
+  function amount(order: OrderRow, column: OrderColumn): number {
+    switch (column) {
+      case "total_price":
+        return order.total_price;
+      case "amount_paid":
+        return order.amount_paid;
+      case "balance":
+        return Math.abs(order.balance ?? 0);
+      default:
+        return order.caution_amount;
+    }
+  }
+
   function cell(order: OrderRow, column: OrderColumn) {
     switch (column) {
-      case "order_no":
-        return <bdi>{order.order_no}</bdi>;
+      case "order_no": {
+        // Point de coupure après « CMD- » : sur téléphone, « CMD- / 00120 » sur
+        // deux lignes plutôt qu'un tableau qui déborde. Sans <wbr>, la règle
+        // Unicode interdit de couper entre un tiret et un chiffre.
+        const [head, ...tail] = order.order_no.split("-");
+        return (
+          <bdi>
+            {tail.length ? <>{`${head}-`}<wbr className="md:hidden" />{tail.join("-")}</> : head}
+          </bdi>
+        );
+      }
       case "customer_name":
         return order.customer_name;
       case "customer_phone":
@@ -124,11 +167,12 @@ export function OrdersList({
 
         return (
           <Badge
-            className={
+            className={cn(
+              "h-auto whitespace-normal",
               late
                 ? "bg-warning-soft text-warning-foreground border-transparent"
-                : STATUS_STYLES[order.status]
-            }
+                : STATUS_STYLES[order.status],
+            )}
           >
             {late
               ? t("orders.lateBy", {
@@ -139,13 +183,10 @@ export function OrdersList({
         );
       }
       case "total_price":
-        return formatMoney(order.total_price, locale);
       case "amount_paid":
-        return formatMoney(order.amount_paid, locale);
       case "balance":
-        return formatMoney(Math.abs(order.balance ?? 0), locale);
       case "caution_amount":
-        return formatMoney(order.caution_amount, locale);
+        return formatMoney(amount(order, column), locale);
     }
   }
 
@@ -157,9 +198,192 @@ export function OrdersList({
     return undefined;
   }
 
+  /* ------------------------------------------------------------------------
+   * Liste : une carte par commande. Les colonnes choisies deviennent les
+   * lignes de la carte.
+   * ---------------------------------------------------------------------- */
+  const cards = (className?: string) => (
+    <ul className={cn("mt-4 grid gap-3", className)}>
+      {orders.map((order) => (
+        <li key={order.id}>
+          <Link
+            href={`/commandes/${order.id}`}
+            className="border-border bg-card hover:border-gold-strong block h-full rounded-lg border p-4 transition-colors"
+          >
+            <p className="truncate font-medium">{order.customer_name}</p>
+
+            <dl className="mt-2 flex flex-col gap-1 text-sm">
+              {shown
+                .filter((c) => c !== "customer_name")
+                .map((column) => (
+                  <div key={column} className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">
+                      {column === "balance"
+                        ? balanceLabel(order)
+                        : t(COLUMN_LABEL_KEYS[column])}
+                    </dt>
+                    <dd
+                      className={cn(
+                        "min-w-0 truncate text-end",
+                        MONEY.includes(column) && "tabular",
+                        toneFor(order, column),
+                      )}
+                    >
+                      {cell(order, column)}
+                    </dd>
+                  </div>
+                ))}
+            </dl>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+
+  /* ------------------------------------------------------------------------
+   * Tableau, façon tableur — et SANS défilement horizontal, à toute largeur :
+   *  - il ne prend jamais plus que la largeur disponible (`w-full`) et une
+   *    cellule trop étroite passe à la ligne au lieu de pousser le tableau ;
+   *  - sur écran étroit, seules les premières colonnes cochées s'affichent
+   *    (`visibility`) ;
+   *  - l'unité monétaire monte dans l'en-tête : chaque montant y gagne la
+   *    largeur de « DA ».
+   * Allure commune au stock : voir `sheet-table.ts`.
+   * ---------------------------------------------------------------------- */
+  const table = (className?: string) => (
+    <div className={cn(sheet.wrapper, className)}>
+      {/* 13 px et marges serrées sur téléphone : quatre valeurs insécables
+          (n°, téléphone, deux dates) doivent tenir côte à côte sur 358 px. */}
+      <table className={sheet.table}>
+        <thead>
+          <tr className={sheet.headRow}>
+            {shown.map((column, i) => {
+              const sortable = column in SORTABLE;
+              const active = sortable && sort === column;
+              const money = MONEY.includes(column);
+              const label = money
+                ? t("orders.withCurrency", {
+                    label: t(COLUMN_SHORT_KEYS[column]),
+                    currency: CURRENCY_SUFFIX[locale],
+                  })
+                : t(COLUMN_SHORT_KEYS[column]);
+
+              return (
+                <th
+                  key={column}
+                  scope="col"
+                  title={t(COLUMN_LABEL_KEYS[column])}
+                  aria-sort={
+                    active ? (ascending ? "ascending" : "descending") : undefined
+                  }
+                  className={cn(
+                    sheet.th,
+                    money ? "text-end" : "text-start",
+                    visibility(i),
+                  )}
+                >
+                  {sortable ? (
+                    <Link
+                      href={href({
+                        tri: column,
+                        sens: active && !ascending ? "asc" : "desc",
+                        page: null,
+                      })}
+                      className={cn(
+                        sheet.thInner,
+                        "hover:text-foreground",
+                        money && "justify-end",
+                        active && "text-foreground",
+                      )}
+                    >
+                      <span>{label}</span>
+                      {active ? (
+                        ascending ? (
+                          <ArrowUp className="size-3.5 shrink-0" aria-hidden />
+                        ) : (
+                          <ArrowDown className="size-3.5 shrink-0" aria-hidden />
+                        )
+                      ) : null}
+                    </Link>
+                  ) : (
+                    <span className={sheet.thInner}>
+                      {label}
+                    </span>
+                  )}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+
+        <tbody>
+          {orders.map((order) => (
+            /* LIGNE ENTIÈRE CLIQUABLE. Le <Link> réel reste dans la première
+               cellule — c'est lui qui porte le nom accessible et le focus
+               clavier. Le clic sur la ligne ne fait que le relayer à la
+               souris, en ignorant les clics sur un autre élément interactif.
+               Pas de <tr role="link"> : ce serait mentir sur la sémantique. */
+            <tr
+              key={order.id}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a,button")) return;
+                router.push(`/commandes/${order.id}`, { locale });
+              }}
+              className={sheet.row}
+            >
+              {shown.map((column, i) => {
+                const money = MONEY.includes(column);
+                const content = money ? (
+                  formatNumber(amount(order, column), locale)
+                ) : column === "customer_name" ? (
+                  // Largeur plancher : sans elle, le navigateur rogne d'abord
+                  // cette colonne et coupe « Mohamed » en « Moham / ed ».
+                  <span className="block min-w-14 wrap-anywhere">{order.customer_name}</span>
+                ) : (
+                  cell(order, column)
+                );
+
+                return (
+                  <td
+                    key={column}
+                    className={cn(
+                      sheet.td,
+                      money ? "tabular text-end" : "text-start",
+                      // Une date ou un montant coupé en deux (« 10/09/202 6 ») ne se
+                      // relit plus : ces valeurs restent entières. Le reste passe à
+                      // la ligne à un endroit lisible (espace, tiret).
+                      ATOMIC.includes(column) && "whitespace-nowrap",
+                      // Dès 768 px la place suffit : n° et téléphone sur une ligne.
+                      (column === "order_no" || column === "customer_phone") &&
+                        "md:whitespace-nowrap",
+                      toneFor(order, column),
+                      visibility(i),
+                    )}
+                    title={column === "balance" ? balanceLabel(order) : undefined}
+                  >
+                    {i === 0 ? (
+                      <Link
+                        href={`/commandes/${order.id}`}
+                        className={sheet.rowLink}
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      content
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <p className="text-muted-foreground text-sm">
           {t("orders.range", {
             first: formatNumber(first, locale),
@@ -167,145 +391,22 @@ export function OrdersList({
             total: formatNumber(total, locale),
           })}
         </p>
-        <OrderColumnsDrawer columns={columns} onToggle={toggle} />
+        <div className="ms-auto flex items-center gap-2">
+          <ViewToggle view={view} onChange={setView} />
+          <OrderColumnsDrawer columns={columns} onToggle={toggle} view={view} />
+        </div>
       </div>
 
-      {/* Téléphone : une carte par commande. Les colonnes choisies deviennent
-          les lignes de la carte — un <table> ne passe pas à 390 px. */}
-      <ul className="mt-4 space-y-3 md:hidden">
-        {orders.map((order) => (
-          <li key={order.id}>
-            <Link
-              href={`/commandes/${order.id}`}
-              className="border-border bg-card hover:border-gold-strong block rounded-lg border p-4 transition-colors"
-            >
-              <p className="truncate font-medium">{order.customer_name}</p>
-
-              <dl className="mt-2 space-y-1 text-sm">
-                {shown
-                  .filter((c) => c !== "customer_name")
-                  .map((column) => (
-                    <div key={column} className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">
-                        {column === "balance"
-                          ? balanceLabel(order)
-                          : t(COLUMN_LABEL_KEYS[column])}
-                      </dt>
-                      <dd
-                        className={cn(
-                          "min-w-0 truncate text-end",
-                          MONEY.includes(column) && "tabular",
-                          toneFor(order, column),
-                        )}
-                      >
-                        {cell(order, column)}
-                      </dd>
-                    </div>
-                  ))}
-              </dl>
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      {/* Écran large : le tableau. */}
-      <div className="border-border mt-4 hidden overflow-x-auto rounded-lg border md:block">
-        <table className="w-full text-sm">
-          <thead>
-            {/* En-tête collant : sur 25 lignes, on perd sinon le nom des
-                colonnes dès qu'on défile. */}
-            <tr className="bg-muted/60 sticky top-0 z-10">
-              {shown.map((column) => {
-                const sortable = column in SORTABLE;
-                const active = sortable && sort === column;
-                const money = MONEY.includes(column);
-
-                return (
-                  <th
-                    key={column}
-                    scope="col"
-                    aria-sort={
-                      active ? (ascending ? "ascending" : "descending") : undefined
-                    }
-                    className={cn(
-                      "text-muted-foreground px-3 py-2.5 font-medium whitespace-nowrap",
-                      money ? "text-end" : "text-start",
-                    )}
-                  >
-                    {sortable ? (
-                      <Link
-                        href={href({
-                          tri: column,
-                          sens: active && !ascending ? "asc" : "desc",
-                          page: null,
-                        })}
-                        className={cn(
-                          "hover:text-foreground inline-flex items-center gap-1",
-                          money && "flex-row-reverse",
-                          active && "text-foreground",
-                        )}
-                      >
-                        {t(COLUMN_LABEL_KEYS[column])}
-                        {active ? (
-                          ascending ? (
-                            <ArrowUp className="size-3.5 shrink-0" aria-hidden />
-                          ) : (
-                            <ArrowDown className="size-3.5 shrink-0" aria-hidden />
-                          )
-                        ) : (
-                          <span className="size-3.5 shrink-0" aria-hidden />
-                        )}
-                      </Link>
-                    ) : (
-                      t(COLUMN_LABEL_KEYS[column])
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-
-          <tbody>
-            {orders.map((order) => (
-              /* LIGNE ENTIÈRE CLIQUABLE. Le <Link> réel reste dans la première
-                 cellule — c'est lui qui porte le nom accessible et le focus
-                 clavier. Le clic sur la ligne ne fait que le relayer à la
-                 souris, en ignorant les clics sur un autre élément interactif.
-                 Pas de <tr role="link"> : ce serait mentir sur la sémantique. */
-              <tr
-                key={order.id}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a,button")) return;
-                  router.push(`/commandes/${order.id}`, { locale });
-                }}
-                className="border-border hover:bg-accent/60 cursor-pointer border-t transition-colors"
-              >
-                {shown.map((column, i) => (
-                  <td
-                    key={column}
-                    className={cn(
-                      "px-3 py-3",
-                      MONEY.includes(column) ? "tabular text-end" : "text-start",
-                      toneFor(order, column),
-                    )}
-                  >
-                    {i === 0 ? (
-                      <Link
-                        href={`/commandes/${order.id}`}
-                        className="hover:text-gold-strong underline-offset-4 hover:underline"
-                      >
-                        {cell(order, column)}
-                      </Link>
-                    ) : (
-                      cell(order, column)
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Tant que l'affichage est inconnu (rendu serveur, hydratation), on
+          garde la bascule par largeur : pas de saut visible sur ordinateur. */}
+      {view === null && (
+        <>
+          {cards("md:hidden")}
+          {table("hidden md:block")}
+        </>
+      )}
+      {view === "list" && cards("md:grid-cols-2 lg:grid-cols-3")}
+      {view === "table" && table()}
 
       {lastPage > 1 && (
         <nav

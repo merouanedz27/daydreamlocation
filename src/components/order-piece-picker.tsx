@@ -103,7 +103,7 @@ export function OrderPiecePicker({
           </div>
 
           {categories.length > 0 && (
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 max-md:scrollbar-none">
               <CategoryChip
                 label={t("stock.allCategories")}
                 active={category === null}
