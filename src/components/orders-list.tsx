@@ -2,7 +2,7 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, CalendarPlus, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarPlus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
@@ -17,8 +17,9 @@ import {
   TABLE_LIMITS,
 } from "@/components/orders-columns";
 import { ViewToggle } from "@/components/view-toggle";
+import { PaginationBar } from "@/components/pagination-bar";
 import { sheet } from "@/components/sheet-table";
-import { PAGE_SIZE, SORTABLE, type OrderRow, type SortKey } from "@/lib/orders-query";
+import { SORTABLE, type OrderRow, type SortKey } from "@/lib/orders-query";
 import { CURRENCY_SUFFIX, formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { daysBetween, todayIso } from "@/lib/rental-range";
 import { cn } from "@/lib/utils";
@@ -59,12 +60,14 @@ export function OrdersList({
   orders,
   total,
   page,
+  perPage,
   sort,
   ascending,
 }: {
   orders: OrderRow[];
   total: number;
   page: number;
+  perPage: number;
   sort: SortKey;
   ascending: boolean;
 }) {
@@ -98,9 +101,8 @@ export function OrdersList({
   }
 
   const shown = ORDER_COLUMNS.filter((c) => columns.includes(c));
-  const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const first = (page - 1) * PAGE_SIZE + 1;
-  const last = Math.min(page * PAGE_SIZE, total);
+  const first = (page - 1) * perPage + 1;
+  const last = Math.min(page * perPage, total);
 
   function href(changes: Record<string, string | null>) {
     const next = new URLSearchParams(params.toString());
@@ -408,57 +410,7 @@ export function OrdersList({
       {view === "list" && cards("md:grid-cols-2 lg:grid-cols-3")}
       {view === "table" && table()}
 
-      {lastPage > 1 && (
-        <nav
-          className="mt-6 flex items-center justify-between gap-3"
-          aria-label={t("orders.pagination")}
-        >
-          <Button
-            asChild={page > 1}
-            variant="outline"
-            disabled={page <= 1}
-            className="h-11"
-          >
-            {page > 1 ? (
-              <Link href={href({ page: String(page - 1) })}>
-                <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
-                {t("orders.previous")}
-              </Link>
-            ) : (
-              <span>
-                <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
-                {t("orders.previous")}
-              </span>
-            )}
-          </Button>
-
-          <span className="text-muted-foreground tabular text-sm">
-            {t("orders.pageOf", {
-              page: formatNumber(page, locale),
-              total: formatNumber(lastPage, locale),
-            })}
-          </span>
-
-          <Button
-            asChild={page < lastPage}
-            variant="outline"
-            disabled={page >= lastPage}
-            className="h-11"
-          >
-            {page < lastPage ? (
-              <Link href={href({ page: String(page + 1) })}>
-                {t("orders.next")}
-                <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
-              </Link>
-            ) : (
-              <span>
-                {t("orders.next")}
-                <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
-              </span>
-            )}
-          </Button>
-        </nav>
-      )}
+      <PaginationBar page={page} perPage={perPage} total={total} />
     </>
   );
 }

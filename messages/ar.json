@@ -33,7 +33,11 @@
     "close": "إغلاق",
     "view": "طريقة العرض",
     "viewList": "قائمة",
-    "viewTable": "جدول"
+    "viewTable": "جدول",
+    "previous": "السابق",
+    "pagination": "الصفحات",
+    "pageOf": "الصفحة {page} / {total}",
+    "perPage": "لكل صفحة"
   },
   "orders": {
     "title": "الطلبيات",
@@ -114,10 +118,6 @@
     "noMatch": "لا توجد طلبية تطابق هذا البحث.",
     "toRefund": "يُرَدّ للزبون",
     "range": "{first}–{last} من {total}",
-    "pagination": "الصفحات",
-    "previous": "السابق",
-    "next": "التالي",
-    "pageOf": "الصفحة {page} / {total}",
     "event": "المناسبة",
     "today": "اليوم",
     "tomorrow": "غدًا",

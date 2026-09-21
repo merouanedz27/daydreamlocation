@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import {
-  PAGE_SIZE,
   SORTABLE,
   ordersFilters,
   type OrderRow,
@@ -38,7 +37,7 @@ export async function getOrdersPage(query: OrdersQuery): Promise<{
   if (search) request = request.or(search);
   if (status) request = request.eq("status", status);
 
-  const from = (query.page - 1) * PAGE_SIZE;
+  const from = (query.page - 1) * query.perPage;
 
   const { data, count } = await request
     .order(SORTABLE[query.sort], { ascending: query.ascending })
@@ -46,7 +45,7 @@ export async function getOrdersPage(query: OrdersQuery): Promise<{
     // d'ordre entre deux pages, sinon une ligne peut être vue deux fois ou
     // jamais.
     .order("id", { ascending: false })
-    .range(from, from + PAGE_SIZE - 1);
+    .range(from, from + query.perPage - 1);
 
   return { rows: (data ?? []) as OrderRow[], total: count ?? 0 };
 }

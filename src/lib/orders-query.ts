@@ -10,7 +10,21 @@
  * d'URL, utilisables des deux côtés.
  */
 
-export const PAGE_SIZE = 25;
+/**
+ * Tailles de page proposées.
+ *
+ * LISTE BLANCHE, comme pour le tri : la valeur vient de l'URL et finit dans un
+ * `.range()`. Une taille libre laisserait demander 100 000 lignes d'un coup
+ * depuis la barre d'adresse — sur un réseau mobile algérien, c'est l'écran qui
+ * ne s'affiche plus.
+ *
+ * 100 est le plafond volontairement bas : au-delà, la liste se parcourt moins
+ * bien qu'avec la recherche et les filtres, qui eux travaillent sur TOUTE la
+ * base et non sur la page affichée.
+ */
+export const PER_PAGE_OPTIONS = [10, 25, 50, 100] as const;
+
+export const DEFAULT_PER_PAGE = 25;
 
 /**
  * LISTE BLANCHE des colonnes triables.
@@ -54,6 +68,7 @@ export type OrdersQuery = {
   sort: SortKey;
   ascending: boolean;
   page: number;
+  perPage: number;
 };
 
 /** Normalise les paramètres d'URL : tout ce qui est inconnu est ignoré. */
@@ -63,9 +78,11 @@ export function parseOrdersQuery(params: {
   tri?: string;
   sens?: string;
   page?: string;
+  taille?: string;
 }): OrdersQuery {
   const sort = (params.tri && params.tri in SORTABLE ? params.tri : "event_date") as SortKey;
   const page = Number.parseInt(params.page ?? "1", 10);
+  const perPage = Number.parseInt(params.taille ?? "", 10);
 
   return {
     q: (params.q ?? "").trim().slice(0, 80),
@@ -79,6 +96,9 @@ export function parseOrdersQuery(params: {
       ? params.sens === "asc"
       : sort === "customer_name" || sort === "order_no",
     page: Number.isFinite(page) && page > 0 ? page : 1,
+    perPage: (PER_PAGE_OPTIONS as readonly number[]).includes(perPage)
+      ? perPage
+      : DEFAULT_PER_PAGE,
   };
 }
 

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ClipboardCheck, Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/navigation";
+import { Link, redirectTo } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
 import { OrdersFilters } from "@/components/orders-filters";
 import { OrdersList } from "@/components/orders-list";
 import { getOrdersPage } from "@/lib/queries/orders-list";
@@ -27,6 +28,7 @@ export default async function OrdersPage({
     tri?: string;
     sens?: string;
     page?: string;
+    taille?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -47,6 +49,21 @@ export default async function OrdersPage({
     if (raw[key]) exportParams.set(key, raw[key]);
   }
   const { rows, total } = await getOrdersPage(query);
+
+  // Page demandée AU-DELÀ du dernier numéro : on renvoie sur la dernière, au
+  // lieu d'un « Rien à afficher » sans issue. Le cas arrive tout seul — on est
+  // en page 4, on filtre sur « annulée », il n'en reste qu'une page — et la
+  // liste vide n'affiche alors aucun bouton pour revenir en arrière.
+  const lastPage = Math.max(1, Math.ceil(total / query.perPage));
+  if (query.page > lastPage) {
+    const back = new URLSearchParams();
+    for (const key of ["q", "statut", "tri", "sens", "taille"] as const) {
+      if (raw[key]) back.set(key, raw[key]);
+    }
+    if (lastPage > 1) back.set("page", String(lastPage));
+    const qs = back.toString();
+    redirectTo(qs ? `/commandes?${qs}` : "/commandes", locale as Locale);
+  }
 
   return (
     <div>
@@ -85,6 +102,7 @@ export default async function OrdersPage({
         orders={rows}
         total={total}
         page={query.page}
+        perPage={query.perPage}
         sort={query.sort}
         ascending={query.ascending}
       />

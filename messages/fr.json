@@ -33,7 +33,11 @@
     "close": "Fermer",
     "view": "Affichage",
     "viewList": "Liste",
-    "viewTable": "Tableau"
+    "viewTable": "Tableau",
+    "previous": "Précédent",
+    "pagination": "Pages",
+    "pageOf": "Page {page} / {total}",
+    "perPage": "Par page"
   },
   "orders": {
     "title": "Commandes",
@@ -114,10 +118,6 @@
     "noMatch": "Aucune commande ne correspond à cette recherche.",
     "toRefund": "À rendre",
     "range": "{first}–{last} sur {total}",
-    "pagination": "Pages",
-    "previous": "Précédent",
-    "next": "Suivant",
-    "pageOf": "Page {page} / {total}",
     "event": "Événement",
     "today": "Aujourd'hui",
     "tomorrow": "Demain",
