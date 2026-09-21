@@ -11,6 +11,7 @@ import {
   Shirt,
   Store,
   StickyNote,
+  Unlink,
   User,
   Wallet,
 } from "lucide-react";
@@ -371,6 +372,7 @@ export default async function OrderPage({
                     labels={{
                       size: t("stock.size"),
                       external: t("stock.external"),
+                      unlinked: t("stock.unlinked"),
                       cost: t("orders.externalCost"),
                       view: t("orders.viewInStock"),
                     }}
@@ -561,10 +563,17 @@ export default async function OrderPage({
 /**
  * Une ligne de la commande.
  *
- * Deux cas bien distincts, et c'est `unit_id` qui tranche, pas le libellé :
- * une pièce du stock mène à sa fiche modèle ; une pièce EXTERNE, sous-louée
- * chez un confrère, n'existe nulle part dans le stock — elle ne mène donc
- * à rien, et le dire est plus utile qu'un lien mort.
+ * TROIS cas, et ce sont les colonnes qui tranchent, jamais le libellé :
+ *
+ * 1. `unit_id` renseigné — une pièce du stock, qui mène à sa fiche modèle.
+ * 2. `external_label` — une pièce EXTERNE, sous-louée chez un confrère. Elle
+ *    n'existe nulle part dans le stock : elle ne mène à rien, et le dire est
+ *    plus utile qu'un lien mort.
+ * 3. Ni l'un ni l'autre, juste un nom — un vêtement NOMMÉ mais pas encore
+ *    rattaché au stock. C'est ce que produit la reprise du tableur : le nom
+ *    du vêtement est connu, la pièce physique n'est pas encore saisie. Le
+ *    signaler évite deux malentendus : ce n'est pas une sous-location, et
+ *    l'absence de lien vers le stock n'est pas une panne.
  */
 function PieceRow({
   line,
@@ -575,19 +584,26 @@ function PieceRow({
   line: OrderDetailLine;
   locale: Locale;
   showCost: boolean;
-  labels: { size: string; external: string; cost: string; view: string };
+  labels: { size: string; external: string; unlinked: string; cost: string; view: string };
 }) {
   const unit = line.article_units;
+  const external = !unit && line.external_label !== null;
 
   const details = unit ? (
     <>
       {line.size_snapshot && <span>{`${labels.size} ${line.size_snapshot}`}</span>}
       <bdi>{unit.ref_code}</bdi>
     </>
-  ) : (
+  ) : external ? (
     <>
       <Store className="size-3 shrink-0" aria-hidden />
       <span>{line.external_source ?? labels.external}</span>
+    </>
+  ) : (
+    <>
+      {line.size_snapshot && <span>{`${labels.size} ${line.size_snapshot}`}</span>}
+      <Unlink className="size-3 shrink-0" aria-hidden />
+      <span>{labels.unlinked}</span>
     </>
   );
 

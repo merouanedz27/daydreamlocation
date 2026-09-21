@@ -78,8 +78,11 @@ const isoDate = z
  * Une ligne de commande : SOIT une pièce du stock, SOIT une pièce sous-louée
  * chez un confrère (la colonne « FETHI LOC » du tableur). Jamais les deux.
  *
- * La base porte la même règle (`order_lines_unit_or_external`) : on la double
- * ici pour rendre un message lisible plutôt qu'une violation de contrainte.
+ * La base est plus LARGE : `order_lines_designates_something` accepte aussi une
+ * ligne qui nomme seulement un vêtement, sans stock ni confrère — ce que la
+ * reprise du tableur écrit, et que la saisie ne propose pas. La règle stricte
+ * des deux cas vit donc ici et dans `create_order`, qui rendent un message
+ * lisible plutôt qu'une violation de contrainte.
  */
 const unitLine = z.object({
   kind: z.literal("unit"),

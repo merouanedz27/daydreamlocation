@@ -181,6 +181,7 @@
     "repair": "En réparation",
     "retired": "Retiré",
     "external": "Pièce externe",
+    "unlinked": "Pièce non rattachée au stock",
     "allCategories": "Tout",
     "noMatch": "Aucun résultat pour cette recherche.",
     "newModel": "Nouveau modèle",

@@ -35,7 +35,11 @@ type ExportOrder = {
   caution_returned: boolean;
   picked_up: boolean;
   returned: boolean;
-  order_lines: { external_label: string | null; article_units: { ref_code: string } | null }[];
+  order_lines: {
+    external_label: string | null;
+    model_name_snapshot: string | null;
+    article_units: { ref_code: string } | null;
+  }[];
 };
 
 /**
@@ -87,7 +91,7 @@ export async function GET(request: NextRequest) {
         `order_no, customer_name, customer_phone, event_date, pickup_date,
          return_due_date, status, total_price, amount_paid, balance,
          caution_amount, caution_returned, picked_up, returned,
-         order_lines ( external_label, article_units ( ref_code ) )`,
+         order_lines ( external_label, model_name_snapshot, article_units ( ref_code ) )`,
       );
     if (search) chunk = chunk.or(search);
     if (status) chunk = chunk.eq("status", status);
@@ -149,7 +153,10 @@ export async function GET(request: NextRequest) {
     { value: t(`orders.status.${STATUS_KEYS[o.status] ?? "reserved"}`), type: String },
     {
       value: o.order_lines
-        .map((l) => l.article_units?.ref_code ?? l.external_label ?? "")
+        // La référence du stock en premier : c'est elle qu'on retrouve sur le
+        // cintre. À défaut, le nom retenu à la commande — une pièce externe ou
+        // un vêtement repris du tableur n'a pas de référence.
+        .map((l) => l.article_units?.ref_code ?? l.external_label ?? l.model_name_snapshot ?? "")
         .filter(Boolean)
         .join(", "),
       type: String,
