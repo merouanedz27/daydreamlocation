@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronLeft, ChevronRight, PartyPopper } from "lucide-react";
-import { Link } from "@/i18n/navigation";
+import { PartyPopper } from "lucide-react";
 import { OrderRowList } from "@/components/order-row";
+import { RefreshOnNewDay } from "@/components/refresh-on-new-day";
 import { getOrdersByEventDate } from "@/lib/queries/orders-list";
-import { addDays, daysBetween, todayIso } from "@/lib/rental-range";
+import { addDays, todayIso } from "@/lib/rental-range";
 import { formatLongDay, formatNumber } from "@/lib/format";
 import type { Locale } from "@/i18n/routing";
 
@@ -16,23 +16,20 @@ export async function generateMetadata(props: {
   return { title: t("tomorrow") };
 }
 
-const ISO = /^\d{4}-\d{2}-\d{2}$/;
-
 /**
- * « Demain Location » de son AppSheet : les clients dont le MARIAGE est demain.
- * Ce sont eux qui passent aujourd'hui retirer leur tenue (retrait = J−1) —
- * l'écran que l'équipe ouvre le matin pour préparer les housses et appeler
- * ceux qui ne sont pas encore venus.
+ * « Demain Location » de son AppSheet : les clients dont le MARIAGE est demain,
+ * et rien d'autre. Un simple filtre — pas un second calendrier : l'équipe
+ * l'ouvre en arrivant pour savoir sur quoi se concentrer, et le lendemain la
+ * liste a changé d'elle-même.
  *
- * Le bouton ✈ de chaque ligne valide la sortie en un toucher. Les flèches
- * passent au jour suivant ou précédent : le samedi, on prépare aussi dimanche.
+ * Le bouton ✈ de chaque ligne valide la sortie en un toucher.
  */
 export default async function TomorrowPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ d?: string; q?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -40,43 +37,21 @@ export default async function TomorrowPage({
   const t = await getTranslations();
 
   const today = todayIso();
-  const { d, q = "" } = await searchParams;
-  // La recherche de l'en-tête suit les flèches d'un jour à l'autre.
-  const dayHref = (day: string) =>
-    `/commandes/demain?d=${day}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
-  const day = d && ISO.test(d) ? d : addDays(today, 1);
-  const offset = daysBetween(today, day);
+  const day = addDays(today, 1);
+  const { q = "" } = await searchParams;
 
   const orders = await getOrdersByEventDate(day, day, q);
 
-  const heading =
-    offset === 1 ? t("orders.tomorrow") : offset === 0 ? t("orders.today") : formatLongDay(day, l);
-
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <Link
-          href={dayHref(addDays(day, -1))}
-          aria-label={t("calendar.previousDay")}
-          className="hover:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full"
-        >
-          <ChevronLeft className="size-5 rtl:-scale-x-100" aria-hidden />
-        </Link>
-        <div className="min-w-0 flex-1 text-center">
-          <h1 className="truncate text-xl">{heading}</h1>
-          <p className="text-muted-foreground text-sm">
-            {offset === 0 || offset === 1 ? formatLongDay(day, l) : null}
-            {offset === 0 || offset === 1 ? " · " : null}
-            {t("calendar.count", { count: orders.length, n: formatNumber(orders.length, l) })}
-          </p>
-        </div>
-        <Link
-          href={dayHref(addDays(day, 1))}
-          aria-label={t("calendar.nextDay")}
-          className="hover:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full"
-        >
-          <ChevronRight className="size-5 rtl:-scale-x-100" aria-hidden />
-        </Link>
+      <RefreshOnNewDay day={today} />
+
+      <div className="text-center">
+        <h1 className="truncate text-xl">{t("orders.tomorrow")}</h1>
+        <p className="text-muted-foreground text-sm">
+          {formatLongDay(day, l)} ·{" "}
+          {t("calendar.count", { count: orders.length, n: formatNumber(orders.length, l) })}
+        </p>
       </div>
 
       <p className="text-muted-foreground mt-2 text-center text-xs">{t("calendar.tomorrowHint")}</p>
