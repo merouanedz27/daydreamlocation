@@ -174,6 +174,67 @@ begin
     case when n < 0 then 'ERREUR SQL' else n::text end, n = 1);
 end $$;
 
+-- --- Frais saisis par l'équipe (20261002120000_frais_equipe.sql) -------------
+-- Rend 1 si l'insertion passe, 0 si la RLS la refuse, -1 sur toute autre
+-- erreur. Contrairement à un `update`, une insertion refusée LÈVE une erreur
+-- (42501) : c'est elle qu'on traduit en 0.
+create or replace function pg_temp.insert_expense_as(p_user uuid, p_created_by uuid)
+returns integer
+language plpgsql
+as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_user::text, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+
+  insert into public.expenses (category, amount, description, created_by)
+  values ('retouche', 1000, 'RLS TEST FRAIS', p_created_by);
+
+  perform set_config('role', 'postgres', true);
+  return 1;
+exception
+  when insufficient_privilege then
+    perform set_config('role', 'postgres', true);
+    return 0;
+  when others then
+    perform set_config('role', 'postgres', true);
+    raise notice 'ERREUR sur expenses: %', sqlerrm;
+    return -1;
+end $$;
+
+do $$
+declare
+  v_owner uuid;
+  v_staff uuid;
+  n integer;
+begin
+  select owner_id, staff_id into v_owner, v_staff from test_ids;
+
+  -- 10. l'employé AJOUTE un frais à son nom (onglet « Frais »)
+  n := pg_temp.insert_expense_as(v_staff, v_staff);
+  insert into test_results values (
+    '10. employe ajoute un frais a son nom', '1',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n = 1);
+
+  -- 11. ... mais jamais au nom d'un autre
+  n := pg_temp.insert_expense_as(v_staff, v_owner);
+  insert into test_results values (
+    '11. employe ne signe PAS un frais pour un autre', '0',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n = 0);
+
+  -- 12. il ne relit que SON frais — pas le loyer du propriétaire
+  n := pg_temp.count_as(v_staff, 'expenses');
+  insert into test_results values (
+    '12. employe ne lit que ses frais', '1',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n = 1);
+
+  -- 13. le propriétaire voit tout, frais de l'employé compris
+  n := pg_temp.count_as(v_owner, 'expenses');
+  insert into test_results values (
+    '13. proprietaire voit aussi les frais de l''equipe', '>= 2',
+    case when n < 0 then 'ERREUR SQL' else n::text end, n >= 2);
+end $$;
+
 select case when ok then 'OK  ' else 'ECHEC' end as resultat,
        step, attendu, obtenu
 from test_results order by step;

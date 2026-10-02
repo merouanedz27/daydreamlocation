@@ -15,7 +15,17 @@
     "shop": "Boutique",
     "account": "Mon compte",
     "admin": "Administration",
-    "myAccount": "Mon compte"
+    "myAccount": "Mon compte",
+    "calendar": "Calendrier",
+    "calendarShort": "Calendrier",
+    "tomorrow": "Demain",
+    "tomorrowShort": "Demain",
+    "ordersShort": "Commandes",
+    "notReturned": "Pas rentrés",
+    "notReturnedShort": "Pas rentrés",
+    "frais": "Frais",
+    "fraisShort": "Frais",
+    "more": "Plus"
   },
   "common": {
     "save": "Enregistrer",
@@ -35,9 +45,8 @@
     "viewList": "Liste",
     "viewTable": "Tableau",
     "previous": "Précédent",
-    "pagination": "Pages",
-    "pageOf": "Page {page} / {total}",
-    "perPage": "Par page"
+    "yes": "Oui",
+    "no": "Non"
   },
   "orders": {
     "title": "Commandes",
@@ -96,9 +105,6 @@
     "rentalWindow": "Location",
     "orderNo": "N° commande",
     "statusLabel": "Statut",
-    "columns": "Colonnes",
-    "columnsHint": "Choisissez ce qui s'affiche. Le réglage vaut pour cet appareil. En tableau, un téléphone n'affiche que les 4 premières colonnes cochées.",
-    "hiddenOnPhone": "Masquée sur téléphone",
     "withCurrency": "{label} ({currency})",
     "short": {
       "orderNo": "N°",
@@ -110,14 +116,16 @@
       "total": "Total",
       "paid": "Versé",
       "balance": "Reste",
-      "caution": "Caution"
+      "caution": "Caution",
+      "pickedUp": "Allez",
+      "returned": "Retour",
+      "pieces": "Tenue",
+      "tailor": "Tailleur",
+      "returnDue": "Retour prévu"
     },
-    "searchPlaceholder": "Nom du client, n° de commande, téléphone",
-    "clearSearch": "Effacer la recherche",
     "allStatuses": "Toutes",
     "noMatch": "Aucune commande ne correspond à cette recherche.",
     "toRefund": "À rendre",
-    "range": "{first}–{last} sur {total}",
     "event": "Événement",
     "today": "Aujourd'hui",
     "tomorrow": "Demain",
@@ -166,7 +174,54 @@
     "pickDateFirst": "Choisissez d'abord la date de l'événement : la disponibilité des pièces en dépend.",
     "fieldsToFix": "Champs à compléter : {count}",
     "zeroAllowed": "Saisissez 0 si le client n'a rien versé.",
-    "export": "Exporter"
+    "export": "Exporter",
+    "quick": {
+      "phoneOptional": "Téléphone (facultatif)",
+      "outfit": "Tenue",
+      "outfitHint": "Tapez librement ou touchez une suggestion. Une case vide est ignorée.",
+      "costume": "Costume",
+      "shirt": "Chemise",
+      "shoes": "Chaussures",
+      "other": "Autre pièce",
+      "size": "Taille",
+      "tailor": "Tailleur",
+      "tailorPlaceholder": "Tailleur : ex. TK-525 (14 cm)",
+      "addOther": "Ajouter une pièce",
+      "payment": "Paiement",
+      "price": "Prix de la tenue",
+      "paidAll": "Tout payé ({amount})",
+      "fromStock": "Pièce du stock",
+      "dateFirst": "choisissez la date",
+      "save": "Enregistrer",
+      "saveAnother": "Suivante",
+      "savedToast": "Commande de {name} enregistrée",
+      "view": "Voir",
+      "clear": "Vider",
+      "clearTitle": "Vider le formulaire ?",
+      "clearBody": "Tout ce qui est saisi pour cette commande est effacé. Rien n'a encore été enregistré.",
+      "accessories": "Accessoires",
+      "sizeJacket": "Taille",
+      "sizeVest": "Taille gilet",
+      "sizePants": "Taille pantalon",
+      "pickPlaceholder": "Choisir…",
+      "sizeJacketLong": "Taille veste",
+      "sizeVestShort": "Gilet",
+      "sizePantsShort": "Pantalon",
+      "stepDown": "Moins {step}",
+      "stepUp": "Plus {step}"
+    },
+    "callNamed": "Appeler {name}",
+    "smsNamed": "Envoyer un SMS à {name}",
+    "checkedToast": "{label} — {name}",
+    "countTotal": "{count, plural, =0 {Aucune commande} =1 {1 commande} other {{n} commandes}}",
+    "endOfList": "Fin de la liste",
+    "edit": {
+      "action": "Modifier",
+      "title": "Modifier {no}",
+      "save": "Enregistrer les modifications",
+      "savedToast": "Commande de {name} modifiée",
+      "backToOrder": "Retour à la commande"
+    }
   },
   "stock": {
     "title": "Stock",
@@ -346,7 +401,8 @@
     "passwordSame": "Choisissez un mot de passe différent de l'actuel.",
     "currentPasswordWrong": "Mot de passe actuel incorrect.",
     "ensembleUnitsRequired": "Ajoutez au moins une pièce.",
-    "ensembleUnitInvalid": "Une pièce retirée du stock ne peut pas faire partie d'un ensemble."
+    "ensembleUnitInvalid": "Une pièce retirée du stock ne peut pas faire partie d'un ensemble.",
+    "orderCancelledEdit": "Une commande annulée ne se modifie pas : rétablissez-la d’abord depuis sa fiche."
   },
   "roles": {
     "owner": "Administrateur",
@@ -485,5 +541,68 @@
     "newPasswordHint": "8 caractères au minimum.",
     "confirmPassword": "Confirmer le nouveau mot de passe",
     "passwordChanged": "Mot de passe changé."
+  },
+  "calendar": {
+    "day": "Jour",
+    "week": "Semaine",
+    "month": "Mois",
+    "today": "Aujourd'hui",
+    "views": "Affichage du calendrier",
+    "previous": "Période précédente",
+    "next": "Période suivante",
+    "previousDay": "Jour précédent",
+    "nextDay": "Jour suivant",
+    "more": "+{n}",
+    "late": "En retard",
+    "count": "{count, plural, =0 {Aucune commande} =1 {1 commande} other {{n} commandes}}",
+    "lateCount": "{count, plural, =1 {1 en retard} other {{n} en retard}}",
+    "tomorrowHint": "Mariages de ce jour : ces clients retirent leur tenue la veille. Touchez ✈ quand la tenue sort.",
+    "dayEmpty": "Aucune commande ce jour-là.",
+    "allBack": "Toutes les tenues sont rentrées.",
+    "done": "Terminée (aller et retour validés)"
+  },
+  "frais": {
+    "hint": "Notez un frais au moment de le payer : tailleur, pressing, livraison…",
+    "type": "Type",
+    "types": {
+      "tailor": "Tailleur",
+      "pressing": "Pressing",
+      "delivery": "Livraison",
+      "other": "Autre"
+    },
+    "detail": "Détail",
+    "detailPlaceholder": "Facultatif — ex. tailleur + livraison",
+    "add": "Ajouter le frais",
+    "added": "Frais ajouté : {label}, {amount}",
+    "recentAll": "Derniers frais",
+    "recentMine": "Mes derniers frais",
+    "seeExpenses": "Toutes les dépenses",
+    "empty": "Aucun frais noté pour l'instant."
+  },
+  "search": {
+    "orders": "Chercher une commande : nom, n°, téléphone",
+    "stock": "Chercher dans le stock",
+    "ensembles": "Chercher un ensemble ou une pièce",
+    "frais": "Chercher un frais",
+    "expenses": "Chercher une dépense",
+    "team": "Chercher un membre",
+    "open": "Rechercher",
+    "close": "Fermer la recherche",
+    "clear": "Effacer la recherche",
+    "noMatch": "Aucun résultat pour « {q} »."
+  },
+  "picker": {
+    "hint": "Cochez un ou plusieurs vêtements, puis validez.",
+    "search": "Rechercher",
+    "addNew": "Ajouter « {label} »",
+    "emptyHint": "Tapez un nom pour le chercher ou l’ajouter.",
+    "clear": "Tout décocher",
+    "done": "Valider",
+    "doneCount": "Valider ({count})",
+    "sizeHint": "Touchez une taille pour la choisir.",
+    "otherSize": "Autre taille",
+    "ok": "OK",
+    "clearSize": "Sans taille",
+    "clearValue": "Effacer « {value} »"
   }
 }

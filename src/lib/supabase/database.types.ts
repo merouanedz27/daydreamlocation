@@ -476,11 +476,36 @@ export type Database = {
         };
         Returns: number;
       };
+      update_order: {
+        Args: {
+          p_order_id: number;
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_event_date: string;
+          p_pickup_date: string;
+          p_return_due_date: string;
+          p_amount_paid?: number;
+          p_caution_amount?: number;
+          p_notes?: string;
+          p_picked_up?: boolean;
+          p_returned?: boolean;
+          p_lines?: Json;
+        };
+        Returns: number;
+      };
+      customer_suggestions: {
+        Args: Record<PropertyKey, never>;
+        Returns: { name: string; phone: string | null; orders: number }[];
+      };
       dashboard_stats: {
         Args: {
           p_today?: string;
         };
         Returns: Json;
+      };
+      order_item_suggestions: {
+        Args: Record<PropertyKey, never>;
+        Returns: { label: string; uses: number; slot: number }[];
       };
       save_ensemble: {
         Args: {

@@ -82,11 +82,15 @@ Skills globaux utiles : `dataviz` (tableau de bord), `security-review` (audit RL
 ```
 src/app/[locale]/(auth)/login
 src/app/[locale]/(app)/commandes            liste, recherche, filtres
-src/app/[locale]/(app)/commandes/nouvelle   assistant pas-à-pas
+src/app/[locale]/(app)/commandes/nouvelle   saisie rapide (une ligne d'AppSheet)
+src/app/[locale]/(app)/commandes/calendrier jour / semaine / mois, sur la date de l'événement
+src/app/[locale]/(app)/commandes/demain     événements du lendemain, ✈ en un toucher
+src/app/[locale]/(app)/commandes/pas-rentres sorties non revenues, ✓ en un toucher
 src/app/[locale]/(app)/commandes/[id]
 src/app/[locale]/(app)/stock                modèles, pièces, ensembles
 src/app/[locale]/(app)/tableau-de-bord      CA / dépenses / bénéfice   (owner)
 src/app/[locale]/(app)/depenses             (owner)
+src/app/[locale]/(app)/frais                ajout de frais par toute l'équipe ; chacun ne relit que les siens
 
 src/components/ui/          shadcn (généré, ne pas éditer à la main sans raison)
 src/components/             composants métier

@@ -49,3 +49,4 @@ next-env.d.ts
 .claude/skills/shadcn/
 .claude/skills/supabase/
 .claude/skills/supabase-postgres-best-practices/
+./docs/docs/

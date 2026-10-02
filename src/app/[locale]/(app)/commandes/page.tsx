@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ClipboardCheck, Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, redirectTo } from "@/i18n/navigation";
-import type { Locale } from "@/i18n/routing";
+import { Link } from "@/i18n/navigation";
 import { OrdersFilters } from "@/components/orders-filters";
 import { OrdersList } from "@/components/orders-list";
-import { getOrdersPage } from "@/lib/queries/orders-list";
+import { getOrdersTable } from "@/lib/queries/orders-list";
 import { parseOrdersQuery } from "@/lib/orders-query";
 
 export async function generateMetadata(props: {
@@ -27,8 +26,6 @@ export default async function OrdersPage({
     statut?: string;
     tri?: string;
     sens?: string;
-    page?: string;
-    taille?: string;
   }>;
 }) {
   const { locale } = await params;
@@ -36,34 +33,23 @@ export default async function OrdersPage({
 
   const t = await getTranslations();
 
-  // Recherche, filtre, tri et pagination viennent de l'URL et sont appliqués
-  // EN BASE. Toute valeur inconnue retombe sur la valeur par défaut plutôt que
-  // de produire une erreur — un lien mal recopié ne doit pas casser l'écran.
+  // Recherche, filtre et tri viennent de l'URL et sont appliqués EN BASE ; le
+  // tableau charge ensuite la suite tout seul, en se déroulant. Toute valeur
+  // inconnue retombe sur la valeur par défaut plutôt que de produire une
+  // erreur — un lien mal recopié ne doit pas casser l'écran.
   const raw = await searchParams;
   const query = parseOrdersQuery(raw);
 
-  // L'export reprend les filtres AFFICHÉS (recherche, statut, tri), sans la
-  // page : le fichier contient tout le résultat filtré, pas les 25 lignes vues.
+  // L'export reprend les filtres AFFICHÉS (recherche, statut, tri) : le fichier
+  // contient tout le résultat filtré, pas seulement les lignes déjà chargées.
   const exportParams = new URLSearchParams({ locale });
   for (const key of ["q", "statut", "tri", "sens"] as const) {
     if (raw[key]) exportParams.set(key, raw[key]);
   }
-  const { rows, total } = await getOrdersPage(query);
+  const { rows, total } = await getOrdersTable(query);
 
-  // Page demandée AU-DELÀ du dernier numéro : on renvoie sur la dernière, au
-  // lieu d'un « Rien à afficher » sans issue. Le cas arrive tout seul — on est
-  // en page 4, on filtre sur « annulée », il n'en reste qu'une page — et la
-  // liste vide n'affiche alors aucun bouton pour revenir en arrière.
-  const lastPage = Math.max(1, Math.ceil(total / query.perPage));
-  if (query.page > lastPage) {
-    const back = new URLSearchParams();
-    for (const key of ["q", "statut", "tri", "sens", "taille"] as const) {
-      if (raw[key]) back.set(key, raw[key]);
-    }
-    if (lastPage > 1) back.set("page", String(lastPage));
-    const qs = back.toString();
-    redirectTo(qs ? `/commandes?${qs}` : "/commandes", locale as Locale);
-  }
+  // Toute la liste repart de zéro quand un filtre ou le tri change.
+  const listKey = [raw.q, raw.statut, raw.tri, raw.sens].map((v) => v ?? "").join("|");
 
   return (
     <div>
@@ -99,10 +85,9 @@ export default async function OrdersPage({
       <OrdersFilters />
 
       <OrdersList
-        orders={rows}
+        key={listKey}
+        initialRows={rows}
         total={total}
-        page={query.page}
-        perPage={query.perPage}
         sort={query.sort}
         ascending={query.ascending}
       />

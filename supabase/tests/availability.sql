@@ -509,6 +509,194 @@ begin
       'retournee', v_statut, v_statut = 'retournee');
   end;
 
+  -- --- 16. saisie rapide : vetement NOMME hors stock -------------------------
+  -- Le geste du tableur : « Invite Noir Simple », taille 50, sans piece du
+  -- stock. La ligne s'ecrit, et ne bloque AUCUNE date : le meme libelle peut
+  -- partir deux fois le meme jour (ce sont deux vetements reels differents).
+  declare
+    v_n1     bigint;
+    v_n2     bigint;
+    v_rec3   record;
+    v_msg    text;
+  begin
+    select public.create_order(
+      p_customer_name := 'Rapide',
+      p_customer_phone := null,
+      p_event_date := '2026-08-26',
+      p_amount_paid := 3000,
+      p_lines := jsonb_build_array(
+        jsonb_build_object('kind', 'named', 'name', 'Invite Noir Simple',
+                           'size', '50', 'unitPrice', 8000, 'note', 'TK-513'),
+        jsonb_build_object('kind', 'named', 'name', 'Chemise blanc simple (L)',
+                           'unitPrice', 0)
+      )
+    ) into v_n1;
+
+    select o.total_price, o.balance, count(l.*) as lignes,
+           bool_and(l.unit_id is null) as hors_stock,
+           max(l.size_snapshot) as taille, max(l.line_note) as note
+      into v_rec3
+    from public.orders o join public.order_lines l on l.order_id = o.id
+    where o.id = v_n1
+    group by o.total_price, o.balance;
+
+    insert into test_results values (
+      '16a. ligne nommee creee (prix, taille, note)',
+      '2 lignes / 8000 / reste 5000 / 50 / TK-513',
+      v_rec3.lignes || ' lignes / ' || v_rec3.total_price || ' / reste '
+        || v_rec3.balance || ' / ' || coalesce(v_rec3.taille, '-') || ' / '
+        || coalesce(v_rec3.note, '-'),
+      v_rec3.lignes = 2 and v_rec3.total_price = 8000 and v_rec3.balance = 5000
+        and v_rec3.taille = '50' and v_rec3.note = 'TK-513' and v_rec3.hors_stock);
+
+    begin
+      select public.create_order(
+        p_customer_name := 'Rapide bis',
+        p_customer_phone := null,
+        p_event_date := '2026-08-26',
+        p_lines := jsonb_build_array(
+          jsonb_build_object('kind', 'named', 'name', 'Invite Noir Simple',
+                             'size', '50', 'unitPrice', 8000))
+      ) into v_n2;
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+
+    insert into test_results values (
+      '16b. ligne nommee ne bloque aucune date',
+      'accepte', v_msg, v_msg = 'accepte');
+
+    begin
+      perform public.create_order(
+        p_customer_name := 'Vide',
+        p_customer_phone := null,
+        p_event_date := '2026-08-26',
+        p_lines := jsonb_build_array(jsonb_build_object('kind', 'named', 'name', '  ')));
+      v_msg := 'ACCEPTE A TORT';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+
+    insert into test_results values (
+      '16c. ligne nommee sans libelle refusee',
+      'named_label_required', v_msg, v_msg = 'named_label_required');
+  end;
+
+  -- --- 17. modifier une commande (update_order) ------------------------------
+  -- Le formulaire de saisie sert aussi à corriger : la commande est réécrite
+  -- et ses lignes REMPLACÉES. La garantie ne doit pas s'affaiblir pour autant :
+  -- une modification qui prendrait une pièce déjà louée échoue, et ne laisse
+  -- rien derrière elle.
+  declare
+    v_u3     bigint;
+    v_u4     bigint;
+    v_a      bigint;
+    v_b      bigint;
+    v_rec4   record;
+    v_msg    text;
+  begin
+    -- Dates à l'écart des autres tests : décembre.
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_model_id, 'TEST-Gio-079-03', '52') returning id into v_u3;
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_model_id, 'TEST-Gio-079-04', '52') returning id into v_u4;
+
+    select public.create_order(
+      p_customer_name := 'Edit A', p_customer_phone := null,
+      p_event_date := '2026-12-10',
+      p_lines := jsonb_build_array(jsonb_build_object('unitId', v_u3, 'unitPrice', 5000))
+    ) into v_a;
+
+    select public.create_order(
+      p_customer_name := 'Edit B', p_customer_phone := null,
+      p_event_date := '2026-12-10',
+      p_lines := jsonb_build_array(jsonb_build_object('unitId', v_u4, 'unitPrice', 5000))
+    ) into v_b;
+
+    -- 17a. on garde SA pièce (supprimée puis réinsérée : pas de conflit avec
+    --      elle-même), on change le nom et on ajoute une chemise nommée.
+    begin
+      perform public.update_order(
+        p_order_id := v_b, p_customer_name := 'Edit B corrige', p_customer_phone := null,
+        p_event_date := '2026-12-10', p_pickup_date := '2026-12-09',
+        p_return_due_date := '2026-12-11', p_amount_paid := 2000,
+        p_lines := jsonb_build_array(
+          jsonb_build_object('unitId', v_u4, 'unitPrice', 7000),
+          jsonb_build_object('kind', 'named', 'name', 'Chemise blanc (L)', 'unitPrice', 0)));
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+
+    select o.customer_name, o.total_price, o.balance, count(l.*) as lignes
+      into v_rec4
+    from public.orders o join public.order_lines l on l.order_id = o.id
+    where o.id = v_b
+    group by o.customer_name, o.total_price, o.balance;
+
+    insert into test_results values (
+      '17a. modification garde sa piece et remplace les lignes',
+      'accepte / Edit B corrige / 2 lignes / 7000 / reste 5000',
+      v_msg || ' / ' || v_rec4.customer_name || ' / ' || v_rec4.lignes || ' lignes / '
+        || v_rec4.total_price || ' / reste ' || v_rec4.balance,
+      v_msg = 'accepte' and v_rec4.customer_name = 'Edit B corrige' and v_rec4.lignes = 2
+        and v_rec4.total_price = 7000 and v_rec4.balance = 5000);
+
+    -- 17b. prendre la pièce de A, louée sur les mêmes dates : REFUSÉ, et B
+    --      reste exactement comme avant.
+    begin
+      perform public.update_order(
+        p_order_id := v_b, p_customer_name := 'Vol', p_customer_phone := null,
+        p_event_date := '2026-12-10', p_pickup_date := '2026-12-09',
+        p_return_due_date := '2026-12-11',
+        p_lines := jsonb_build_array(jsonb_build_object('unitId', v_u3, 'unitPrice', 5000)));
+      v_msg := 'ACCEPTE A TORT';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+
+    select o.customer_name, count(l.*) as lignes,
+           bool_or(l.unit_id = v_u4) as garde_u4
+      into v_rec4
+    from public.orders o join public.order_lines l on l.order_id = o.id
+    where o.id = v_b
+    group by o.customer_name;
+
+    insert into test_results values (
+      '17b. modification vers une piece prise refusee, rien ecrit',
+      'unit_unavailable:TEST-Gio-079-03 / Edit B corrige / 2 lignes',
+      v_msg || ' / ' || v_rec4.customer_name || ' / ' || v_rec4.lignes || ' lignes',
+      v_msg = 'unit_unavailable:TEST-Gio-079-03' and v_rec4.customer_name = 'Edit B corrige'
+        and v_rec4.lignes = 2 and v_rec4.garde_u4);
+
+    -- 17c. cocher aller ET retour depuis le formulaire : le statut se DÉDUIT
+    --      des deux cases (retournee), comme sur la fiche, et la commande garde
+    --      sa pièce. (Seule l'annulation libère une pièce : une commande rendue
+    --      garde ses dates dans l'historique — `private.order_blocks_stock`.)
+    perform public.update_order(
+      p_order_id := v_b, p_customer_name := 'Edit B corrige', p_customer_phone := null,
+      p_event_date := '2026-12-10', p_pickup_date := '2026-12-09',
+      p_return_due_date := '2026-12-11', p_picked_up := true, p_returned := true,
+      p_lines := jsonb_build_array(jsonb_build_object('unitId', v_u4, 'unitPrice', 7000)));
+
+    select o.status, o.picked_up, o.returned, count(l.*) as lignes,
+           bool_and(l.unit_id = v_u4) as garde_u4
+      into v_rec4
+    from public.orders o join public.order_lines l on l.order_id = o.id
+    where o.id = v_b
+    group by o.status, o.picked_up, o.returned;
+
+    insert into test_results values (
+      '17c. aller+retour coches depuis le formulaire : retournee',
+      'retournee / aller+retour / 1 ligne',
+      v_rec4.status || ' / '
+        || case when v_rec4.picked_up and v_rec4.returned then 'aller+retour' else 'cases ?' end
+        || ' / ' || v_rec4.lignes || ' ligne',
+      v_rec4.status = 'retournee' and v_rec4.picked_up and v_rec4.returned
+        and v_rec4.lignes = 1 and v_rec4.garde_u4);
+  end;
+
 end $$;
 
 select

@@ -100,3 +100,37 @@ export function useMediaQuery(query: string): boolean | null {
     () => null,
   );
 }
+
+/**
+ * Même interface que `createDeviceSetting`, mais en MÉMOIRE seulement, avec
+ * une valeur de départ connue du serveur.
+ *
+ * Sert à la modification d'une commande : le formulaire part de la commande
+ * en base, pas d'un brouillon resté dans le téléphone — qui pourrait dater
+ * d'avant une correction faite par un collègue. Et il ne doit surtout pas
+ * écraser le brouillon de NOUVELLE commande en cours.
+ */
+export function createMemoryStore<T>(initial: T) {
+  let current = initial;
+  const listeners = new Set<() => void>();
+
+  // Stable pour toute la vie du store : `useSyncExternalStore` ne se
+  // réabonne pas à chaque rendu.
+  function subscribe(onChange: () => void) {
+    listeners.add(onChange);
+    return () => {
+      listeners.delete(onChange);
+    };
+  }
+
+  return {
+    get: () => current,
+    set(next: T) {
+      current = next;
+      for (const listener of listeners) listener();
+    },
+    useValue(): T {
+      return useSyncExternalStore(subscribe, () => current, () => initial);
+    },
+  };
+}

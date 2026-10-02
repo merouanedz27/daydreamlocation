@@ -1,26 +1,22 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, CalendarPlus, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarPlus, Check, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { loadMoreOrders } from "@/lib/actions/orders-list";
 import {
-  OrderColumnsDrawer,
-  useOrderColumns,
-  useOrdersView,
-  type OrderColumn,
-  COLUMN_LABEL_KEYS,
-  COLUMN_SHORT_KEYS,
-  ORDER_COLUMNS,
-  TABLE_LIMITS,
-} from "@/components/orders-columns";
-import { ViewToggle } from "@/components/view-toggle";
-import { PaginationBar } from "@/components/pagination-bar";
-import { sheet } from "@/components/sheet-table";
-import { SORTABLE, type OrderRow, type SortKey } from "@/lib/orders-query";
-import { CURRENCY_SUFFIX, formatDate, formatMoney, formatNumber } from "@/lib/format";
+  DONE_NAME_CLASS,
+  SORTABLE,
+  isOrderDone,
+  type OrderTableRow,
+  type SortKey,
+} from "@/lib/orders-query";
+import { formatDate, formatNumber } from "@/lib/format";
 import { daysBetween, todayIso } from "@/lib/rental-range";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
@@ -39,35 +35,74 @@ const STATUS_KEYS: Record<string, string> = {
   annulee: "cancelled",
 };
 
-/** Colonnes monétaires : alignées à la fin, en chiffres tabulaires. */
-const MONEY: OrderColumn[] = ["total_price", "amount_paid", "balance", "caution_amount"];
+/**
+ * TOUTES les colonnes, dans l'ordre de son tableau AppSheet : qui, quand,
+ * les deux cases, ce qu'il emporte, l'argent, puis le reste.
+ */
+const COLUMNS = [
+  "customer_name",
+  "customer_phone",
+  "event_date",
+  "picked_up",
+  "returned",
+  "pieces",
+  "tailor",
+  "amount_paid",
+  "total_price",
+  "balance",
+  "caution_amount",
+  "pickup_date",
+  "return_due_date",
+  "order_no",
+  "status",
+] as const;
 
-/** Valeurs qui ne se coupent jamais dans le tableau. */
-const ATOMIC: OrderColumn[] = [...MONEY, "event_date", "pickup_date"];
+type Column = (typeof COLUMNS)[number];
+
+const HEADERS: Record<Column, string> = {
+  customer_name: "orders.short.customer",
+  customer_phone: "orders.short.phone",
+  event_date: "orders.short.eventDate",
+  picked_up: "orders.short.pickedUp",
+  returned: "orders.short.returned",
+  pieces: "orders.short.pieces",
+  tailor: "orders.short.tailor",
+  amount_paid: "orders.short.paid",
+  total_price: "orders.short.total",
+  balance: "orders.short.balance",
+  caution_amount: "orders.short.caution",
+  pickup_date: "orders.short.pickupDate",
+  return_due_date: "orders.short.returnDue",
+  order_no: "orders.short.orderNo",
+  status: "orders.short.status",
+};
+
+const MONEY: Column[] = ["amount_paid", "total_price", "balance", "caution_amount"];
+
+/** Rayure des lignes impaires, OPAQUE : la colonne collée doit cacher ce qui glisse dessous. */
+const STRIPE = "bg-[color-mix(in_oklab,var(--muted)_45%,var(--background))]";
 
 /**
- * Une colonne du tableau se masque selon sa POSITION parmi les colonnes
- * cochées : 4 sur téléphone, 6 sur tablette, toutes au-delà. Même classe sur
- * le `th` et les `td`, sinon l'en-tête se décale.
+ * Le tableau des commandes, COMME SON APPSHEET : toutes les colonnes, et on
+ * fait défiler — vers la droite pour les colonnes, vers le bas pour les
+ * commandes, qui arrivent d'elles-mêmes par tranches quand on approche du bas.
+ * Plus de pages, plus de choix de colonnes, plus de bascule liste / tableau.
+ *
+ * Le tableau défile DANS son cadre (hauteur de l'écran) : c'est ce qui permet
+ * de garder à la fois l'en-tête collé en haut et le nom du client collé au
+ * bord pendant qu'on fait glisser les colonnes.
+ *
+ * Le parent remonte le composant à chaque changement de filtre (`key`) : la
+ * liste repart de la première tranche.
  */
-function visibility(index: number) {
-  if (index >= TABLE_LIMITS.tablet) return "hidden lg:table-cell";
-  if (index >= TABLE_LIMITS.phone) return "hidden sm:table-cell";
-  return undefined;
-}
-
 export function OrdersList({
-  orders,
+  initialRows,
   total,
-  page,
-  perPage,
   sort,
   ascending,
 }: {
-  orders: OrderRow[];
+  initialRows: OrderTableRow[];
   total: number;
-  page: number;
-  perPage: number;
   sort: SortKey;
   ascending: boolean;
 }) {
@@ -76,12 +111,49 @@ export function OrdersList({
   const pathname = usePathname();
   const params = useSearchParams();
   const { locale } = useParams<{ locale: Locale }>();
-  const { columns, toggle } = useOrderColumns();
-  const { view, setView } = useOrdersView();
+
+  const [rows, setRows] = useState(initialRows);
+  const [loading, setLoading] = useState(false);
+  /** Le serveur n'a plus rien rendu (commandes supprimées entre-temps). */
+  const [exhausted, setExhausted] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const done = exhausted || rows.length >= total;
+
+  // Une tranche de plus quand le bas du tableau approche (200 px d'avance :
+  // la suite est déjà là quand le doigt y arrive).
+  useEffect(() => {
+    if (done || !sentinel.current) return;
+    const filters = {
+      q: params.get("q") ?? undefined,
+      statut: params.get("statut") ?? undefined,
+      tri: params.get("tri") ?? undefined,
+      sens: params.get("sens") ?? undefined,
+    };
+    let busy = false;
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        if (busy || !entries[0]?.isIntersecting) return;
+        busy = true;
+        setLoading(true);
+        const more = await loadMoreOrders(filters, rows.length);
+        if (!more.length) setExhausted(true);
+        // Pas de doublon si une commande a été créée entre deux tranches.
+        setRows((current) => {
+          const seen = new Set(current.map((r) => r.id));
+          return [...current, ...more.filter((r) => !seen.has(r.id))];
+        });
+        setLoading(false);
+      },
+      { root: scroller.current, rootMargin: "0px 0px 200px 0px" },
+    );
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [done, rows.length, params]);
 
   const hasFilters = Boolean(params.get("q") || params.get("statut"));
 
-  if (!orders.length) {
+  if (!rows.length) {
     return (
       <div className="border-border mt-6 flex flex-col items-center rounded-lg border border-dashed px-6 py-16 text-center">
         <CalendarPlus className="text-muted-foreground size-8" aria-hidden />
@@ -100,317 +172,193 @@ export function OrdersList({
     );
   }
 
-  const shown = ORDER_COLUMNS.filter((c) => columns.includes(c));
-  const first = (page - 1) * perPage + 1;
-  const last = Math.min(page * perPage, total);
-
-  function href(changes: Record<string, string | null>) {
+  function sortHref(column: SortKey) {
     const next = new URLSearchParams(params.toString());
-    for (const [k, v] of Object.entries(changes)) {
-      if (v === null) next.delete(k);
-      else next.set(k, v);
-    }
-    const qs = next.toString();
-    return qs ? `${pathname}?${qs}` : pathname;
+    const active = sort === column;
+    next.set("tri", column);
+    next.set("sens", active && !ascending ? "asc" : "desc");
+    return `${pathname}?${next}`;
   }
 
-  /**
-   * Un reste NÉGATIF n'est pas une dette : le client a versé plus que le prix
-   * final (acompte encaissé avant une remise, par exemple). L'afficher comme
-   * un « Reste » en rouge inquiéterait pour rien — c'est un montant à RENDRE.
-   */
-  function balanceLabel(order: OrderRow) {
-    const b = order.balance ?? 0;
-    return b < 0 ? t("orders.toRefund") : t("orders.balance");
-  }
+  const today = todayIso();
 
-  /** Montant d'une colonne monétaire, sans unité. */
-  function amount(order: OrderRow, column: OrderColumn): number {
+  function cell(order: OrderTableRow, column: Column) {
     switch (column) {
-      case "total_price":
-        return order.total_price;
-      case "amount_paid":
-        return order.amount_paid;
-      case "balance":
-        return Math.abs(order.balance ?? 0);
-      default:
-        return order.caution_amount;
-    }
-  }
-
-  function cell(order: OrderRow, column: OrderColumn) {
-    switch (column) {
-      case "order_no": {
-        // Point de coupure après « CMD- » : sur téléphone, « CMD- / 00120 » sur
-        // deux lignes plutôt qu'un tableau qui déborde. Sans <wbr>, la règle
-        // Unicode interdit de couper entre un tiret et un chiffre.
-        const [head, ...tail] = order.order_no.split("-");
-        return (
-          <bdi>
-            {tail.length ? <>{`${head}-`}<wbr className="md:hidden" />{tail.join("-")}</> : head}
-          </bdi>
-        );
-      }
       case "customer_name":
-        return order.customer_name;
+        return (
+          <Link
+            href={`/commandes/${order.id}`}
+            className={cn(
+              "hover:text-gold-strong font-medium underline-offset-4 hover:underline",
+              isOrderDone(order) && DONE_NAME_CLASS,
+            )}
+          >
+            {order.customer_name}
+          </Link>
+        );
       case "customer_phone":
-        return order.customer_phone ? <bdi dir="ltr">{order.customer_phone}</bdi> : "—";
+        return order.customer_phone ? (
+          <a href={`tel:${order.customer_phone}`} className="hover:underline" dir="ltr">
+            {order.customer_phone}
+          </a>
+        ) : (
+          "—"
+        );
       case "event_date":
-        return formatDate(order.event_date, locale);
       case "pickup_date":
-        return formatDate(order.pickup_date, locale);
+      case "return_due_date":
+        return <span className="tabular">{formatDate(order[column], locale)}</span>;
+      case "picked_up":
+      case "returned":
+        // ✗ / ✓ comme les deux colonnes de son AppSheet.
+        return order[column] ? (
+          <Check className="text-success-foreground mx-auto size-5" aria-label={t("common.yes")} />
+        ) : (
+          <X className="text-destructive/70 mx-auto size-4" aria-label={t("common.no")} />
+        );
+      case "pieces":
+        return order.pieces.length ? order.pieces.join(" · ") : "—";
+      case "tailor":
+        return order.tailor ?? "—";
+      case "amount_paid":
+      case "total_price":
+      case "caution_amount":
+        return formatNumber(order[column], locale);
+      case "balance":
+        return formatNumber(order.balance ?? 0, locale);
+      case "order_no":
+        return <bdi>{order.order_no}</bdi>;
       case "status": {
-        // Le retard REMPLACE le statut : « En cours » ne dit rien de plus que
-        // « En retard de 3 j », et deux pastilles ne tiennent pas dans une
-        // cellule de liste. Il ne se stocke nulle part — c'est le calendrier
-        // qui le dit, à chaque affichage.
-        const late = order.status === "en_cours"
-          && daysBetween(todayIso(), order.return_due_date) < 0;
-
+        const late = order.status === "en_cours" && daysBetween(today, order.return_due_date) < 0;
         return (
           <Badge
-            className={cn(
-              "h-auto whitespace-normal",
+            className={
               late
                 ? "bg-warning-soft text-warning-foreground border-transparent"
-                : STATUS_STYLES[order.status],
-            )}
+                : STATUS_STYLES[order.status]
+            }
           >
             {late
               ? t("orders.lateBy", {
-                  count: formatNumber(-daysBetween(todayIso(), order.return_due_date), locale),
+                  count: formatNumber(-daysBetween(today, order.return_due_date), locale),
                 })
               : t(`orders.status.${STATUS_KEYS[order.status]}`)}
           </Badge>
         );
       }
-      case "total_price":
-      case "amount_paid":
-      case "balance":
-      case "caution_amount":
-        return formatMoney(amount(order, column), locale);
     }
   }
 
-  function toneFor(order: OrderRow, column: OrderColumn) {
-    if (column !== "balance") return undefined;
-    const b = order.balance ?? 0;
-    if (b > 0) return "text-warning-foreground font-medium";
-    if (b < 0) return "text-muted-foreground";
-    return undefined;
-  }
+  return (
+    <>
+      <p className="text-muted-foreground mt-4 text-sm">
+        {t("orders.countTotal", { count: total, n: formatNumber(total, locale) })}
+      </p>
 
-  /* ------------------------------------------------------------------------
-   * Liste : une carte par commande. Les colonnes choisies deviennent les
-   * lignes de la carte.
-   * ---------------------------------------------------------------------- */
-  const cards = (className?: string) => (
-    <ul className={cn("mt-4 grid gap-3", className)}>
-      {orders.map((order) => (
-        <li key={order.id}>
-          <Link
-            href={`/commandes/${order.id}`}
-            className="border-border bg-card hover:border-gold-strong block h-full rounded-lg border p-4 transition-colors"
-          >
-            <p className="truncate font-medium">{order.customer_name}</p>
-
-            <dl className="mt-2 flex flex-col gap-1 text-sm">
-              {shown
-                .filter((c) => c !== "customer_name")
-                .map((column) => (
-                  <div key={column} className="flex items-center justify-between gap-3">
-                    <dt className="text-muted-foreground">
-                      {column === "balance"
-                        ? balanceLabel(order)
-                        : t(COLUMN_LABEL_KEYS[column])}
-                    </dt>
-                    <dd
-                      className={cn(
-                        "min-w-0 truncate text-end",
-                        MONEY.includes(column) && "tabular",
-                        toneFor(order, column),
-                      )}
-                    >
-                      {cell(order, column)}
-                    </dd>
-                  </div>
-                ))}
-            </dl>
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-
-  /* ------------------------------------------------------------------------
-   * Tableau, façon tableur — et SANS défilement horizontal, à toute largeur :
-   *  - il ne prend jamais plus que la largeur disponible (`w-full`) et une
-   *    cellule trop étroite passe à la ligne au lieu de pousser le tableau ;
-   *  - sur écran étroit, seules les premières colonnes cochées s'affichent
-   *    (`visibility`) ;
-   *  - l'unité monétaire monte dans l'en-tête : chaque montant y gagne la
-   *    largeur de « DA ».
-   * Allure commune au stock : voir `sheet-table.ts`.
-   * ---------------------------------------------------------------------- */
-  const table = (className?: string) => (
-    <div className={cn(sheet.wrapper, className)}>
-      {/* 13 px et marges serrées sur téléphone : quatre valeurs insécables
-          (n°, téléphone, deux dates) doivent tenir côte à côte sur 358 px. */}
-      <table className={sheet.table}>
-        <thead>
-          <tr className={sheet.headRow}>
-            {shown.map((column, i) => {
-              const sortable = column in SORTABLE;
-              const active = sortable && sort === column;
-              const money = MONEY.includes(column);
-              const label = money
-                ? t("orders.withCurrency", {
-                    label: t(COLUMN_SHORT_KEYS[column]),
-                    currency: CURRENCY_SUFFIX[locale],
-                  })
-                : t(COLUMN_SHORT_KEYS[column]);
-
-              return (
-                <th
-                  key={column}
-                  scope="col"
-                  title={t(COLUMN_LABEL_KEYS[column])}
-                  aria-sort={
-                    active ? (ascending ? "ascending" : "descending") : undefined
-                  }
-                  className={cn(
-                    sheet.th,
-                    money ? "text-end" : "text-start",
-                    visibility(i),
-                  )}
-                >
-                  {sortable ? (
-                    <Link
-                      href={href({
-                        tri: column,
-                        sens: active && !ascending ? "asc" : "desc",
-                        page: null,
-                      })}
-                      className={cn(
-                        sheet.thInner,
-                        "hover:text-foreground",
-                        money && "justify-end",
-                        active && "text-foreground",
-                      )}
-                    >
-                      <span>{label}</span>
-                      {active ? (
-                        ascending ? (
-                          <ArrowUp className="size-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <ArrowDown className="size-3.5 shrink-0" aria-hidden />
-                        )
-                      ) : null}
-                    </Link>
-                  ) : (
-                    <span className={sheet.thInner}>
-                      {label}
-                    </span>
-                  )}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-
-        <tbody>
-          {orders.map((order) => (
-            /* LIGNE ENTIÈRE CLIQUABLE. Le <Link> réel reste dans la première
-               cellule — c'est lui qui porte le nom accessible et le focus
-               clavier. Le clic sur la ligne ne fait que le relayer à la
-               souris, en ignorant les clics sur un autre élément interactif.
-               Pas de <tr role="link"> : ce serait mentir sur la sémantique. */
-            <tr
-              key={order.id}
-              onClick={(e) => {
-                if ((e.target as HTMLElement).closest("a,button")) return;
-                router.push(`/commandes/${order.id}`, { locale });
-              }}
-              className={sheet.row}
-            >
-              {shown.map((column, i) => {
+      <div
+        ref={scroller}
+        className="border-border mt-2 h-[calc(100dvh-16rem)] min-h-80 overflow-auto overscroll-contain rounded-lg border md:h-[calc(100dvh-13rem)]"
+      >
+        <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr>
+              {COLUMNS.map((column, i) => {
+                const sortable = column in SORTABLE;
+                const active = sortable && sort === column;
                 const money = MONEY.includes(column);
-                const content = money ? (
-                  formatNumber(amount(order, column), locale)
-                ) : column === "customer_name" ? (
-                  // Largeur plancher : sans elle, le navigateur rogne d'abord
-                  // cette colonne et coupe « Mohamed » en « Moham / ed ».
-                  <span className="block min-w-14 wrap-anywhere">{order.customer_name}</span>
-                ) : (
-                  cell(order, column)
-                );
-
+                const label = t(HEADERS[column]);
                 return (
-                  <td
+                  <th
                     key={column}
+                    scope="col"
+                    aria-sort={active ? (ascending ? "ascending" : "descending") : undefined}
                     className={cn(
-                      sheet.td,
-                      money ? "tabular text-end" : "text-start",
-                      // Une date ou un montant coupé en deux (« 10/09/202 6 ») ne se
-                      // relit plus : ces valeurs restent entières. Le reste passe à
-                      // la ligne à un endroit lisible (espace, tiret).
-                      ATOMIC.includes(column) && "whitespace-nowrap",
-                      // Dès 768 px la place suffit : n° et téléphone sur une ligne.
-                      (column === "order_no" || column === "customer_phone") &&
-                        "md:whitespace-nowrap",
-                      toneFor(order, column),
-                      visibility(i),
+                      "bg-muted text-muted-foreground border-border sticky top-0 z-10 border-b px-3 py-0 font-medium whitespace-nowrap",
+                      i > 0 && "border-s",
+                      // Le nom du client reste collé au bord pendant qu'on
+                      // fait glisser les colonnes — et passe au-dessus d'elles.
+                      i === 0 && "start-0 z-20 border-e",
+                      money ? "text-end" : "text-start",
                     )}
-                    title={column === "balance" ? balanceLabel(order) : undefined}
                   >
-                    {i === 0 ? (
+                    {sortable ? (
                       <Link
-                        href={`/commandes/${order.id}`}
-                        className={sheet.rowLink}
+                        href={sortHref(column as SortKey)}
+                        className={cn(
+                          "hover:text-foreground flex min-h-11 items-center gap-1",
+                          money && "justify-end",
+                          active && "text-foreground",
+                        )}
                       >
-                        {content}
+                        {label}
+                        {active &&
+                          (ascending ? (
+                            <ArrowUp className="size-3.5 shrink-0" aria-hidden />
+                          ) : (
+                            <ArrowDown className="size-3.5 shrink-0" aria-hidden />
+                          ))}
                       </Link>
                     ) : (
-                      content
+                      <span className="flex min-h-11 items-center">{label}</span>
                     )}
-                  </td>
+                  </th>
                 );
               })}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+          </thead>
+          <tbody>
+            {rows.map((order, r) => (
+              <tr
+                key={order.id}
+                // Toute la ligne s'ouvre au toucher ; le vrai lien reste sur
+                // le nom (focus clavier, nom accessible).
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a,button")) return;
+                  router.push(`/commandes/${order.id}`, { locale });
+                }}
+                className="hover:[&>td]:bg-accent cursor-pointer"
+              >
+                {COLUMNS.map((column, i) => (
+                  <td
+                    key={column}
+                    className={cn(
+                      "border-border h-12 border-b px-3 align-middle whitespace-nowrap",
+                      r % 2 ? STRIPE : "bg-background",
+                      i > 0 && "border-s",
+                      i === 0 && "sticky start-0 z-1 max-w-44 truncate border-e",
+                      MONEY.includes(column) && "tabular text-end",
+                      (column === "picked_up" || column === "returned") && "text-center",
+                      column === "pieces" && "max-w-96 truncate",
+                      column === "tailor" && "max-w-48 truncate",
+                      column === "balance" &&
+                        (order.balance ?? 0) > 0 &&
+                        "text-warning-foreground font-medium",
+                    )}
+                    title={
+                      column === "pieces"
+                        ? order.pieces.join(" · ")
+                        : column === "customer_name"
+                          ? order.customer_name
+                          : undefined
+                    }
+                  >
+                    {cell(order, column)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-  return (
-    <>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <p className="text-muted-foreground text-sm">
-          {t("orders.range", {
-            first: formatNumber(first, locale),
-            last: formatNumber(last, locale),
-            total: formatNumber(total, locale),
-          })}
-        </p>
-        <div className="ms-auto flex items-center gap-2">
-          <ViewToggle view={view} onChange={setView} />
-          <OrderColumnsDrawer columns={columns} onToggle={toggle} view={view} />
+        {/* Le repère de bas de liste : quand il approche, la suite arrive. */}
+        <div ref={sentinel} className="flex h-14 items-center justify-center" aria-live="polite">
+          {loading ? (
+            <Spinner className="text-muted-foreground" />
+          ) : done ? (
+            <span className="text-muted-foreground text-xs">{t("orders.endOfList")}</span>
+          ) : null}
         </div>
       </div>
-
-      {/* Tant que l'affichage est inconnu (rendu serveur, hydratation), on
-          garde la bascule par largeur : pas de saut visible sur ordinateur. */}
-      {view === null && (
-        <>
-          {cards("md:hidden")}
-          {table("hidden md:block")}
-        </>
-      )}
-      {view === "list" && cards("md:grid-cols-2 lg:grid-cols-3")}
-      {view === "table" && table()}
-
-      <PaginationBar page={page} perPage={perPage} total={total} />
     </>
   );
 }

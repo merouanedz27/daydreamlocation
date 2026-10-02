@@ -1,16 +1,20 @@
 "use client";
 
 import {
+  CalendarDays,
   ClipboardList,
   Download,
   KeyRound,
   LayoutGrid,
   LogOut,
+  Plane,
   Receipt,
   Store,
   TrendingUp,
+  Undo2,
   User,
   Users,
+  Wallet,
 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -18,6 +22,7 @@ import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { Link, usePathname } from "@/i18n/navigation";
 import { AccountSheet } from "@/components/account-sheet";
+import { HeaderSearch } from "@/components/header-search";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { InstallHelpDrawer, useInstallApp } from "@/components/install-app";
 import { Button } from "@/components/ui/button";
@@ -56,23 +61,38 @@ export function AppHeader({
 
   // Navigation horizontale sur desktop uniquement : sur téléphone c'est la
   // barre basse qui sert (zone du pouce). Voir `daydream-ui`.
+  //
+  // Les CINQ onglets de la barre basse — ceux de son AppSheet — et rien de
+  // plus. L'en-tête est borné à la largeur de la page (1024 px) : avec le
+  // stock, le bilan et les dépenses en plus, il débordait et affichait une
+  // barre de défilement même sur grand écran. Ces pages passent dans le menu
+  // du compte, comme sur téléphone.
   const items = [
+    { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendarShort") },
+    { href: "/commandes/demain", icon: Plane, label: t("nav.tomorrowShort") },
     { href: "/commandes", icon: ClipboardList, label: t("nav.orders") },
+    { href: "/commandes/pas-rentres", icon: Undo2, label: t("nav.notReturnedShort") },
+    { href: "/frais", icon: Receipt, label: t("nav.fraisShort") },
+  ] as const;
+
+  /** Pages hors onglets, rangées dans le menu du compte. */
+  const moreLinks = [
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
-    // Dépenses n'entre PAS dans la barre basse : elle porte déjà quatre
-    // cibles, et une cinquième casserait les 44 px à 390 px de large. Sur
-    // téléphone on y accède par le menu compte et le tableau de bord.
     ...(showDashboard
       ? [
-          {
-            href: "/tableau-de-bord",
-            icon: TrendingUp,
-            label: t("nav.dashboard"),
-          },
-          { href: "/depenses", icon: Receipt, label: t("nav.expenses") },
+          { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },
+          { href: "/depenses", icon: Wallet, label: t("nav.expenses") },
         ]
       : []),
-  ] as const;
+  ];
+
+  /** Même règle que la barre basse : « Commandes » n'allume pas ses onglets frères. */
+  function isActive(href: string) {
+    if (href === "/commandes") {
+      return pathname === "/commandes" || /^\/commandes\/(\d+|nouvelle)(\/|$)/.test(pathname);
+    }
+    return pathname.startsWith(href);
+  }
 
   return (
     /* Barre BRUNE, translucide et floutée : le contenu défile visiblement
@@ -89,7 +109,7 @@ export function AppHeader({
        (Ce n'est pas du « glassmorphism » : pas de halo, pas d'ombre, le filet
        de bordure fait toujours la séparation. Voir `daydream-ui`.) */
     <header className="border-nav-border bg-nav supports-[backdrop-filter]:bg-nav/92 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
+      <div className="relative mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
         {/* LE LOGO, À NU SUR LA BARRE — fond transparent, aucune plaque.
             À savoir si l'on reprend cette barre un jour : le logo est un
             bitmap à deux tons, dessiné pour un fond CLAIR. Contrastes MESURÉS
@@ -122,16 +142,20 @@ export function AppHeader({
           />
         </Link>
 
-        <nav className="ms-4 hidden items-center gap-1 md:flex">
+        {/* Pas de défilement : les cinq onglets tiennent toujours. Entre 768
+            et 1024 px, icônes seules (le nom reste en infobulle et pour les
+            lecteurs d'écran) ; au-delà, icône et nom. */}
+        <nav className="ms-2 hidden shrink-0 items-center gap-0.5 md:flex lg:ms-4">
           {items.map(({ href, icon: Icon, label }) => {
-            const active = pathname.startsWith(href);
+            const active = isActive(href);
             return (
               <Link
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
+                title={label}
                 className={cn(
-                  "flex min-h-10 items-center gap-2 rounded-md px-3 text-sm transition-colors",
+                  "flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-2 rounded-md px-2.5 text-sm whitespace-nowrap transition-colors",
                   active
                     ? // Pastille or clair sur le brun : 5,67:1 contre la barre,
                       // et l'encre dessus 14,65:1. L'onglet actif se voit de
@@ -143,14 +167,20 @@ export function AppHeader({
                       "text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground",
                 )}
               >
-                <Icon className="size-4" aria-hidden />
-                {label}
+                <Icon
+                  className={cn("size-4 shrink-0", href === "/commandes/demain" && "rtl:-scale-x-100")}
+                  aria-hidden
+                />
+                <span className="sr-only lg:not-sr-only">{label}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="ms-auto flex items-center gap-2">
+        {/* Remontée à chaque page : elle repart du `?q=` de la nouvelle URL. */}
+        <HeaderSearch key={pathname} />
+
+        <div className="flex shrink-0 items-center gap-2">
           {/* Le commutateur sert aussi la page de connexion, sur fond
               blanc : ses couleurs de barre lui sont passées d'ici. */}
           <LocaleSwitcher className="border-nav-border bg-nav-foreground/10 text-nav-foreground hover:bg-nav-foreground/20" />
@@ -201,12 +231,20 @@ export function AppHeader({
 
               <DropdownMenuSeparator />
 
+              {moreLinks.map(({ href, icon: Icon, label }) => (
+                <DropdownMenuItem key={href} asChild>
+                  <Link href={href}>
+                    <Icon className="size-4" aria-hidden />
+                    {label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+
               {showDashboard && (
                 <>
-                  {/* Ce menu ne sert plus qu'au bureau, où Dépenses est déjà
-                      dans la barre horizontale. L'équipe et la boutique, elles,
-                      restent ICI : la barre porte déjà quatre entrées, et ce
-                      sont des gestes rares. */}
+                  {/* L'équipe et la boutique : des gestes rares, réservés au
+                      propriétaire. */}
                   <DropdownMenuItem asChild>
                     <Link href="/equipe">
                       <Users className="size-4" aria-hidden />

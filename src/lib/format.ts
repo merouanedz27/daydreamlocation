@@ -112,3 +112,37 @@ export function formatDayMonth(date: Date | string, locale: Locale): string {
 
   return `${get("day")}/${get("month")}`;
 }
+
+/**
+ * « vendredi 3 octobre » / « الجمعة 3 أكتوبر » — le jour en toutes lettres,
+ * pour les titres d'écran (« Demain », la vue Jour du calendrier). Pas
+ * d'année : le titre parle d'un jour proche, l'année n'apporte rien.
+ */
+export function formatLongDay(date: Date | string, locale: Locale): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat(NUMBER_LOCALE[locale], {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Africa/Algiers",
+  }).format(d);
+}
+
+/** « octobre 2026 » — en-tête du calendrier mensuel. */
+export function formatMonthYear(date: Date | string, locale: Locale): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat(NUMBER_LOCALE[locale], {
+    month: "long",
+    year: "numeric",
+    timeZone: "Africa/Algiers",
+  }).format(d);
+}
+
+/** Initiale du jour de la semaine (« lun. », « ن ») — en-tête de colonnes. */
+export function formatWeekdayShort(date: Date | string, locale: Locale): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat(NUMBER_LOCALE[locale], {
+    weekday: "short",
+    timeZone: "Africa/Algiers",
+  }).format(d);
+}

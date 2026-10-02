@@ -23,6 +23,14 @@ export type DraftLine =
       size: string | null;
     }
   | {
+      /** Vêtement nommé hors stock — la saisie rapide, comme le tableur. */
+      kind: "named";
+      name: string;
+      size: string | null;
+      unitPrice: number;
+      note: string | null;
+    }
+  | {
       kind: "external";
       source: string | null;
       label: string;
@@ -71,16 +79,37 @@ export function unitIdsIn(lines: DraftLine[]): Set<number> {
 
 /** Ce qui part réellement au serveur : sans les champs d'affichage. */
 export function toPayload(lines: DraftLine[]) {
-  return lines.map((l) =>
-    l.kind === "unit"
-      ? { kind: "unit" as const, unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? undefined }
-      : {
+  return lines.map((l) => {
+    switch (l.kind) {
+      case "unit":
+        return { kind: "unit" as const, unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? undefined };
+      case "named":
+        return {
+          kind: "named" as const,
+          name: l.name,
+          size: l.size ?? undefined,
+          unitPrice: l.unitPrice,
+          note: l.note ?? undefined,
+        };
+      case "external":
+        return {
           kind: "external" as const,
           source: l.source ?? undefined,
           label: l.label,
           cost: l.cost,
           unitPrice: l.unitPrice,
           note: l.note ?? undefined,
-        },
-  );
+        };
+    }
+  });
+}
+
+/**
+ * Le PRIX DE LA TENUE, comme dans le tableur : un seul montant pour toute la
+ * commande. Il est porté par la première ligne, les autres à zéro — la règle
+ * de la reprise du tableur. La somme des lignes vaut ainsi le prix saisi, ce
+ * que le trigger `orders_recompute_totals` recalcule de toute façon.
+ */
+export function spreadOutfitPrice<T extends { unitPrice: number }>(lines: T[], total: number): T[] {
+  return lines.map((l, i) => ({ ...l, unitPrice: i === 0 ? Math.max(total, 0) : 0 }));
 }

@@ -1,103 +1,81 @@
 "use client";
 
-import { ClipboardList, LayoutGrid, Plus, TrendingUp } from "lucide-react";
+import { CalendarDays, List, Plane, Receipt, Undo2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 
 /**
- * Barre d'onglets BASSE — l'équipe travaille au pouce, sur téléphone.
- * Voir le skill `daydream-ui`.
+ * Barre d'onglets BASSE — les cinq onglets de son AppSheet, dans le même
+ * ordre : l'équipe retrouve ses gestes sans réapprendre. Voir `daydream-ui`.
  *
- * Trois décisions valent d'être expliquées :
+ *   Calendrier · Demain · Commandes · Pas rentrés · Frais
  *
- * 1. **Le « + » est au MILIEU**, pas en bout de barre. Créer une commande est
- *    le geste le plus répété de la journée : il revient au centre, là où le
- *    pouce tombe sans déplacer la main.
- * 2. **Colonnes de largeur ÉGALE** (`grid`, pas `justify-around`) : les onglets
- *    ne bougent plus d'un écran à l'autre ni d'une langue à l'autre. Un onglet
- *    qui se déplace entre deux pages se rate au pouce.
- * 3. **Les libellés ne passent jamais à la ligne.** À 390 px, quatre colonnes
- *    font 97 px : « Tableau de bord » s'y cassait en deux lignes et poussait la
- *    barre en hauteur. La barre basse utilise donc `nav.dashboardShort`, forme
- *    courte réservée à cet usage — l'en-tête de bureau, lui, garde le nom
- *    complet. `truncate` reste en filet de sécurité pour toute traduction
- *    future plus longue que prévu.
+ * La création de commande n'est PLUS un onglet : c'est le bouton rond flottant
+ * (`NewOrderFab`), au-dessus de la barre, comme le « + » rouge d'AppSheet.
+ * Le stock et le bilan passent dans le menu du compte : ce ne sont pas des
+ * gestes de comptoir.
+ *
+ * Colonnes de largeur ÉGALE (`grid`) : un onglet qui bouge d'une page ou d'une
+ * langue à l'autre se rate au pouce. Libellés COURTS (`nav.*Short`) et
+ * `truncate` : à 390 px, cinq colonnes font 78 px.
  */
-export function BottomNav({ showDashboard }: { showDashboard: boolean }) {
+export function BottomNav() {
   const t = useTranslations("nav");
   const pathname = usePathname();
 
   const items = [
-    { href: "/commandes", icon: ClipboardList, label: t("orders") },
-    { href: "/stock", icon: LayoutGrid, label: t("stock") },
-    ...(showDashboard
-      ? [{ href: "/tableau-de-bord", icon: TrendingUp, label: t("dashboardShort") }]
-      : []),
+    { href: "/commandes/calendrier", icon: CalendarDays, label: t("calendarShort") },
+    { href: "/commandes/demain", icon: Plane, label: t("tomorrowShort") },
+    { href: "/commandes", icon: List, label: t("ordersShort") },
+    { href: "/commandes/pas-rentres", icon: Undo2, label: t("notReturnedShort") },
+    { href: "/frais", icon: Receipt, label: t("fraisShort") },
   ] as const;
 
-  const tab = ({
-    href,
-    icon: Icon,
-    label,
-  }: {
-    href: string;
-    icon: typeof ClipboardList;
-    label: string;
-  }) => {
-    const active = pathname.startsWith(href);
-    return (
-      <Link
-        key={href}
-        href={href}
-        aria-current={active ? "page" : undefined}
-        className={cn(
-          "relative flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-xs transition-colors",
-          active ? "text-nav-foreground font-medium" : "text-nav-muted hover:text-nav-foreground",
-        )}
-      >
-        {/* L'onglet actif se signale par un TRAIT, jamais par un libellé
-            coloré. Le trait est en `gold-soft` et NON en jaune vif : depuis
-            que la barre a été éclaircie, le jaune vif n'y vaut plus que
-            2,74:1 — sous le minimum de 3:1 d'un élément graphique, il se
-            serait dissous dans le brun. `gold-soft` y tient 4,89:1.
-            `inset-x` porte sur les deux côtés — rien à miroiter en RTL. */}
-        {active && (
-          <span className="bg-gold-soft absolute inset-x-3 top-0 h-0.5 rounded-full" aria-hidden />
-        )}
-        <Icon className="size-5 shrink-0" aria-hidden />
-        <span className="max-w-full truncate">{label}</span>
-      </Link>
-    );
-  };
+  /**
+   * « Commandes » coiffe la liste ET les fiches (`/commandes/123`), mais pas
+   * ses onglets frères : sans cette règle, `startsWith("/commandes")` allumerait
+   * deux onglets à la fois sur « Demain ».
+   */
+  function isActive(href: string) {
+    if (href === "/commandes") {
+      return pathname === "/commandes" || /^\/commandes\/(\d+|nouvelle)(\/|$)/.test(pathname);
+    }
+    return pathname.startsWith(href);
+  }
 
   return (
     <nav
       className="border-nav-border bg-nav supports-[backdrop-filter]:bg-nav/92 pb-safe sticky bottom-0 z-40 border-t backdrop-blur-md md:hidden"
       aria-label={t("primary")}
     >
-      <div
-        className={cn(
-          "mx-auto grid max-w-lg items-stretch",
-          showDashboard ? "grid-cols-4" : "grid-cols-3",
-        )}
-      >
-        {items.slice(0, 2).map(tab)}
-
-        {/* Pas de libellé sous le « + » : le disque jaune est déjà le seul
-            élément plein de la barre, il se désigne tout seul. Le nom reste
-            dans le DOM pour les lecteurs d'écran. */}
-        <Link
-          href="/commandes/nouvelle"
-          className="flex min-h-14 flex-col items-center justify-center px-1"
-        >
-          <span className="bg-primary text-primary-foreground flex size-10 items-center justify-center rounded-full">
-            <Plus className="size-5" aria-hidden />
-          </span>
-          <span className="sr-only">{t("new")}</span>
-        </Link>
-
-        {items.slice(2).map(tab)}
+      <div className="mx-auto grid max-w-lg grid-cols-5 items-stretch">
+        {items.map(({ href, icon: Icon, label }) => {
+          const active = isActive(href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[11px] transition-colors",
+                active ? "text-nav-foreground font-medium" : "text-nav-muted hover:text-nav-foreground",
+              )}
+            >
+              {/* L'onglet actif se signale par un TRAIT `gold-soft` (4,89:1
+                  sur la barre), jamais par la seule couleur du libellé.
+                  `inset-x` porte sur les deux côtés — rien à miroiter en RTL. */}
+              {active && (
+                <span className="bg-gold-soft absolute inset-x-3 top-0 h-0.5 rounded-full" aria-hidden />
+              )}
+              <Icon
+                className={cn("size-5 shrink-0", href === "/commandes/demain" && "rtl:-scale-x-100")}
+                aria-hidden
+              />
+              <span className="max-w-full truncate">{label}</span>
+            </Link>
+          );
+        })}
       </div>
     </nav>
   );

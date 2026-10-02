@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { OrderForm } from "@/components/order-form";
+import { OrderQuickForm } from "@/components/order-quick-form";
 import { requireProfile } from "@/lib/auth";
-import { getOrderCatalogue, getSettings } from "@/lib/queries/orders";
+import { getOrderCatalogue, getQuickSuggestions, getSettings } from "@/lib/queries/orders";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -28,8 +28,9 @@ export default async function NewOrderPage({
   await requireProfile(locale as Locale);
 
   const t = await getTranslations();
-  const [{ models, ensembles }, settings] = await Promise.all([
+  const [{ models }, { items, customers }, settings] = await Promise.all([
     getOrderCatalogue(),
+    getQuickSuggestions(),
     getSettings(),
   ]);
 
@@ -43,9 +44,7 @@ export default async function NewOrderPage({
         {t("orders.title")}
       </Link>
 
-      <h1 className="sr-only">{t("orders.newTitle")}</h1>
-
-      <OrderForm models={models} ensembles={ensembles} settings={settings} />
+      <OrderQuickForm models={models} items={items} customers={customers} settings={settings} />
     </div>
   );
 }

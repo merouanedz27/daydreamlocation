@@ -127,6 +127,44 @@ export async function getOrderCatalogue(): Promise<{
   };
 }
 
+export type ItemSuggestion = {
+  label: string;
+  uses: number;
+  /** Position habituelle dans la commande : 1 tenue, 2 chemise, 3 chaussures. */
+  slot: number;
+};
+
+export type CustomerSuggestion = { name: string; phone: string | null };
+
+/**
+ * Ce que la saisie rapide propose pendant la frappe : les vêtements déjà
+ * nommés et les clients déjà venus. Chargé en une fois, comme le catalogue —
+ * quelques centaines de lignes, filtrées ensuite dans le navigateur sans
+ * aller-retour réseau.
+ *
+ * Une suggestion manquante n'empêche jamais de saisir : en cas d'erreur, liste
+ * vide, et l'employé tape le texte en entier.
+ */
+export async function getQuickSuggestions(): Promise<{
+  items: ItemSuggestion[];
+  customers: CustomerSuggestion[];
+}> {
+  const supabase = await createClient();
+  const [items, customers] = await Promise.all([
+    supabase.rpc("order_item_suggestions"),
+    supabase.rpc("customer_suggestions"),
+  ]);
+
+  return {
+    items: (items.data ?? []).map((r) => ({
+      label: r.label,
+      uses: Number(r.uses),
+      slot: Number(r.slot),
+    })),
+    customers: (customers.data ?? []).map((r) => ({ name: r.name, phone: r.phone })),
+  };
+}
+
 export type Unavailability = {
   unitId: number;
   /** Premier jour où la pièce redevient louable. */
@@ -150,16 +188,21 @@ export async function getUnavailableUnits(
   pickup: IsoDate,
   returnDue: IsoDate,
   cleaningBufferDays: number,
+  /** En modification : les pièces de CETTE commande ne la bloquent pas. */
+  excludeOrderId?: number,
 ): Promise<Unavailability[]> {
   const supabase = await createClient();
   const candidate = rentalRange(pickup, returnDue, cleaningBufferDays);
 
-  const { data, error } = await supabase
+  let request = supabase
     .from("order_lines")
     .select("unit_id, rental_range, orders ( order_no )")
     .eq("is_active", true)
     .not("unit_id", "is", null)
     .filter("rental_range", "ov", candidate);
+  if (excludeOrderId) request = request.neq("order_id", excludeOrderId);
+
+  const { data, error } = await request;
 
   if (error) throw error;
 

@@ -8,6 +8,7 @@ import { StockTabs } from "@/components/stock-tabs";
 import { getEnsembles } from "@/lib/queries/ensembles";
 import { getProfile, isOwner } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
+import { matchesSearch } from "@/lib/search";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -27,18 +28,26 @@ export async function generateMetadata(props: {
  */
 export default async function EnsemblesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const l = locale as Locale;
 
-  const [ensembles, profile, t] = await Promise.all([
+  const [all, profile, t, { q = "" }] = await Promise.all([
     getEnsembles(),
     getProfile(),
     getTranslations(),
+    searchParams,
   ]);
+  // Recherche de l'en-tête : sur le nom de l'ensemble, ou une de ses pièces
+  // (« Gio-079 » retrouve tous les costumes qui contiennent cette veste).
+  const ensembles = all.filter((e) =>
+    matchesSearch(q, e.name, ...e.pieces.flatMap((p) => [p.ref_code, p.model_name_fr, p.model_name_ar])),
+  );
   const canEdit = isOwner(profile);
 
   return (
@@ -52,7 +61,9 @@ export default async function EnsemblesPage({
         }
       />
 
-      {!ensembles.length ? (
+      {q && !ensembles.length ? (
+        <p className="text-muted-foreground mt-6 text-center text-sm">{t("search.noMatch", { q })}</p>
+      ) : !ensembles.length ? (
         <div className="border-border mt-6 flex flex-col items-center rounded-lg border border-dashed px-6 py-16 text-center">
           <Layers className="text-muted-foreground size-8" aria-hidden />
           <p className="text-muted-foreground mt-4 max-w-xs text-sm">{t("stock.ensemblesEmpty")}</p>

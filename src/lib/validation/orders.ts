@@ -26,22 +26,17 @@ const money = z.coerce
   .max(99_999_999);
 
 /**
- * Montant OBLIGATOIRE : versement et caution.
+ * Montant FACULTATIF venant d'un formulaire : vide = 0.
  *
- * Décision du client : ces deux champs doivent être SAISIS, même à 0. Un champ
- * vide ne vaut donc plus 0 — c'est ce qui distingue « le client n'a rien
- * versé » de « l'employé a oublié de demander ». Le formulaire les présente
- * vides, pas pré-remplis à 0, sinon l'obligation ne voudrait rien dire.
- *
- * `z.unknown()` d'abord : `formData.get` rend `null` pour un champ absent, et
- * ce `null` doit produire « obligatoire », pas « saisissez un nombre ».
+ * Décision du client (saisie rapide, octobre 2026) : versement et caution ne
+ * sont plus obligatoires. Son tableur ne les exigeait pas, et l'obligation
+ * ralentissait chaque commande. Un champ vide vaut donc 0 — le « reste » le
+ * montre aussitôt dans la barre du bas.
  */
-const requiredMoney = z
+const optionalMoney = z
   .unknown()
-  .transform((v) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v)))
-  .pipe(z.string().min(1, { message: "errors.required" }))
-  // `Number("abc")` vaut NaN, que `z.number` refuse : « saisissez un nombre ».
-  .transform(Number)
+  .transform((v) => (typeof v === "string" ? v.trim() : v == null ? "" : v))
+  .transform((v) => (v === "" ? 0 : Number(v)))
   .pipe(
     z
       .number({ message: "errors.numberInvalid" })
@@ -50,22 +45,21 @@ const requiredMoney = z
   );
 
 /**
- * Téléphone du client : obligatoire, mobile algérien, enregistré NORMALISÉ.
- * Voir `src/lib/phone.ts`.
+ * Téléphone du client : FACULTATIF, mais s'il est saisi c'est un mobile
+ * algérien, enregistré NORMALISÉ. Voir `src/lib/phone.ts`.
  *
- * Obligatoire dans l'APPLICATION seulement — pas de `not null` en base : les
- * commandes déjà saisies sans numéro, et l'import du Google Sheet, doivent
- * rester valides.
+ * Facultatif depuis la saisie rapide : le tableur du client ne l'exigeait pas,
+ * et une commande prise au comptoir ne doit pas attendre un numéro.
  */
-const requiredPhone = z
+const optionalPhone = z
   .unknown()
   .transform((v) => (typeof v === "string" ? normalizePhone(v) : ""))
   .pipe(
     z
       .string()
-      .min(1, { message: "errors.required" })
-      .refine(isAlgerianMobile, { message: "errors.phoneInvalid" }),
-  );
+      .refine((v) => v === "" || isAlgerianMobile(v), { message: "errors.phoneInvalid" }),
+  )
+  .transform((v) => (v ? v : null));
 
 // `min(1)` avant le motif : une date VIDE est un oubli (« obligatoire »), pas
 // une date mal formée.
@@ -75,14 +69,13 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "errors.dateInvalid" });
 
 /**
- * Une ligne de commande : SOIT une pièce du stock, SOIT une pièce sous-louée
- * chez un confrère (la colonne « FETHI LOC » du tableur). Jamais les deux.
+ * Une ligne de commande, de trois sortes :
  *
- * La base est plus LARGE : `order_lines_designates_something` accepte aussi une
- * ligne qui nomme seulement un vêtement, sans stock ni confrère — ce que la
- * reprise du tableur écrit, et que la saisie ne propose pas. La règle stricte
- * des deux cas vit donc ici et dans `create_order`, qui rendent un message
- * lisible plutôt qu'une violation de contrainte.
+ * - `unit`     — une pièce du STOCK. La seule qui bloque des dates.
+ * - `named`    — un vêtement NOMMÉ hors stock (« Invite Noir Simple », 50),
+ *                comme une colonne du tableur. Ne bloque rien : le stock ne le
+ *                connaît pas.
+ * - `external` — une pièce sous-louée chez un confrère (« FETHI LOC »).
  */
 const unitLine = z.object({
   kind: z.literal("unit"),
@@ -100,7 +93,15 @@ const externalLine = z.object({
   note: optionalText,
 });
 
-export const draftLineSchema = z.discriminatedUnion("kind", [unitLine, externalLine]);
+const namedLine = z.object({
+  kind: z.literal("named"),
+  name: z.string().trim().min(1, { message: "errors.required" }).max(200),
+  size: optionalText,
+  unitPrice: money,
+  note: optionalText,
+});
+
+export const draftLineSchema = z.discriminatedUnion("kind", [unitLine, namedLine, externalLine]);
 export type DraftLineInput = z.infer<typeof draftLineSchema>;
 
 export const orderSchema = z
@@ -110,13 +111,13 @@ export const orderSchema = z
       .trim()
       .min(1, { message: "errors.required" })
       .max(120),
-    customer_phone: requiredPhone,
+    customer_phone: optionalPhone,
     event_date: isoDate,
     pickup_date: isoDate,
     return_due_date: isoDate,
     discount: money,
-    amount_paid: requiredMoney,
-    caution_amount: requiredMoney,
+    amount_paid: optionalMoney,
+    caution_amount: optionalMoney,
     notes: z.string().trim().max(1000).optional().transform((v) => (v ? v : null)),
     lines: z
       .array(draftLineSchema)

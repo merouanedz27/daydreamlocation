@@ -19,17 +19,19 @@ function resolveLocale(value: FormDataEntryValue | null): Locale {
 /**
  * Enregistre une dépense.
  *
- * Pas de RPC ici : une seule table, une seule ligne, rien à rendre atomique.
- * `expenses_owner_all` suffit côté base — mais le contrôle de rôle est refait
- * ici, une Server Action étant un point d'entrée réseau à part entière. RLS
- * refuserait de toute façon ; on veut un message propre plutôt qu'une erreur
- * Postgres brute.
+ * Ouverte à TOUTE l'équipe : dans son AppSheet, ce sont les employés qui
+ * notent le tailleur ou le pressing au moment de payer. La base le permet par
+ * `expenses_staff_insert`, qui exige `created_by = auth.uid()` — d'où le
+ * `created_by` écrit ici depuis le profil, jamais depuis le formulaire.
+ *
+ * Pas de `.select()` après l'insertion : un employé n'a pas le droit de relire
+ * les frais des autres, et PostgREST relirait la ligne à travers la RLS.
  */
 export async function createExpense(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!profile) return { ok: false, error: "errors.forbidden" };
 
   const parsed = expenseSchema.safeParse({
     spent_on: formData.get("spent_on"),
@@ -47,11 +49,12 @@ export async function createExpense(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").insert({
     ...parsed.data,
-    created_by: profile!.id,
+    created_by: profile.id,
   });
 
   if (error) return { ok: false, error: "errors.generic" };
 
+  revalidatePath(`/${locale}/frais`);
   revalidatePath(`/${locale}/depenses`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };
@@ -60,8 +63,8 @@ export async function createExpense(formData: FormData): Promise<ActionResult> {
 /**
  * Supprime une dépense.
  *
- * Réservée au propriétaire, comme la saisie : une dépense effacée fausse le
- * bénéfice de tout un mois.
+ * Réservée au propriétaire : une dépense effacée fausse le bénéfice de tout un
+ * mois. L'équipe peut ajouter un frais, jamais l'effacer.
  */
 export async function deleteExpense(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
@@ -77,6 +80,7 @@ export async function deleteExpense(formData: FormData): Promise<ActionResult> {
 
   if (error) return { ok: false, error: "errors.generic" };
 
+  revalidatePath(`/${locale}/frais`);
   revalidatePath(`/${locale}/depenses`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };

@@ -2,7 +2,19 @@
 
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronRight, Download, KeyRound, LogOut, Receipt, Store, User, Users, X } from "lucide-react";
+import {
+  ChevronRight,
+  Download,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  Receipt,
+  Store,
+  TrendingUp,
+  User,
+  Users,
+  X,
+} from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,13 +70,20 @@ export function AccountSheet({
   // non état : `onCloseAutoFocus` est lu avant le rendu suivant.
   const openingSignOut = useRef(false);
 
-  const links = showAdmin
-    ? [
-        { href: "/depenses", icon: Receipt, label: t("nav.expenses") },
-        { href: "/equipe", icon: Users, label: t("nav.team") },
-        { href: "/boutique", icon: Store, label: t("nav.shop") },
-      ]
-    : [];
+  // Ce qui n'a pas trouvé place dans les cinq onglets de la barre basse (ceux
+  // de son AppSheet) : le stock pour tous, et pour le propriétaire le bilan,
+  // le registre des dépenses et l'administration.
+  const links = [
+    { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
+    ...(showAdmin
+      ? [
+          { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },
+          { href: "/depenses", icon: Receipt, label: t("nav.expenses") },
+          { href: "/equipe", icon: Users, label: t("nav.team") },
+          { href: "/boutique", icon: Store, label: t("nav.shop") },
+        ]
+      : []),
+  ];
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -110,12 +129,12 @@ export function AccountSheet({
           </SheetClose>
         </div>
 
-        {/* --- Pages d'administration --------------------------------------- */}
+        {/* --- Pages hors barre basse ----------------------------------------- */}
         <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label={t("nav.account")}>
           {links.length > 0 && (
             <>
               <p className="text-muted-foreground px-3 pb-1 text-xs font-medium">
-                {t("nav.admin")}
+                {t("nav.more")}
               </p>
               <ul className="space-y-0.5">
                 {links.map(({ href, icon: Icon, label }) => {

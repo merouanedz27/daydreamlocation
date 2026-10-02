@@ -15,7 +15,17 @@
     "shop": "المحل",
     "account": "حسابي",
     "admin": "الإدارة",
-    "myAccount": "حسابي"
+    "myAccount": "حسابي",
+    "calendar": "التقويم",
+    "calendarShort": "التقويم",
+    "tomorrow": "غدًا",
+    "tomorrowShort": "غدًا",
+    "ordersShort": "الطلبيات",
+    "notReturned": "لي ما رجعوش",
+    "notReturnedShort": "ما رجعوش",
+    "frais": "المصاريف اليومية",
+    "fraisShort": "المصاريف",
+    "more": "المزيد"
   },
   "common": {
     "save": "حفظ",
@@ -35,9 +45,8 @@
     "viewList": "قائمة",
     "viewTable": "جدول",
     "previous": "السابق",
-    "pagination": "الصفحات",
-    "pageOf": "الصفحة {page} / {total}",
-    "perPage": "لكل صفحة"
+    "yes": "نعم",
+    "no": "لا"
   },
   "orders": {
     "title": "الطلبيات",
@@ -96,9 +105,6 @@
     "rentalWindow": "الكراء",
     "orderNo": "رقم الطلبية",
     "statusLabel": "الحالة",
-    "columns": "الأعمدة",
-    "columnsHint": "اختر ما يُعرض. الإعداد خاص بهذا الجهاز. في وضع الجدول، لا يعرض الهاتف إلا أول 4 أعمدة محددة.",
-    "hiddenOnPhone": "مخفي على الهاتف",
     "withCurrency": "{label} ({currency})",
     "short": {
       "orderNo": "الرقم",
@@ -110,14 +116,16 @@
       "total": "المجموع",
       "paid": "التسبيق",
       "balance": "الباقي",
-      "caution": "الضمان"
+      "caution": "الضمان",
+      "pickedUp": "التسليم",
+      "returned": "الإرجاع",
+      "pieces": "الطقم",
+      "tailor": "الخياط",
+      "returnDue": "الإرجاع المتوقع"
     },
-    "searchPlaceholder": "اسم الزبون أو رقم الطلبية أو الهاتف",
-    "clearSearch": "مسح البحث",
     "allStatuses": "الكل",
     "noMatch": "لا توجد طلبية تطابق هذا البحث.",
     "toRefund": "يُرَدّ للزبون",
-    "range": "{first}–{last} من {total}",
     "event": "المناسبة",
     "today": "اليوم",
     "tomorrow": "غدًا",
@@ -166,7 +174,54 @@
     "pickDateFirst": "اختر تاريخ المناسبة أولًا: توفّر القطع يتوقف عليه.",
     "fieldsToFix": "حقول يجب إكمالها: {count}",
     "zeroAllowed": "أدخل 0 إذا لم يدفع الزبون شيئًا.",
-    "export": "تصدير"
+    "export": "تصدير",
+    "quick": {
+      "phoneOptional": "الهاتف (اختياري)",
+      "outfit": "البدلة",
+      "outfitHint": "اكتب بحرية أو اختر اقتراحًا. الخانة الفارغة لا تُحتسب.",
+      "costume": "الطقم",
+      "shirt": "القميص",
+      "shoes": "الحذاء",
+      "other": "قطعة أخرى",
+      "size": "المقاس",
+      "tailor": "الخياط",
+      "tailorPlaceholder": "الخياط: مثال TK-525 (14 سم)",
+      "addOther": "إضافة قطعة",
+      "payment": "الدفع",
+      "price": "سعر البدلة",
+      "paidAll": "مدفوع بالكامل ({amount})",
+      "fromStock": "قطعة من المخزون",
+      "dateFirst": "اختر التاريخ",
+      "save": "حفظ",
+      "saveAnother": "التالي",
+      "savedToast": "تم حفظ طلب {name}",
+      "view": "عرض",
+      "clear": "مسح",
+      "clearTitle": "مسح النموذج؟",
+      "clearBody": "سيتم حذف كل ما أُدخل لهذا الطلب. لم يُحفظ شيء بعد.",
+      "accessories": "الإكسسوارات",
+      "sizeJacket": "المقاس",
+      "sizeVest": "مقاس الصدرية",
+      "sizePants": "مقاس السروال",
+      "pickPlaceholder": "اختيار…",
+      "sizeJacketLong": "مقاس السترة",
+      "sizeVestShort": "الصدرية",
+      "sizePantsShort": "السروال",
+      "stepDown": "ناقص {step}",
+      "stepUp": "زائد {step}"
+    },
+    "callNamed": "الاتصال بـ {name}",
+    "smsNamed": "إرسال رسالة إلى {name}",
+    "checkedToast": "{label} — {name}",
+    "countTotal": "{count, plural, =0 {لا توجد طلبيات} =1 {طلبية واحدة} other {{n} طلبيات}}",
+    "endOfList": "نهاية القائمة",
+    "edit": {
+      "action": "تعديل",
+      "title": "تعديل {no}",
+      "save": "حفظ التعديلات",
+      "savedToast": "تم تعديل طلبية {name}",
+      "backToOrder": "العودة إلى الطلبية"
+    }
   },
   "stock": {
     "title": "المخزون",
@@ -346,7 +401,8 @@
     "passwordSame": "اختر كلمة مرور مختلفة عن الحالية.",
     "currentPasswordWrong": "كلمة المرور الحالية غير صحيحة.",
     "ensembleUnitsRequired": "أضف قطعة واحدة على الأقل.",
-    "ensembleUnitInvalid": "لا يمكن أن تكون قطعة مسحوبة من المخزون ضمن طقم."
+    "ensembleUnitInvalid": "لا يمكن أن تكون قطعة مسحوبة من المخزون ضمن طقم.",
+    "orderCancelledEdit": "لا يمكن تعديل طلبية ملغاة: أعِد تفعيلها أولًا من صفحتها."
   },
   "roles": {
     "owner": "مسؤول",
@@ -485,5 +541,68 @@
     "newPasswordHint": "8 أحرف على الأقل.",
     "confirmPassword": "تأكيد كلمة المرور الجديدة",
     "passwordChanged": "تم تغيير كلمة المرور."
+  },
+  "calendar": {
+    "day": "يوم",
+    "week": "أسبوع",
+    "month": "شهر",
+    "today": "اليوم",
+    "views": "عرض التقويم",
+    "previous": "الفترة السابقة",
+    "next": "الفترة التالية",
+    "previousDay": "اليوم السابق",
+    "nextDay": "اليوم التالي",
+    "more": "+{n}",
+    "late": "متأخرة",
+    "count": "{count, plural, =0 {لا توجد طلبيات} =1 {طلبية واحدة} other {{n} طلبيات}}",
+    "lateCount": "{count, plural, =1 {واحدة متأخرة} other {{n} متأخرة}}",
+    "tomorrowHint": "أعراس هذا اليوم: يأخذ هؤلاء الزبائن ملابسهم في اليوم السابق. المس ✈ عند خروج الطقم.",
+    "dayEmpty": "لا توجد طلبيات في هذا اليوم.",
+    "allBack": "رجعت كل الأطقم.",
+    "done": "منتهية (تم التسليم والإرجاع)"
+  },
+  "frais": {
+    "hint": "سجّل المصروف عند دفعه: الخياط، المصبغة، التوصيل…",
+    "type": "النوع",
+    "types": {
+      "tailor": "الخياط",
+      "pressing": "المصبغة",
+      "delivery": "التوصيل",
+      "other": "أخرى"
+    },
+    "detail": "التفاصيل",
+    "detailPlaceholder": "اختياري — مثلًا خياط + توصيل",
+    "add": "إضافة المصروف",
+    "added": "تمت إضافة المصروف: {label}، {amount}",
+    "recentAll": "آخر المصاريف",
+    "recentMine": "آخر مصاريفي",
+    "seeExpenses": "كل المصاريف",
+    "empty": "لم يُسجَّل أي مصروف بعد."
+  },
+  "search": {
+    "orders": "ابحث عن طلبية: الاسم، الرقم، الهاتف",
+    "stock": "ابحث في المخزون",
+    "ensembles": "ابحث عن طقم أو قطعة",
+    "frais": "ابحث عن مصروف",
+    "expenses": "ابحث عن نفقة",
+    "team": "ابحث عن عضو",
+    "open": "بحث",
+    "close": "إغلاق البحث",
+    "clear": "مسح البحث",
+    "noMatch": "لا توجد نتائج لـ «{q}»."
+  },
+  "picker": {
+    "hint": "اختر قطعة أو أكثر ثم أكّد.",
+    "search": "بحث",
+    "addNew": "إضافة «{label}»",
+    "emptyHint": "اكتب اسمًا للبحث عنه أو إضافته.",
+    "clear": "إلغاء التحديد",
+    "done": "تأكيد",
+    "doneCount": "تأكيد ({count})",
+    "sizeHint": "المس مقاسًا لاختياره.",
+    "otherSize": "مقاس آخر",
+    "ok": "موافق",
+    "clearSize": "بدون مقاس",
+    "clearValue": "مسح «{value}»"
   }
 }

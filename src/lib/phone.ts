@@ -27,9 +27,9 @@ export function normalizePhone(raw: string): string {
 /**
  * Mobile algérien : 05 (Ooredoo), 06 (Mobilis), 07 (Djezzy), puis 8 chiffres.
  *
- * Décision du client : le numéro est OBLIGATOIRE et c'est un MOBILE. C'est le
- * numéro qu'on appelle quand un retour tarde, et le fixe d'un domicile ne
- * répond pas le lendemain d'un mariage.
+ * Quand il est saisi, c'est un MOBILE : c'est le numéro qu'on appelle quand un
+ * retour tarde, et le fixe d'un domicile ne répond pas le lendemain d'un
+ * mariage. Il n'est plus obligatoire depuis la saisie rapide.
  */
 export function isAlgerianMobile(normalized: string): boolean {
   return /^0[5-7]\d{8}$/.test(normalized);

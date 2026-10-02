@@ -11,20 +11,12 @@
  */
 
 /**
- * Tailles de page proposées.
- *
- * LISTE BLANCHE, comme pour le tri : la valeur vient de l'URL et finit dans un
- * `.range()`. Une taille libre laisserait demander 100 000 lignes d'un coup
- * depuis la barre d'adresse — sur un réseau mobile algérien, c'est l'écran qui
- * ne s'affiche plus.
- *
- * 100 est le plafond volontairement bas : au-delà, la liste se parcourt moins
- * bien qu'avec la recherche et les filtres, qui eux travaillent sur TOUTE la
- * base et non sur la page affichée.
+ * Commandes chargées à chaque fois que la liste arrive en bas. La liste se
+ * DÉROULE, comme le tableau de son AppSheet : plus de pages ni de taille de
+ * page à choisir. 40 lignes remplissent deux écrans de téléphone sans peser
+ * sur un réseau mobile.
  */
-export const PER_PAGE_OPTIONS = [10, 25, 50, 100] as const;
-
-export const DEFAULT_PER_PAGE = 25;
+export const ORDERS_BATCH = 40;
 
 /**
  * LISTE BLANCHE des colonnes triables.
@@ -56,10 +48,26 @@ export type OrderRow = {
   /** Sert au retard, qui se déduit du calendrier — il ne se stocke nulle part. */
   return_due_date: string;
   status: string;
+  /** « Allez validé » : la tenue est sortie. */
+  picked_up: boolean;
+  /** « Retour validé » : la tenue est revenue. */
+  returned: boolean;
   total_price: number;
   amount_paid: number;
   balance: number | null;
   caution_amount: number;
+};
+
+/**
+ * Une ligne du TABLEAU des commandes : la commande, plus ce que le client
+ * emporte — les colonnes « Costume, Chemise, Chaussures… » de son AppSheet,
+ * réunies en une seule.
+ */
+export type OrderTableRow = OrderRow & {
+  /** « Invite Noir Simple (50 · P 52) », dans l'ordre de saisie. */
+  pieces: string[];
+  /** La colonne « Tailleur » : la note de la première pièce qui en porte une. */
+  tailor: string | null;
 };
 
 export type OrdersQuery = {
@@ -67,8 +75,6 @@ export type OrdersQuery = {
   status: OrderStatus | null;
   sort: SortKey;
   ascending: boolean;
-  page: number;
-  perPage: number;
 };
 
 /** Normalise les paramètres d'URL : tout ce qui est inconnu est ignoré. */
@@ -77,12 +83,8 @@ export function parseOrdersQuery(params: {
   statut?: string;
   tri?: string;
   sens?: string;
-  page?: string;
-  taille?: string;
 }): OrdersQuery {
   const sort = (params.tri && params.tri in SORTABLE ? params.tri : "event_date") as SortKey;
-  const page = Number.parseInt(params.page ?? "1", 10);
-  const perPage = Number.parseInt(params.taille ?? "", 10);
 
   return {
     q: (params.q ?? "").trim().slice(0, 80),
@@ -95,10 +97,6 @@ export function parseOrdersQuery(params: {
     ascending: params.sens
       ? params.sens === "asc"
       : sort === "customer_name" || sort === "order_no",
-    page: Number.isFinite(page) && page > 0 ? page : 1,
-    perPage: (PER_PAGE_OPTIONS as readonly number[]).includes(perPage)
-      ? perPage
-      : DEFAULT_PER_PAGE,
   };
 }
 
@@ -120,13 +118,41 @@ export function ordersFilters(query: OrdersQuery): {
   search: string | null;
   status: OrderStatus | null;
 } {
-  const term = sanitizeSearch(query.q);
   return {
-    // On cherche sur ce que l'équipe a sous les yeux quand le client appelle :
-    // son nom, le numéro de commande, son téléphone.
-    search: term
-      ? `customer_name.ilike.%${term}%,order_no.ilike.%${term}%,customer_phone.ilike.%${term}%`
-      : null,
+    search: orderSearchFilter(query.q),
     status: query.status,
   };
 }
+
+/**
+ * Argument `.or(...)` de la recherche d'une commande, ou `null` sans terme.
+ * Partagé par toutes les listes de commandes (liste, calendrier, « Demain »,
+ * « Pas rentrés ») : la barre de recherche de l'en-tête doit trouver la même
+ * chose partout.
+ *
+ * On cherche sur ce que l'équipe a sous les yeux quand le client appelle :
+ * son nom, le numéro de commande, son téléphone.
+ */
+export function orderSearchFilter(q: string | null | undefined): string | null {
+  const term = sanitizeSearch((q ?? "").trim().slice(0, 80));
+  return term
+    ? `customer_name.ilike.%${term}%,order_no.ilike.%${term}%,customer_phone.ilike.%${term}%`
+    : null;
+}
+
+/**
+ * Commande TERMINÉE : « Aller validé » ET « Retour validé » cochés — la tenue
+ * est partie et revenue. C'est le seul cas où son AppSheet barre le nom, et
+ * l'équipe s'en sert pour écarter d'un coup d'œil ce qui n'appelle plus rien.
+ */
+export function isOrderDone(order: { picked_up: boolean; returned: boolean }): boolean {
+  return order.picked_up && order.returned;
+}
+
+/**
+ * Le trait qui barre le nom d'une commande terminée — épais et de la couleur
+ * du texte, pour se lire même sur un nom court et en plein soleil. Partagé par
+ * toutes les listes pour que « terminé » ait partout la même allure.
+ */
+export const DONE_NAME_CLASS =
+  "text-muted-foreground line-through decoration-foreground/70 decoration-2";

@@ -4,12 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
 import { fieldErrorsOf, orderSchema, paymentSchema } from "@/lib/validation/orders";
+import type { z } from "zod";
 import { getSettings, getUnavailableUnits, type Unavailability } from "@/lib/queries/orders";
 import { redirectTo } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
 
+type OrderInput = z.infer<typeof orderSchema>;
+
 export type ActionResult =
-  | { ok: true }
+  | { ok: true; id?: number }
   | {
       ok: false;
       error: string;
@@ -61,12 +64,112 @@ function unitConflict(error: { code?: string; message: string }): ActionResult |
 export async function checkAvailability(
   pickup: string,
   returnDue: string,
+  excludeOrderId?: number,
 ): Promise<Unavailability[]> {
   const profile = await getProfile();
   if (!profile) return [];
 
   const settings = await getSettings();
-  return getUnavailableUnits(pickup, returnDue, settings.cleaning_buffer_days);
+  return getUnavailableUnits(
+    pickup,
+    returnDue,
+    settings.cleaning_buffer_days,
+    Number.isInteger(excludeOrderId) ? excludeOrderId : undefined,
+  );
+}
+
+/** Lit et valide le formulaire de commande (saisie ET modification). */
+function parseOrderForm(
+  formData: FormData,
+):
+  | { ok: true; input: OrderInput }
+  | { ok: false; result: ActionResult } {
+  let lines: unknown;
+  try {
+    lines = JSON.parse(String(formData.get("lines") ?? "[]"));
+  } catch {
+    return { ok: false, result: { ok: false, error: "errors.generic" } };
+  }
+
+  const parsed = orderSchema.safeParse({
+    customer_name: formData.get("customer_name"),
+    customer_phone: formData.get("customer_phone"),
+    event_date: formData.get("event_date"),
+    pickup_date: formData.get("pickup_date"),
+    return_due_date: formData.get("return_due_date"),
+    discount: formData.get("discount") || 0,
+    // Vide = 0 : voir `optionalMoney`.
+    amount_paid: formData.get("amount_paid"),
+    caution_amount: formData.get("caution_amount"),
+    notes: formData.get("notes"),
+    lines,
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        error: issue.message,
+        field: String(issue.path[0] ?? ""),
+        fieldErrors: fieldErrorsOf(parsed.error),
+      },
+    };
+  }
+  return { ok: true, input: parsed.data };
+}
+
+/** Les lignes au format attendu par `create_order` / `update_order`. */
+function toRpcLines(lines: OrderInput["lines"]) {
+  return lines.map((l) => {
+    switch (l.kind) {
+      case "unit":
+        return { unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? "" };
+      case "named":
+        return {
+          kind: "named",
+          name: l.name,
+          size: l.size ?? "",
+          unitPrice: l.unitPrice,
+          note: l.note ?? "",
+        };
+      case "external":
+        return {
+          source: l.source ?? "",
+          label: l.label,
+          cost: l.cost ?? "",
+          unitPrice: l.unitPrice,
+          note: l.note ?? "",
+        };
+    }
+  });
+}
+
+/** Erreurs attendues de l'écriture d'une commande, traduites en clés i18n. */
+function orderWriteError(error: { code?: string; message: string }): ActionResult {
+  const conflict = unitConflict(error);
+  if (conflict) return conflict;
+
+  if (error.message.includes("lines_required")) {
+    return { ok: false, error: "errors.linesRequired" };
+  }
+  if (error.message.includes("external_label_required")) {
+    return { ok: false, error: "errors.externalLabelRequired" };
+  }
+  if (error.message.includes("named_label_required")) {
+    return { ok: false, error: "errors.linesRequired" };
+  }
+  if (error.message.includes("customer_name_required")) {
+    return { ok: false, error: "errors.required", field: "customer_name" };
+  }
+  if (error.message.includes("order_cancelled")) {
+    return { ok: false, error: "errors.orderCancelledEdit" };
+  }
+  if (error.message.includes("order_not_found")) {
+    return { ok: false, error: "errors.forbidden" };
+  }
+  return { ok: false, error: "errors.generic" };
 }
 
 /**
@@ -87,44 +190,16 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   // Créer une commande est le métier quotidien de l'équipe : `staff` suffit.
   if (!profile) return { ok: false, error: "errors.forbidden" };
 
-  let lines: unknown;
-  try {
-    lines = JSON.parse(String(formData.get("lines") ?? "[]"));
-  } catch {
-    return { ok: false, error: "errors.generic" };
-  }
+  const parsed = parseOrderForm(formData);
+  if (!parsed.ok) return parsed.result;
 
-  const parsed = orderSchema.safeParse({
-    customer_name: formData.get("customer_name"),
-    customer_phone: formData.get("customer_phone"),
-    event_date: formData.get("event_date"),
-    pickup_date: formData.get("pickup_date"),
-    return_due_date: formData.get("return_due_date"),
-    discount: formData.get("discount") || 0,
-    // PAS de `|| 0` ici : versement et caution sont obligatoires, un champ
-    // vide doit être refusé et non compté comme zéro. Voir `requiredMoney`.
-    amount_paid: formData.get("amount_paid"),
-    caution_amount: formData.get("caution_amount"),
-    notes: formData.get("notes"),
-    lines,
-  });
-
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return {
-      ok: false,
-      error: issue.message,
-      field: String(issue.path[0] ?? ""),
-      fieldErrors: fieldErrorsOf(parsed.error),
-    };
-  }
-
-  const input = parsed.data;
+  const input = parsed.input;
   const supabase = await createClient();
 
   const { data: orderId, error } = await supabase.rpc("create_order", {
     p_customer_name: input.customer_name,
-    p_customer_phone: input.customer_phone,
+    // Vide = pas de numéro : la fonction SQL le ramène à NULL.
+    p_customer_phone: input.customer_phone ?? "",
     p_event_date: input.event_date,
     p_pickup_date: input.pickup_date,
     p_return_due_date: input.return_due_date,
@@ -132,37 +207,81 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
     p_amount_paid: input.amount_paid,
     p_caution_amount: input.caution_amount,
     p_notes: input.notes ?? "",
-    p_lines: input.lines.map((l) =>
-      l.kind === "unit"
-        ? { unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? "" }
-        : {
-            source: l.source ?? "",
-            label: l.label,
-            cost: l.cost ?? "",
-            unitPrice: l.unitPrice,
-            note: l.note ?? "",
-          },
-    ),
+    p_lines: toRpcLines(input.lines),
   });
 
-  if (error) {
-    const conflict = unitConflict(error);
-    if (conflict) return conflict;
+  if (error) return orderWriteError(error);
 
-    if (error.message.includes("lines_required")) {
-      return { ok: false, error: "errors.linesRequired" };
-    }
-    if (error.message.includes("external_label_required")) {
-      return { ok: false, error: "errors.externalLabelRequired" };
-    }
-    if (error.message.includes("customer_name_required")) {
-      return { ok: false, error: "errors.required", field: "customer_name" };
-    }
+  // « Allez validé » / « Retour validé » cochés DÈS la saisie — son AppSheet
+  // les propose dans le formulaire : le client qui réserve et emporte sa tenue
+  // dans la foulée. Écrits par une mise à jour ordinaire, pour que le trigger
+  // `orders_before_update` en déduise le statut exactement comme pour une case
+  // cochée sur la fiche. Un échec ici ne défait pas la commande, déjà
+  // enregistrée : la case reste simplement à cocher sur la fiche.
+  const pickedUp = formData.get("picked_up") === "1";
+  const returned = formData.get("returned") === "1";
+  if (pickedUp || returned) {
+    await supabase
+      .from("orders")
+      .update({ picked_up: pickedUp || returned, returned })
+      .eq("id", Number(orderId));
+  }
+
+  revalidatePath(`/${locale}/commandes`, "layout");
+
+  // La saisie rapide navigue elle-même : elle doit d'abord vider son brouillon,
+  // puis soit ouvrir la fiche, soit rester sur place pour la commande suivante.
+  if (formData.get("return_id") === "1") return { ok: true, id: Number(orderId) };
+
+  redirectTo(`/commandes/${orderId}`, locale);
+}
+
+/**
+ * Modifie une commande — le MÊME formulaire que la saisie, rouvert sur elle.
+ *
+ * Passe par `update_order`, qui réécrit la commande et REMPLACE ses lignes en
+ * une transaction : si une pièce du stock est déjà louée sur les nouvelles
+ * dates, rien n'est modifié. Voir
+ * `supabase/migrations/20261002140000_modifier_commande.sql`.
+ *
+ * Ouverte à `staff`, comme la saisie : corriger une faute de frappe est le
+ * même métier que la faire.
+ */
+export async function updateOrder(formData: FormData): Promise<ActionResult> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const orderId = Number(formData.get("id"));
+  if (!Number.isInteger(orderId) || orderId <= 0) {
     return { ok: false, error: "errors.generic" };
   }
 
-  revalidatePath(`/${locale}/commandes`);
-  redirectTo(`/commandes/${orderId}`, locale);
+  const parsed = parseOrderForm(formData);
+  if (!parsed.ok) return parsed.result;
+  const input = parsed.input;
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_order", {
+    p_order_id: orderId,
+    p_customer_name: input.customer_name,
+    p_customer_phone: input.customer_phone ?? "",
+    p_event_date: input.event_date,
+    p_pickup_date: input.pickup_date,
+    p_return_due_date: input.return_due_date,
+    p_amount_paid: input.amount_paid,
+    p_caution_amount: input.caution_amount,
+    p_notes: input.notes ?? "",
+    p_picked_up: formData.get("picked_up") === "1",
+    p_returned: formData.get("returned") === "1",
+    p_lines: toRpcLines(input.lines),
+  });
+
+  if (error) return orderWriteError(error);
+
+  revalidatePath(`/${locale}/commandes`, "layout");
+  return { ok: true, id: orderId };
 }
 
 /**
@@ -212,7 +331,7 @@ export async function setOrderChecks(formData: FormData): Promise<ActionResult> 
   // cochée que la base n'a jamais acceptée.
   if (!data?.length) return { ok: false, error: "errors.forbidden" };
 
-  revalidatePath(`/${locale}/commandes`);
+  revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   return { ok: true };
 }
@@ -286,7 +405,7 @@ export async function addOrderPayment(formData: FormData): Promise<ActionResult>
 
   // Le reste dû se lit à trois endroits, et le tableau de bord compte les
   // impayés : les quatre doivent bouger ensemble.
-  revalidatePath(`/${locale}/commandes`);
+  revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };
@@ -380,7 +499,7 @@ export async function setOrderCancelled(formData: FormData): Promise<ActionResul
 
   // La liste affiche le statut, la fiche l'affiche et change de boutons, et le
   // tableau de bord vient de changer de chiffre d'affaires.
-  revalidatePath(`/${locale}/commandes`);
+  revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };
@@ -428,7 +547,7 @@ export async function deleteOrder(formData: FormData): Promise<ActionResult> {
 
   // La commande quitte la liste, le chiffre d'affaires, les échéances du
   // tableau de bord ; et ses frais perdent leur lien dans les dépenses.
-  revalidatePath(`/${locale}/commandes`);
+  revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/tableau-de-bord`);
   revalidatePath(`/${locale}/depenses`);
   redirectTo("/commandes", locale);

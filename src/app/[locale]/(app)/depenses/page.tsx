@@ -8,6 +8,7 @@ import { ExpensesList } from "@/components/expenses-list";
 import { requireOwner } from "@/lib/auth";
 import { getExpenses, getRecentOrders } from "@/lib/queries/expenses";
 import { formatMoney } from "@/lib/format";
+import { matchesSearch } from "@/lib/search";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -34,7 +35,7 @@ export default async function ExpensesPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ mois?: string }>;
+  searchParams: Promise<{ mois?: string; q?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -43,7 +44,7 @@ export default async function ExpensesPage({
   // qui sépare `staff` de `owner`.
   await requireOwner(locale as Locale);
 
-  const { mois } = await searchParams;
+  const { mois, q = "" } = await searchParams;
   const t = await getTranslations();
   const l = locale as Locale;
 
@@ -51,8 +52,20 @@ export default async function ExpensesPage({
   // produire une erreur.
   const month = isValidMonth(mois) ? mois : new Date().toISOString().slice(0, 7);
 
-  const [expenses, orders] = await Promise.all([getExpenses(month), getRecentOrders()]);
+  const [monthExpenses, orders] = await Promise.all([getExpenses(month), getRecentOrders()]);
+  // Recherche de l'en-tête, sur le mois affiché : libellé, catégorie, ou la
+  // commande liée. Le total suit le filtre — « combien de pressing ce mois ».
+  const expenses = monthExpenses.filter((e) =>
+    matchesSearch(
+      q,
+      e.description,
+      t(`expenses.categories.${e.category}`),
+      e.orders?.customer_name,
+      e.orders?.order_no,
+    ),
+  );
   const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const monthHref = (m: string) => `/depenses?mois=${m}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   const monthLabel = new Intl.DateTimeFormat(l === "ar" ? "ar-DZ" : "fr-DZ", {
     month: "long",
@@ -73,7 +86,7 @@ export default async function ExpensesPage({
           total se lisent d'un seul regard ; les chevrons gardent leurs 44 px. */}
       <div className="mt-2 flex items-center gap-1">
         <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
-          <Link href={`/depenses?mois=${shiftMonth(month, -1)}`}>
+          <Link href={monthHref(shiftMonth(month, -1))}>
             <ChevronLeft className="size-5 rtl:-scale-x-100" aria-hidden />
             <span className="sr-only">{t("expenses.previousMonth")}</span>
           </Link>
@@ -90,7 +103,7 @@ export default async function ExpensesPage({
         </p>
 
         <Button asChild variant="ghost" size="icon" className="size-11 shrink-0">
-          <Link href={`/depenses?mois=${shiftMonth(month, 1)}`}>
+          <Link href={monthHref(shiftMonth(month, 1))}>
             <ChevronRight className="size-5 rtl:-scale-x-100" aria-hidden />
             <span className="sr-only">{t("expenses.nextMonth")}</span>
           </Link>

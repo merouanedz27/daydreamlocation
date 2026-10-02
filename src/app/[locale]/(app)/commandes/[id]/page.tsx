@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Pencil,
   Phone,
   Printer,
   Shirt,
@@ -199,12 +200,25 @@ export default async function OrderPage({
       {/* Le bon de location, à imprimer ou à enregistrer en PDF pour l'envoyer
           au client. Sous le titre et non dans la barre d'action : on l'édite
           une fois par commande, ce n'est pas le geste du quotidien. */}
-      <Button asChild variant="outline" className="mt-3 h-11">
-        <Link href={`/imprimer/commande/${order.id}`}>
-          <Printer className="size-4" aria-hidden />
-          {t("print.slipButton")}
-        </Link>
-      </Button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button asChild variant="outline" className="h-11">
+          <Link href={`/imprimer/commande/${order.id}`}>
+            <Printer className="size-4" aria-hidden />
+            {t("print.slipButton")}
+          </Link>
+        </Button>
+        {/* Modifier : sur téléphone, c'est le bouton rond en bas (à la place
+            du « + ») ; sur grand écran, où il n'existe pas, ce bouton-ci. Une
+            commande annulée se rétablit d'abord. */}
+        {order.status !== "annulee" && (
+          <Button asChild className="hidden h-11 md:inline-flex">
+            <Link href={`/commandes/${order.id}/modifier`}>
+              <Pencil className="size-4" aria-hidden />
+              {t("orders.edit.action")}
+            </Link>
+          </Button>
+        )}
+      </div>
 
       {/* Commande annulée : on le dit en clair, et on offre le retour sur place.
           Même bandeau que le modèle retiré du catalogue — l'équipe reconnaît la

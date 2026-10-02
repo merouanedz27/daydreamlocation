@@ -4,6 +4,7 @@ import { MemberForm } from "@/components/member-form";
 import { TeamList } from "@/components/team-list";
 import { requireOwner } from "@/lib/auth";
 import { getTeam } from "@/lib/queries/profiles";
+import { matchesSearch } from "@/lib/search";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -16,8 +17,10 @@ export async function generateMetadata(props: {
 
 export default async function TeamPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -28,7 +31,9 @@ export default async function TeamPage({
   const profile = await requireOwner(locale as Locale);
 
   const t = await getTranslations();
-  const members = await getTeam();
+  // Recherche de l'en-tête : nom ou adresse e-mail.
+  const { q = "" } = await searchParams;
+  const members = (await getTeam()).filter((m) => matchesSearch(q, m.full_name, m.email));
 
   return (
     <div>
