@@ -2,77 +2,38 @@
 
 import { useLayoutEffect, useRef } from "react";
 import { PrintSheet } from "@/components/print-sheet";
+import { useTicketPdf } from "@/components/ticket-pdf";
+import { fitTicket } from "@/lib/fit-ticket";
 import { cn } from "@/lib/utils";
 
 /** 4 pouces en px CSS (96 px au pouce) : la largeur EXACTE de l'étiquette. */
 const TICKET_WIDTH_PX = 384;
 
-/** Bornes du facteur de taille : la recherche garde le plus GRAND qui tient. */
-const FIT_MAX = 2.2;
-const FIT_MIN = 0.5;
-const FIT_STEPS = 10;
-/** Quelques px de marge : le moteur d'impression arrondit autrement que l'écran. */
-const FIT_SLACK_PX = 6;
-
 /**
- * Ajuste la taille du texte d'un ticket pour qu'il REMPLISSE son étiquette
- * 4 × 6 sans jamais déborder.
+ * Un ticket du bon de location : une feuille de 4 × 6 pouces EXACTEMENT.
  *
- * Toutes les tailles du ticket — logos compris — sont en `em` d'une seule
- * taille racine, `calc(10.5pt * var(--fit))` : un seul nombre à changer. On
- * cherche par dichotomie le plus GRAND `--fit` pour lequel le contenu tient.
+ * Deux états :
+ * 1. à l'ouverture, la mise en page vivante (texte ajusté par `fitTicket`) ;
+ * 2. dès que `TicketPdfProvider` l'a photographiée, c'est la PHOTO qui
+ *    s'affiche et qui s'imprime — la même image que la page du PDF partagé.
+ *    L'aperçu à l'écran est donc exactement ce que l'appli de l'imprimante
+ *    recevra, et le papier aussi.
  *
- * On mesure le CONTENU (`[data-ticket-content]`, à sa hauteur naturelle) et
- * non la feuille : le `scrollHeight` d'une boîte n'est jamais inférieur à sa
- * hauteur visible — le comparer à elle disait « déborde » à tous les coups, et
- * le texte tombait toujours au minimum (tout petit au milieu de l'étiquette).
- *
- * Exporté pour `ticket-share.tsx`, qui le rejoue sur sa copie avant la photo.
- */
-export function fitTicket(el: HTMLElement) {
-  const content = el.querySelector<HTMLElement>("[data-ticket-content]");
-  if (!content) return;
-  const style = getComputedStyle(el);
-  const available =
-    el.clientHeight -
-    parseFloat(style.paddingTop) -
-    parseFloat(style.paddingBottom) -
-    FIT_SLACK_PX;
-
-  const fits = (fit: number) => {
-    el.style.setProperty("--fit", fit.toFixed(3));
-    return (
-      content.offsetHeight <= available &&
-      // Un mot trop long pour la largeur déborderait sur le côté.
-      content.scrollWidth <= content.clientWidth + 1
-    );
-  };
-
-  let lo = FIT_MIN;
-  let hi = FIT_MAX;
-  if (fits(hi)) return;
-  for (let i = 0; i < FIT_STEPS; i++) {
-    const mid = (lo + hi) / 2;
-    if (fits(mid)) lo = mid;
-    else hi = mid;
-  }
-  el.style.setProperty("--fit", lo.toFixed(3));
-}
-
-/**
- * Un ticket du bon de location : une feuille de 4 × 6 pouces EXACTEMENT, à
- * l'écran comme sur le papier et dans le PDF — la même mise en page partout,
- * mesurée une seule fois.
+ * À l'impression, la photo prend TOUTE la page (`100vw × 100vh`, sans
+ * déformation) : sur la page 4 × 6 demandée, elle la couvre pile ; si le
+ * téléphone impose un autre papier, elle s'y ajuste au lieu de déborder.
  *
  * Sur un téléphone de 390 px, 4 pouces (384 px) ne tiennent pas avec les
- * marges : la feuille est RÉDUITE à l'affichage (`scale`, qui ne touche pas à
- * la mise en page), jamais reflowée. À l'impression, plus de réduction.
+ * marges : la feuille est RÉDUITE à l'affichage (`scale`), jamais reflowée.
  */
 export function TicketFrame({
+  index,
   className,
   frameClassName,
   children,
 }: {
+  /** Rang du ticket dans la page : sa photo dans le PDF. */
+  index: number;
   className?: string;
   /** Sur le cadre extérieur — le saut de page du 2ᵉ ticket. */
   frameClassName?: string;
@@ -80,6 +41,7 @@ export function TicketFrame({
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const sheet = useRef<HTMLElement>(null);
+  const photo = useTicketPdf().images?.[index] ?? null;
 
   useLayoutEffect(() => {
     const outer = frame.current;
@@ -102,12 +64,10 @@ export function TicketFrame({
     for (const img of Array.from(ticket.querySelectorAll("img"))) {
       if (!img.complete) img.addEventListener("load", refit, { once: true });
     }
-    window.addEventListener("beforeprint", refit);
 
     return () => {
       alive = false;
       observer.disconnect();
-      window.removeEventListener("beforeprint", refit);
     };
   }, []);
 
@@ -120,25 +80,47 @@ export function TicketFrame({
         frameClassName,
       )}
     >
-      <PrintSheet
-        ref={sheet}
-        data-ticket
-        style={{ fontSize: "calc(10.5pt * var(--fit, 1))" }}
+      <div
         className={cn(
-          // Encre noire sur blanc, même en thème sombre : c'est du papier.
-          "print-ticket flex h-[6in] w-[4in] max-w-none shrink-0 flex-col justify-center-safe overflow-hidden bg-white p-[5mm] text-black sm:p-[5mm]",
-          "origin-top [scale:var(--s,1)] print:p-[5mm] print:[scale:1]",
-          // Arial comme son modèle ; l'arabe retombe sur Cairo si Arial n'a pas les glyphes.
-          "font-[family-name:Arial,Helvetica,var(--font-cairo),sans-serif]",
-          className,
+          "print-ticket relative h-[6in] w-[4in] shrink-0 origin-top [scale:var(--s,1)]",
+          "print:[scale:1]",
+          // La photo à l'impression : toute la page, proportions gardées.
+          photo && "print:h-screen print:w-screen",
         )}
       >
-        {/* À sa hauteur NATURELLE (élément flex de la colonne, sans
-            étirement) : c'est elle que `fitTicket` mesure. */}
-        <div data-ticket-content className="w-full shrink-0">
-          {children}
-        </div>
-      </PrintSheet>
+        <PrintSheet
+          ref={sheet}
+          data-ticket
+          style={{ fontSize: "calc(10.5pt * var(--fit, 1))" }}
+          className={cn(
+            // Encre noire sur blanc, même en thème sombre : c'est du papier.
+            "flex h-[6in] w-[4in] max-w-none flex-col justify-center-safe overflow-hidden bg-white p-[5mm] text-black sm:p-[5mm] print:p-[5mm]",
+            // Arial comme son modèle ; l'arabe retombe sur Cairo si Arial n'a pas les glyphes.
+            "font-[family-name:Arial,Helvetica,var(--font-cairo),sans-serif]",
+            // Photographiée : la mise en page vivante reste en place mais ne
+            // se voit ni ne s'imprime plus.
+            photo && "invisible print:hidden",
+            className,
+          )}
+        >
+          {/* À sa hauteur NATURELLE (élément flex de la colonne, sans
+              étirement) : c'est elle que `fitTicket` mesure. */}
+          <div data-ticket-content className="w-full shrink-0">
+            {children}
+          </div>
+        </PrintSheet>
+
+        {photo && (
+          // La photo de la page elle-même (adresse `blob:` locale) : rien à
+          // optimiser pour `next/image`.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo}
+            alt=""
+            className="border-border absolute inset-0 size-full rounded-sm border bg-white object-contain print:static print:rounded-none print:border-0 print:[print-color-adjust:exact]"
+          />
+        )}
+      </div>
     </div>
   );
 }

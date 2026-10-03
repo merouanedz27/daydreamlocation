@@ -48,7 +48,7 @@ export function PrintToolbar({
 
         <div className="ms-auto flex items-center gap-2">
           <LocaleSwitcher />
-          {action}
+          {printButton && action}
           {printButton && (
             <Button
               type="button"
@@ -62,6 +62,13 @@ export function PrintToolbar({
           )}
         </div>
       </div>
+
+      {/* Le document a ses PROPRES boutons (le bon : Partager / Imprimer) :
+          sur leur ligne, pleine largeur, moitié-moitié — à 390 px, à côté du
+          retour et de la langue, ils débordaient de l'écran. */}
+      {!printButton && action && (
+        <div className="mt-2 grid grid-cols-2 gap-2 [&>*]:w-full">{action}</div>
+      )}
 
       {children && <div className="mt-3">{children}</div>}
 

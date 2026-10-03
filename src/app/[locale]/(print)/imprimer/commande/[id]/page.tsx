@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
 import { TicketFrame } from "@/components/ticket-fit";
+import { TicketPdfProvider } from "@/components/ticket-pdf";
 import { getOrder, getOrderCatalogue, getLabelSlots, getSettings } from "@/lib/queries/orders";
 import { ticketFields } from "@/lib/ticket-fields";
 import { normalizeSearch } from "@/lib/search";
@@ -156,11 +157,13 @@ export default async function OrderSlipPage({
   );
 
   return (
-    <>
+    // Les photos 4 × 6 des deux tickets, préparées à l'ouverture : l'aperçu,
+    // le PDF partagé et l'impression montrent la MÊME image (ticket-pdf.tsx).
+    <TicketPdfProvider fileName={`${t("print.slipTitle")} ${order.order_no}`}>
       <PrintToolbar
         backHref={`/commandes/${order.id}`}
         printButton={false}
-        action={<TicketActions fileName={`${t("print.slipTitle")} ${order.order_no}`} />}
+        action={<TicketActions />}
       />
 
       {/* Le format 4 × 6 posé sur TOUT le document, pas seulement sur la page
@@ -173,7 +176,7 @@ export default async function OrderSlipPage({
 
       <div className="space-y-4 print:space-y-0">
         {/* --- Ticket du CLIENT ------------------------------------------- */}
-        <TicketFrame>
+        <TicketFrame index={0}>
           {/* `print-color-adjust: exact` : sans lui, Chrome « économise
               l'encre » et délave le logo.
               `unoptimized` : chaque logo est servi par SON fichier, et non par
@@ -218,7 +221,7 @@ export default async function OrderSlipPage({
             Le saut de page est AVANT ce ticket, et lui seul : un saut APRÈS
             le premier, sur une feuille pile à sa hauteur, faisait sortir une
             page blanche entre les deux. */}
-        <TicketFrame frameClassName="print:break-before-page">
+        <TicketFrame index={1} frameClassName="print:break-before-page">
           <Image
             src={suit}
             alt=""
@@ -230,7 +233,7 @@ export default async function OrderSlipPage({
           <TicketRows rows={costumeRows} className="mt-[0.6em] text-[1.15em]" />
         </TicketFrame>
       </div>
-    </>
+    </TicketPdfProvider>
   );
 }
 

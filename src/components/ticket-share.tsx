@@ -1,39 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader2, Printer, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fitTicket } from "@/components/ticket-fit";
-
-/** 4 × 6 pouces : 384 × 576 px CSS (96 px au pouce), 288 × 432 points PDF. */
-const WIDTH_PX = 384;
-const HEIGHT_PX = 576;
-const PAGE_PT: [number, number] = [288, 432];
-/** ≈ 290 ppp : plus fin que la tête d'une imprimante thermique (203 / 300 ppp). */
-const PIXEL_RATIO = 3;
+import { useTicketPdf } from "@/components/ticket-pdf";
 
 /**
- * « Partager le PDF » — le bon en VRAI fichier PDF, une page 4 × 6 par ticket,
- * remis à la feuille de partage du téléphone.
+ * Les deux gestes du bon, côte à côte :
  *
- * Pourquoi pas `window.print()` : sur Android, la boîte d'impression ne
- * propose que « Enregistrer au format PDF », pas l'application de
- * l'imprimante d'étiquettes (4BARCODE) ; sur iPhone, une app installée
- * (PWA) n'imprime pas du tout. La feuille de partage, elle, montre
- * l'application de l'imprimante, WhatsApp, et « Imprimer » sur iPhone.
+ * - « Partager le PDF » — le fichier (une page 4 × 6 par ticket) remis à la
+ *   feuille de partage du téléphone : l'appli de l'imprimante d'étiquettes
+ *   (4BARCODE), WhatsApp, « Imprimer » sur iPhone. Sur ordinateur, il se
+ *   télécharge ;
+ * - « Imprimer » — la boîte d'impression, DIRECTEMENT. Elle imprime les mêmes
+ *   photos 4 × 6 que le PDF (voir `TicketFrame`), chacune ajustée à la page :
+ *   rien ne déborde, même quand le téléphone impose son propre papier.
  *
- * Chaque ticket (`[data-ticket]`) est PHOTOGRAPHIÉ tel que le navigateur
- * l'affiche, puis posé sur une page : l'arabe garde sa police et son sens
- * d'écriture, ce qu'une bibliothèque PDF qui écrit le texte gère mal.
- *
- * Le PDF se prépare DÈS L'OUVERTURE de la page : Safari refuse d'ouvrir la
- * feuille de partage si le toucher remonte à plus d'un instant — il faut que
- * le fichier soit déjà prêt quand on appuie.
+ * Les deux attendent que les photos soient prêtes (une seconde à l'ouverture) :
+ * c'est ce qui garantit que l'aperçu, le PDF et le papier sont identiques.
  */
-export function TicketActions({ fileName }: { fileName: string }) {
+export function TicketActions() {
   const t = useTranslations("print");
-  const { file, failed } = useTicketPdf(fileName);
+  const { file, images, failed } = useTicketPdf();
+  const ready = Boolean(file && images);
 
   async function share() {
     if (!file) return;
@@ -54,182 +43,27 @@ export function TicketActions({ fileName }: { fileName: string }) {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
+  const spinner = <Loader2 className="size-4 animate-spin" aria-hidden />;
+
   return (
     <>
       {!failed && (
-        <Button type="button" onClick={share} disabled={!file} className="h-11">
-          {file ? (
-            <Share2 className="size-4" aria-hidden />
-          ) : (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          )}
-          {file ? t("share") : t("preparing")}
+        <Button type="button" onClick={share} disabled={!ready} className="h-11">
+          {ready ? <Share2 className="size-4" aria-hidden /> : spinner}
+          {ready ? t("share") : t("preparing")}
         </Button>
       )}
+      {/* Photos ratées : on imprime quand même, la page elle-même. */}
       <Button
         type="button"
         variant="outline"
-        onClick={() => (file && isPhone() ? share() : printTickets(file))}
+        onClick={() => window.print()}
+        disabled={!ready && !failed}
         className="h-11"
       >
-        <Printer className="size-4" aria-hidden />
+        {ready || failed ? <Printer className="size-4" aria-hidden /> : spinner}
         {t("print")}
       </Button>
     </>
   );
-}
-
-/**
- * Téléphone ou tablette. Là, « Imprimer » passe AUSSI par le PDF partagé :
- * Chrome sur Android ignore le format 4 × 6 de la page et imprime une feuille
- * A4 (avec l'adresse en pied de page) que l'appli de l'imprimante d'étiquettes
- * réduit ensuite — un texte minuscule, de travers, étalé sur trois étiquettes.
- */
-function isPhone() {
-  const ua = navigator.userAgent;
-  // Un iPad se présente comme un Mac : on le reconnaît à son écran tactile.
-  return (
-    /Mobi|Android|iPhone|iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
-  );
-}
-
-/**
- * « Imprimer » sur ordinateur — le PDF 4 × 6 lui-même quand le navigateur sait
- * l'afficher (Chrome, Edge, Firefox) : l'imprimante reçoit des pages de
- * 4 × 6 pouces, quels que soient les réglages de papier et de marges de la
- * boîte d'impression. Sinon, ou si le PDF n'a pas pu se préparer,
- * l'impression de la page, elle aussi réglée à 4 × 6.
- */
-function printTickets(file: File | null) {
-  const ua = navigator.userAgent;
-  const inlinePdf = file && navigator.pdfViewerEnabled && /Chrome|Edg|Firefox/.test(ua);
-  if (!inlinePdf) {
-    window.print();
-    return;
-  }
-
-  const url = URL.createObjectURL(file);
-  const frame = document.createElement("iframe");
-  Object.assign(frame.style, { position: "fixed", width: "0", height: "0", border: "0" });
-  frame.src = url;
-  frame.onload = () => {
-    try {
-      frame.contentWindow?.focus();
-      frame.contentWindow?.print();
-    } catch {
-      window.print();
-    }
-    // La boîte d'impression est modale ailleurs, pas dans un PDF intégré :
-    // on laisse une minute avant de tout retirer.
-    setTimeout(() => {
-      frame.remove();
-      URL.revokeObjectURL(url);
-    }, 60_000);
-  };
-  document.body.appendChild(frame);
-}
-
-/** Le PDF du bon, préparé une fois à l'ouverture et partagé par les deux boutons. */
-function useTicketPdf(fileName: string): { file: File | null; failed: boolean } {
-  const [file, setFile] = useState<File | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    buildPdf(fileName)
-      .then((built) => !cancelled && setFile(built))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [fileName]);
-
-  return { file, failed };
-}
-
-async function buildPdf(fileName: string): Promise<File> {
-  const [{ toCanvas }, { PDFDocument }] = await Promise.all([
-    import("html-to-image"),
-    import("pdf-lib"),
-  ]);
-
-  // Polices (l'arabe) et images (le logo) chargées, sinon le ticket sortirait
-  // sans logo, dans la police de secours.
-  await document.fonts.ready;
-  await Promise.all(
-    Array.from(document.images).map((img) =>
-      img.complete ? undefined : img.decode().catch(() => undefined),
-    ),
-  );
-
-  const pdf = await PDFDocument.create();
-  pdf.setTitle(fileName);
-
-  for (const ticket of Array.from(document.querySelectorAll<HTMLElement>("[data-ticket]"))) {
-    const canvas = await snapshot(ticket, toCanvas);
-    const bytes = await new Promise<ArrayBuffer>((resolve, reject) =>
-      canvas.toBlob(
-        (blob) => (blob ? blob.arrayBuffer().then(resolve, reject) : reject(new Error("toBlob"))),
-        "image/jpeg",
-        0.92,
-      ),
-    );
-    const image = await pdf.embedJpg(bytes);
-    const page = pdf.addPage(PAGE_PT);
-    // La photo fait pile 4 × 6 (texte déjà ajusté) : elle couvre la page.
-    page.drawImage(image, { x: 0, y: 0, width: PAGE_PT[0], height: PAGE_PT[1] });
-  }
-
-  const bytes = await pdf.save();
-  return new File([bytes as BlobPart], `${fileName}.pdf`, { type: "application/pdf" });
-}
-
-/**
- * Photographie un ticket à la largeur EXACTE du papier (4 pouces), quelle que
- * soit la largeur de l'écran : sur un téléphone, le ticket affiché est plus
- * étroit. On en pose donc une copie hors de l'écran, au bon gabarit, dans le
- * même parent — elle hérite de la langue, du sens et des polices.
- */
-async function snapshot(
-  ticket: HTMLElement,
-  toCanvas: typeof import("html-to-image").toCanvas,
-): Promise<HTMLCanvasElement> {
-  const copy = ticket.cloneNode(true) as HTMLElement;
-  copy.removeAttribute("data-ticket");
-  Object.assign(copy.style, {
-    position: "fixed",
-    top: "0",
-    left: "-10000px",
-    width: `${WIDTH_PX}px`,
-    height: `${HEIGHT_PX}px`,
-    maxWidth: "none",
-    margin: "0",
-    border: "0",
-    borderRadius: "0",
-    // À l'écran, la feuille est réduite pour tenir sur le téléphone : pas la copie.
-    scale: "none",
-  });
-  ticket.parentElement!.appendChild(copy);
-  try {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    fitTicket(copy);
-    const options = {
-      width: WIDTH_PX,
-      height: HEIGHT_PX,
-      pixelRatio: PIXEL_RATIO,
-      backgroundColor: "#ffffff",
-      // Sans lui, deux images qui ne diffèrent que par `?url=…` (le cas de
-      // `/_next/image`) partagent la même entrée de cache : le 2ᵉ logo
-      // devenait le 1ᵉʳ.
-      includeQueryParams: true,
-      // La copie est hors de l'écran : dans l'image, elle se pose à l'origine.
-      style: { position: "static", left: "auto", scale: "none" },
-    };
-    // Safari n'intègre les images et les polices qu'au DEUXIÈME passage : le
-    // premier sert d'échauffement.
-    await toCanvas(copy, options);
-    return await toCanvas(copy, options);
-  } finally {
-    copy.remove();
-  }
 }
