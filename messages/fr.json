@@ -213,6 +213,7 @@
       "stepUp": "Plus {step}"
     },
     "callNamed": "Appeler {name}",
+    "printNamed": "Bon de location de {name}",
     "messageNamed": "Envoyer un SMS à {name}",
     "messageCustomer": "Envoyer un SMS",
     "checkedToast": "{label} — {name}",

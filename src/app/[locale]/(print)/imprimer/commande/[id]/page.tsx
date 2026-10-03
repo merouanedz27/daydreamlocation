@@ -194,6 +194,12 @@ export default async function OrderSlipPage({
         action={<TicketShare fileName={`${t("print.slipTitle")} ${order.order_no}`} />}
       />
 
+      {/* Le format 4 × 6 posé sur TOUT le document, pas seulement sur la page
+          nommée `ticket` : Chrome sur Android ignorait la page nommée et
+          imposait ses marges (et l'URL en pied de page). Rendu dans la page,
+          ce `@page` vient après celui de globals.css et l'emporte. */}
+      <style>{"@page { size: 4in 6in; margin: 4mm; }"}</style>
+
       <div className="space-y-4 print:space-y-0">
         {/* --- Ticket du CLIENT ------------------------------------------- */}
         <PrintSheet data-ticket className={TICKET}>
@@ -204,12 +210,12 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             sizes="260px"
-            className="mx-auto h-auto w-[80mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[70mm] [print-color-adjust:exact]"
           />
 
           {/* Téléphone et conditions en GRAS, comme sur son modèle. */}
           {(shopPhone || terms) && (
-            <div className="mt-3 space-y-1 text-center text-[10pt] leading-snug font-bold">
+            <div className="mt-2 space-y-0.5 text-center text-[9pt] leading-snug font-bold">
               {shopPhone && (
                 <p>
                   {t("print.ticket.shopPhone")}{" "}
@@ -228,7 +234,7 @@ export default async function OrderSlipPage({
 
           {cancelledBanner}
 
-          <TicketRows rows={[...clientRows, ...money]} className="mt-3 text-[11pt]" />
+          <TicketRows rows={[...clientRows, ...money]} className="mt-2 text-[10.5pt]" />
         </PrintSheet>
 
         {/* --- Ticket du COSTUME : sans argent ----------------------------
@@ -240,10 +246,10 @@ export default async function OrderSlipPage({
             src={suit}
             alt=""
             sizes="96px"
-            className="mx-auto h-auto w-[38mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[28mm] [print-color-adjust:exact]"
           />
           {cancelledBanner}
-          <TicketRows rows={costumeRows} className="mt-2 text-[13pt]" />
+          <TicketRows rows={costumeRows} className="mt-2 text-[12pt]" />
         </PrintSheet>
       </div>
     </>
@@ -254,20 +260,19 @@ export default async function OrderSlipPage({
  * Une feuille 4 × 6 pouces par ticket (page nommée `ticket`, globals.css), à
  * l'écran comme sur le papier. Mise en page de son modèle « Daydream Ticket » :
  * Arial, chaque ligne CENTRÉE, « **Libellé :** valeur ». Les tailles du modèle
- * (page Letter de 8,5 po) sont ramenées à 4 po de large — × 0,47, arrondi vers
- * le haut pour rester lisible : 26 pt → 17 pt, 20 pt → 13 pt, 16 pt → 11 pt.
- * Le contenu est CENTRÉ sur la feuille ; `justify-center-safe` le recolle en
- * haut s'il dépasse, pour que ce soit le bas — jamais l'en-tête — qui se coupe.
+ * (page Letter de 8,5 po) sont ramenées à 4 po de large, puis réduites pour
+ * qu'un ticket tienne en ~105 mm : 26 pt → 15 pt, 20 pt → 12 pt, 16 pt → 10,5 pt.
  */
 const TICKET = cn(
   "print-ticket flex max-w-[4in] min-h-[6in] flex-col justify-center-safe p-[4mm] sm:p-[4mm]",
   // Arial comme son modèle ; l'arabe retombe sur Cairo si Arial n'a pas les glyphes.
   "font-[family-name:Arial,Helvetica,var(--font-cairo),sans-serif]",
-  // À l'impression, HAUTEUR FIXE et rien ne déborde : un ticket trop long se
-  // coupait sur une 2ᵉ page, puis une 3ᵉ. Deux tickets = deux pages, point.
-  // 140 mm et non les 144,4 de la zone imprimable (152,4 − 2 × 4 mm) : à la
-  // hauteur exacte, l'arrondi du navigateur poussait parfois une page blanche.
-  "print:min-h-0 print:h-[140mm] print:overflow-hidden print:break-inside-avoid",
+  // À l'impression : JAMAIS plus haut que 125 mm. Testé sur l'étiqueteuse :
+  // un ticket de 140 mm débordait sur l'étiquette suivante dès que le
+  // téléphone imposait ses propres marges (~1 cm) au lieu des 4 mm demandés.
+  // 125 mm tient même avec ces marges ; le contenu (~105 mm) y est centré, et
+  // rien ne passe jamais sur une 3ᵉ étiquette. Deux tickets = deux pages.
+  "print:min-h-0 print:h-[125mm] print:overflow-hidden print:break-inside-avoid",
 );
 
 type RowStyle = { big?: boolean; underline?: boolean; bullet?: boolean };
@@ -275,14 +280,14 @@ type Row = RowStyle & { label: string; value: string | null };
 
 /**
  * « **Libellé :** valeur », une ligne centrée par champ ; un champ vide garde
- * son libellé, comme sur son modèle. `big` = 17 pt, `underline` souligne le
+ * son libellé, comme sur son modèle. `big` = 15 pt, `underline` souligne le
  * libellé, `bullet` le précède d'un ●.
  */
 function TicketRows({ rows, className }: { rows: Row[]; className?: string }) {
   return (
     <div className={cn("space-y-0.5 text-center leading-tight", className)}>
       {rows.map(({ label, value, big, underline, bullet }) => (
-        <p key={label} className={cn(big && "text-[17pt]")}>
+        <p key={label} className={cn(big && "text-[15pt]")}>
           {bullet && <span aria-hidden>● </span>}
           <b className={cn(underline && "underline decoration-2 underline-offset-2")}>{label}</b>
           {value && (

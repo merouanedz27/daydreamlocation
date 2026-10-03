@@ -213,6 +213,7 @@
       "stepUp": "زائد {step}"
     },
     "callNamed": "الاتصال بـ {name}",
+    "printNamed": "وصل الكراء لـ {name}",
     "messageNamed": "إرسال رسالة نصية إلى {name}",
     "messageCustomer": "رسالة نصية",
     "checkedToast": "{label} — {name}",

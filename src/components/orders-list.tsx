@@ -12,6 +12,7 @@ import {
   CircleCheck,
   Plane,
   Plus,
+  Printer,
   Trash2,
   X,
 } from "lucide-react";
@@ -380,6 +381,14 @@ export function OrdersList({
               )}
             >
               {order.customer_name}
+            </Link>
+            {/* Le bon de location en un toucher, sans passer par la fiche. */}
+            <Link
+              href={`/imprimer/commande/${order.id}`}
+              aria-label={t("orders.printNamed", { name: order.customer_name })}
+              className="press text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted ms-1 flex size-9 shrink-0 items-center justify-center rounded-full"
+            >
+              <Printer className="size-4" aria-hidden />
             </Link>
           </div>
         );
