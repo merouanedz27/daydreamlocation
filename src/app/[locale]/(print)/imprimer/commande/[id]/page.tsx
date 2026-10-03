@@ -5,12 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
 import { TicketFrame } from "@/components/ticket-fit";
-import {
-  getOrder,
-  getOrderCatalogue,
-  getLabelSlots,
-  getSettings,
-} from "@/lib/queries/orders";
+import { getOrder, getOrderCatalogue, getLabelSlots, getSettings } from "@/lib/queries/orders";
 import { draftFromOrder, type Slot } from "@/lib/quick-draft";
 import { normalizeSearch } from "@/lib/search";
 import { defaultWindow } from "@/lib/rental-range";
@@ -123,13 +118,19 @@ export default async function OrderSlipPage({
     tailor: draft.tailor || null,
     shirt: piece(shirt),
     shoes: piece(shoes),
-    accessories: [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
+    accessories:
+      [accessory, ...others]
+        .map((s) => piece(s))
+        .filter(Boolean)
+        .join(" · ") || null,
   };
-  const row = (key: string, style: RowStyle = {}): Row => ({
-    label: label(`print.ticket.${key}`),
-    value: values[key],
-    ...style,
-  });
+  // Une pièce absente de la commande (pas de chaussures, pas de tailleur) ne
+  // prend pas de ligne : sur 4 × 6, chaque ligne vide rapetisse tout le texte.
+  // Le client, son numéro et la date restent toujours.
+  const row = (key: string, style: RowStyle = {}): Row[] =>
+    values[key] || ["customer", "phone", "date"].includes(key)
+      ? [{ label: label(`print.ticket.${key}`), value: values[key], ...style }]
+      : [];
 
   // Les mêmes champs, mis en page comme les DEUX pages de son modèle Word :
   // le client lit d'abord son nom et la date ; l'équipe, devant le cintre,
@@ -145,7 +146,7 @@ export default async function OrderSlipPage({
     row("shirt"),
     row("shoes"),
     row("accessories"),
-  ];
+  ].flat();
   const costumeRows = [
     row("customer", { big: true, underline: true }),
     row("phone"),
@@ -157,7 +158,7 @@ export default async function OrderSlipPage({
     row("shirt", { bullet: true }),
     row("shoes", { bullet: true }),
     row("accessories", { bullet: true }),
-  ];
+  ].flat();
 
   // VERS / PRIX / REST : trois lignes de plus, comme sur son modèle.
   const balance = order.balance ?? 0;
@@ -216,7 +217,7 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             unoptimized
-            className="mx-auto h-auto w-[70mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[60mm] [print-color-adjust:exact]"
           />
 
           {/* Téléphone et avertissements en GRAS, comme sur son modèle. */}
@@ -274,9 +275,9 @@ type RowStyle = { big?: boolean; underline?: boolean; bullet?: boolean };
 type Row = RowStyle & { label: string; value: string | null };
 
 /**
- * « **Libellé :** valeur », une ligne centrée par champ ; un champ vide garde
- * son libellé, comme sur son modèle. `big` = 1,4 fois la taille courante, `underline` souligne le
- * libellé, `bullet` le précède d'un ●.
+ * « **Libellé :** valeur », une ligne centrée par champ (le client, son
+ * numéro et la date gardent leur libellé même vides). `big` = 1,4 fois la
+ * taille courante, `underline` souligne le libellé, `bullet` le précède d'un ●.
  */
 function TicketRows({ rows, className }: { rows: Row[]; className?: string }) {
   return (

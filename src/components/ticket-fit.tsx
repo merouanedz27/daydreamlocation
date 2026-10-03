@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const TICKET_WIDTH_PX = 384;
 
 /** Le texte part de ce facteur et descend jusqu'à ce que tout tienne. */
-const FIT_MAX = 1.35;
+const FIT_MAX = 1.8;
 const FIT_MIN = 0.6;
 const FIT_STEP = 0.95;
 /** Quelques px de marge : le moteur d'impression arrondit autrement que l'écran. */

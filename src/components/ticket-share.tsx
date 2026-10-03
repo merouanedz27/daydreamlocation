@@ -66,7 +66,12 @@ export function TicketActions({ fileName }: { fileName: string }) {
           {file ? t("share") : t("preparing")}
         </Button>
       )}
-      <Button type="button" variant="outline" onClick={() => printTickets(file)} className="h-11">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => (file && isPhone() ? share() : printTickets(file))}
+        className="h-11"
+      >
         <Printer className="size-4" aria-hidden />
         {t("print")}
       </Button>
@@ -75,19 +80,29 @@ export function TicketActions({ fileName }: { fileName: string }) {
 }
 
 /**
- * « Imprimer » — le PDF 4 × 6 lui-même quand le navigateur sait l'afficher
- * (Chrome, Edge, Firefox sur ordinateur) : l'imprimante reçoit des pages de
+ * Téléphone ou tablette. Là, « Imprimer » passe AUSSI par le PDF partagé :
+ * Chrome sur Android ignore le format 4 × 6 de la page et imprime une feuille
+ * A4 (avec l'adresse en pied de page) que l'appli de l'imprimante d'étiquettes
+ * réduit ensuite — un texte minuscule, de travers, étalé sur trois étiquettes.
+ */
+function isPhone() {
+  const ua = navigator.userAgent;
+  // Un iPad se présente comme un Mac : on le reconnaît à son écran tactile.
+  return (
+    /Mobi|Android|iPhone|iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
+ * « Imprimer » sur ordinateur — le PDF 4 × 6 lui-même quand le navigateur sait
+ * l'afficher (Chrome, Edge, Firefox) : l'imprimante reçoit des pages de
  * 4 × 6 pouces, quels que soient les réglages de papier et de marges de la
- * boîte d'impression. Ailleurs (Android, iPhone), l'impression de la page,
- * elle aussi réglée à 4 × 6.
+ * boîte d'impression. Sinon, ou si le PDF n'a pas pu se préparer,
+ * l'impression de la page, elle aussi réglée à 4 × 6.
  */
 function printTickets(file: File | null) {
   const ua = navigator.userAgent;
-  const inlinePdf =
-    file &&
-    navigator.pdfViewerEnabled &&
-    /Chrome|Edg|Firefox/.test(ua) &&
-    !/Mobi|Android/.test(ua);
+  const inlinePdf = file && navigator.pdfViewerEnabled && /Chrome|Edg|Firefox/.test(ua);
   if (!inlinePdf) {
     window.print();
     return;
