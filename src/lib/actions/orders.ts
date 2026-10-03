@@ -240,7 +240,12 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   // puis soit ouvrir la fiche, soit rester sur place pour la commande suivante.
   if (formData.get("return_id") === "1") return { ok: true, id: Number(orderId) };
 
-  redirectTo(`/commandes/${orderId}`, locale);
+  // « Enregistrer » : retour à la LISTE, par une redirection DE L'ACTION et
+  // non un `router.push` du client. Next renvoie alors la liste déjà rendue
+  // dans la MÊME réponse — un seul aller-retour. Sans elle, `revalidatePath`
+  // faisait re-rendre la page de saisie (catalogue, suggestions…) pour rien,
+  // puis le client repartait chercher la page suivante : deux allers-retours.
+  redirectTo("/commandes", locale);
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { flushSync } from "react-dom";
-import { useParams } from "next/navigation";
+import { unstable_rethrow, useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
@@ -191,7 +191,11 @@ export function OrderQuickForm({
   // En modification, un brouillon EN MÉMOIRE parti de la commande : le
   // brouillon de nouvelle commande gardé dans le téléphone n'est pas touché.
   const [store] = useState(() => (edit ? createMemoryStore(edit.initial) : draftStore));
-  const draft = store.useValue();
+  // Pendant l'envoi d'une nouvelle commande, la saisie affichée est figée
+  // (voir `onSubmit`) : le brouillon stocké est déjà vidé.
+  const [frozen, setFrozen] = useState<QuickDraft | null>(null);
+  const live = store.useValue();
+  const draft = frozen ?? live;
 
   function updateDraft(patch: Partial<QuickDraft>) {
     store.set(withAutoPrice({ ...store.get(), ...patch }));
@@ -582,7 +586,11 @@ export function OrderQuickForm({
     setGeneralError(null);
     const formData = new FormData();
     formData.set("locale", locale);
-    formData.set("return_id", "1");
+    // « Enregistrer » d'une NOUVELLE commande : l'action redirige elle-même
+    // vers la liste (un seul aller-retour). Les autres cas restent sur place
+    // ou choisissent leur page : ils veulent le résultat.
+    const redirects = !edit && !another;
+    if (!redirects) formData.set("return_id", "1");
     if (edit) formData.set("id", String(edit.orderId));
     formData.set("customer_name", draft.customerName);
     formData.set("customer_phone", draft.customerPhone);
@@ -598,8 +606,37 @@ export function OrderQuickForm({
     formData.set("lines", JSON.stringify(toPayload(lines)));
     const name = draft.customerName.trim();
 
+    // Le brouillon du téléphone est vidé TOUT DE SUITE : la redirection
+    // démonte le formulaire, il n'y aurait plus de « après » pour le faire.
+    // L'écran, lui, garde la saisie figée pendant l'envoi, et tout revient
+    // si le serveur refuse.
+    const saved = redirects ? store.get() : null;
+    if (saved) {
+      setFrozen(saved);
+      store.set(EMPTY_DRAFT);
+    }
+
     startTransition(async () => {
-      const result = await (edit ? updateOrder(formData) : createOrder(formData));
+      const restore = () => {
+        if (!saved) return;
+        store.set(saved);
+        setFrozen(null);
+      };
+      let result: Awaited<ReturnType<typeof createOrder>>;
+      try {
+        result = await (edit ? updateOrder(formData) : createOrder(formData));
+      } catch (error) {
+        // La redirection de l'action passe par ici sous forme d'erreur
+        // spéciale de Next : on la laisse filer, la liste s'affiche.
+        unstable_rethrow(error);
+        // Réseau coupé : la saisie n'est pas perdue.
+        restore();
+        setGeneralError({ key: "errors.generic" });
+        return;
+      }
+      // Redirigé : la liste s'affiche, rien d'autre à faire ici.
+      if (!result) return;
+      if (!result.ok) restore();
 
       if (result.ok && edit) {
         toast.success(t("orders.edit.savedToast", { name }));
@@ -608,12 +645,8 @@ export function OrderQuickForm({
       }
       if (result.ok) {
         const href = `/commandes/${result.id}`;
-        if (!another) {
-          reset(false);
-          router.push(href);
-          return;
-        }
-        // Même mariage, client suivant : on garde la date.
+        // « Enregistrer » seul est redirigé par l'action : ici, c'est
+        // « + Autre » — même mariage, client suivant : on garde la date.
         reset(true);
         toast.success(t("orders.quick.savedToast", { name }), {
           action: { label: t("orders.quick.view"), onClick: () => router.push(href) },
