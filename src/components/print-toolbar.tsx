@@ -64,10 +64,10 @@ export function PrintToolbar({
       </div>
 
       {/* Le document a ses PROPRES boutons (le bon : Partager / Imprimer) :
-          sur leur ligne, pleine largeur, moitié-moitié — à 390 px, à côté du
-          retour et de la langue, ils débordaient de l'écran. */}
+          sur leur ligne — à 390 px, à côté du retour et de la langue, ils
+          débordaient de l'écran. Le dernier prend la place qui reste. */}
       {!printButton && action && (
-        <div className="mt-2 grid grid-cols-2 gap-2 [&>*]:w-full">{action}</div>
+        <div className="mt-2 flex gap-2 [&>*:last-child]:flex-1">{action}</div>
       )}
 
       {children && <div className="mt-3">{children}</div>}

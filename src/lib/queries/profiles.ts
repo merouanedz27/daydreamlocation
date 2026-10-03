@@ -43,9 +43,10 @@ export type NotificationMember = {
 };
 
 /**
- * L'équipe ACTIVE et ses préférences d'e-mail, pour l'écran Notifications.
- * Même garde que `getTeam` : `profiles_read` ne montre tout qu'à un
- * administrateur, la page ajoute `requireOwner`.
+ * Les administrateurs ACTIFS et leurs préférences d'e-mail, pour l'écran
+ * Notifications : seuls eux reçoivent des e-mails (`getRecipients`), un membre
+ * `staff` n'y figure donc pas. Même garde que `getTeam` : `profiles_read` ne
+ * montre tout qu'à un administrateur, la page ajoute `requireOwner`.
  */
 export async function getNotificationTeam(): Promise<NotificationMember[]> {
   const supabase = await createClient();
@@ -54,6 +55,7 @@ export async function getNotificationTeam(): Promise<NotificationMember[]> {
     .from("profiles")
     .select("id, full_name, email, is_active, notify_new_order, notify_daily, email_locale")
     .eq("is_active", true)
+    .eq("role", "owner")
     .order("full_name");
 
   if (error) throw error;

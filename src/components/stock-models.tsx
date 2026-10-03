@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -7,6 +8,7 @@ import { Shirt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link, useRouter } from "@/i18n/navigation";
 import { sheet } from "@/components/sheet-table";
+import { StockModelMenu, type MenuModel } from "@/components/stock-model-menu";
 import { ViewToggle, type ListView } from "@/components/view-toggle";
 import { createDeviceSetting } from "@/lib/device-setting";
 import { CURRENCY_SUFFIX, formatMoney, formatNumber } from "@/lib/format";
@@ -37,17 +39,79 @@ const viewSetting = createDeviceSetting<ListView>({
   sanitize: (value) => (value === "list" || value === "table" ? value : null),
 });
 
+/** Durée de l'appui long, comme la sélection de la liste des commandes. */
+const HOLD_MS = 500;
+
+/**
+ * Appui long sur un modèle → son menu (administrateur seulement). Le doigt
+ * qui glisse fait défiler la liste : au-delà de quelques pixels, ce n'est plus
+ * un appui. Le « clic » du relâché qui suit un appui long est avalé, sinon il
+ * ouvrirait la fiche sous le menu. Sur ordinateur, le clic droit fait pareil.
+ */
+function useHold(enabled: boolean, onHold: (model: StockModelRow) => void) {
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
+  const held = useRef(false);
+
+  const cancel = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+
+  return (model: StockModelRow) =>
+    enabled
+      ? {
+          onPointerDown: (e: React.PointerEvent) => {
+            if (e.pointerType === "mouse") return;
+            cancel();
+            held.current = false;
+            const timer = window.setTimeout(() => {
+              press.current = null;
+              held.current = true;
+              navigator.vibrate?.(30);
+              onHold(model);
+            }, HOLD_MS);
+            press.current = { timer, x: e.clientX, y: e.clientY };
+          },
+          onPointerMove: (e: React.PointerEvent) => {
+            const p = press.current;
+            if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) cancel();
+          },
+          onPointerUp: cancel,
+          onPointerCancel: cancel,
+          onContextMenu: (e: React.MouseEvent) => {
+            // Le menu natif (« Ouvrir dans un onglet »…) cède la place au nôtre.
+            e.preventDefault();
+            if (!held.current) onHold(model);
+          },
+          onClickCapture: (e: React.MouseEvent) => {
+            if (held.current) {
+              held.current = false;
+              e.preventDefault();
+              e.stopPropagation();
+            }
+          },
+        }
+      : {};
+}
+
 export function StockModels({
   models,
   archived,
+  canEdit,
 }: {
   models: StockModelRow[];
   archived: boolean;
+  /** Administrateur : l'appui long ouvre le menu du modèle. */
+  canEdit: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
   const { locale } = useParams<{ locale: Locale }>();
   const view = viewSetting.useValue();
+  const [menu, setMenu] = useState<MenuModel | null>(null);
+  const hold = useHold(canEdit, (m) => setMenu({ id: m.id, name: m.name, ref: m.ref }));
+  // Pas de loupe ni de menu « copier le lien » d'iOS sous le doigt qui appuie.
+  const holdable = canEdit && "select-none [-webkit-touch-callout:none]";
 
   return (
     <>
@@ -64,7 +128,11 @@ export function StockModels({
             <li key={model.id}>
               <Link
                 href={`/stock/${model.id}`}
-                className="press border-border bg-card hover:border-gold-strong active:border-gold-strong flex [--press-scale:0.98] gap-3 rounded-lg border p-3"
+                {...hold(model)}
+                className={cn(
+                  "press border-border bg-card hover:border-gold-strong active:border-gold-strong flex [--press-scale:0.98] gap-3 rounded-lg border p-3",
+                  holdable,
+                )}
               >
                 {/* Vignette carrée : sans photo, une icône plutôt qu'un trou. */}
                 <div className="bg-muted relative size-20 shrink-0 overflow-hidden rounded-md">
@@ -146,11 +214,12 @@ export function StockModels({
                    cellule (même principe que le tableau des commandes). */
                 <tr
                   key={model.id}
+                  {...hold(model)}
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest("a,button")) return;
                     router.push(`/stock/${model.id}`, { locale });
                   }}
-                  className={sheet.row}
+                  className={cn(sheet.row, holdable)}
                 >
                   <td className={cn(sheet.td, "text-start md:whitespace-nowrap")}>
                     <Link href={`/stock/${model.id}`} className={sheet.rowLink}>
@@ -188,6 +257,10 @@ export function StockModels({
             </tbody>
           </table>
         </div>
+      )}
+
+      {canEdit && (
+        <StockModelMenu model={menu} archived={archived} onClose={() => setMenu(null)} />
       )}
     </>
   );

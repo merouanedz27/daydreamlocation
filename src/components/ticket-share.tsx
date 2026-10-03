@@ -48,9 +48,18 @@ export function TicketActions() {
   return (
     <>
       {!failed && (
-        <Button type="button" onClick={share} disabled={!ready} className="h-11">
-          {ready ? <Share2 className="size-4" aria-hidden /> : spinner}
-          {ready ? t("share") : t("preparing")}
+        // Icône seule : à 390 px, le libellé prenait la place d'« Imprimer ».
+        // Le nom reste lu par les lecteurs d'écran et affiché au survol.
+        <Button
+          type="button"
+          size="icon"
+          onClick={share}
+          disabled={!ready}
+          title={ready ? t("share") : t("preparing")}
+          className="size-11 shrink-0"
+        >
+          {ready ? <Share2 className="size-5" aria-hidden /> : spinner}
+          <span className="sr-only">{ready ? t("share") : t("preparing")}</span>
         </Button>
       )}
       {/* Photos ratées : on imprime quand même, la page elle-même. */}

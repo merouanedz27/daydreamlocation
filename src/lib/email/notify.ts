@@ -10,7 +10,7 @@ import { ticketFields } from "@/lib/ticket-fields";
 import type { Locale } from "@/i18n/routing";
 
 /*
- * Les trois e-mails de l'équipe. Les destinataires se lisent avec le client
+ * Les trois e-mails, aux SEULS administrateurs. Les destinataires se lisent avec le client
  * ADMIN : le résumé du soir part d'une tâche planifiée, sans session, et un
  * membre `staff` qui saisit une commande ne voit pas les profils des autres
  * (`profiles_read`). Seuls nom, adresse, langue et préférences sont lus.
@@ -28,13 +28,18 @@ export type Recipient = {
 
 type Flag = "notify_new_order" | "notify_daily";
 
-/** Les membres ACTIFS qui ont une adresse — et, le cas échéant, la case cochée. */
+/**
+ * Les ADMINISTRATEURS actifs qui ont une adresse — et, le cas échéant, la case
+ * cochée. Un membre `staff` ne reçoit JAMAIS d'e-mail, quelle que soit sa
+ * case : c'est le choix du propriétaire (et le coût de l'envoi reste bas).
+ */
 export async function getRecipients(flag?: Flag): Promise<Recipient[]> {
   const admin = createAdminClient();
   let request = admin
     .from("profiles")
     .select("id, full_name, email, email_locale")
     .eq("is_active", true)
+    .eq("role", "owner")
     .not("email", "is", null);
   if (flag) request = request.eq(flag, true);
   const { data, error } = await request.order("full_name");
@@ -109,7 +114,9 @@ ${
         .map(
           ([label, href], i) =>
             `<a href="${escapeHtml(href)}" style="display:inline-block;margin:0 0 8px;margin-inline-end:8px;text-decoration:none;padding:10px 16px;border-radius:6px;font-size:15px;${
-              i === 0 ? "background:#1c1917;color:#ffffff" : "border:1px solid #1c1917;color:#1c1917"
+              i === 0
+                ? "background:#1c1917;color:#ffffff"
+                : "border:1px solid #1c1917;color:#1c1917"
             }">${escapeHtml(label)}</a>`,
         )
         .join("")}</p>`
@@ -124,7 +131,10 @@ ${
     parts.intro,
     ...lines.map(([l, v]) => `${l} ${v}`),
     ...(parts.table ?? []).map(([l, v]) => `${l} ${v ?? ""}`),
-    parts.body?.replace(/<br>|<\/li>/g, "\n").replace(/<[^>]+>/g, "").trim(),
+    parts.body
+      ?.replace(/<br>|<\/li>/g, "\n")
+      .replace(/<[^>]+>/g, "")
+      .trim(),
     ...(parts.links ?? []).map(([l, href]) => `${l} : ${href}`),
     "",
     parts.footer,

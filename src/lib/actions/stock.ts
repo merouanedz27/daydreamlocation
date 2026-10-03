@@ -288,40 +288,40 @@ export async function deleteModel(formData: FormData): Promise<ActionResult> {
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
 
-  const supabase = await createClient();
+  const outcome = await eraseModel(await createClient(), id);
+  if (outcome !== "deleted") {
+    return { ok: false, error: outcome === "inUse" ? "errors.modelInUse" : "errors.generic" };
+  }
 
+  revalidatePath(`/${locale}/stock`);
+  redirectTo("/stock", locale);
+}
+
+/**
+ * Efface un modèle et ses pièces — ou dit pourquoi c'est impossible.
+ * Partagé par la fiche (`deleteModel`) et l'appui long du catalogue
+ * (`removeModel`).
+ */
+async function eraseModel(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  id: number,
+): Promise<"deleted" | "inUse" | "error"> {
   const { data: model } = await supabase
     .from("article_models")
     .select("photo_path")
     .eq("id", id)
     .single();
 
-  if (!model) return { ok: false, error: "errors.generic" };
+  if (!model) return "error";
 
   const { error: unitsError } = await supabase
     .from("article_units")
     .delete()
     .eq("model_id", id);
-
-  if (unitsError) {
-    return {
-      ok: false,
-      error:
-        unitsError.code === FOREIGN_KEY_VIOLATION
-          ? "errors.modelInUse"
-          : "errors.generic",
-    };
-  }
+  if (unitsError) return unitsError.code === FOREIGN_KEY_VIOLATION ? "inUse" : "error";
 
   const { error } = await supabase.from("article_models").delete().eq("id", id);
-
-  if (error) {
-    return {
-      ok: false,
-      error:
-        error.code === FOREIGN_KEY_VIOLATION ? "errors.modelInUse" : "errors.generic",
-    };
-  }
+  if (error) return error.code === FOREIGN_KEY_VIOLATION ? "inUse" : "error";
 
   // La photo ne part qu'APRÈS la ligne : un fichier orphelin ne coûte que
   // quelques kilo-octets, alors qu'une fiche pointant vers une image effacée
@@ -329,9 +329,42 @@ export async function deleteModel(formData: FormData): Promise<ActionResult> {
   if (model.photo_path) {
     await supabase.storage.from(PHOTO_BUCKET).remove([model.photo_path]);
   }
+  return "deleted";
+}
+
+/**
+ * « Supprimer » depuis le catalogue (appui long sur un modèle).
+ *
+ * Un modèle jamais loué est EFFACÉ. Un modèle déjà loué ne peut pas l'être —
+ * ses commandes passées le désignent, la base refuse (`on delete restrict`) :
+ * il est alors RETIRÉ du catalogue, ce qui le fait disparaître du stock et de
+ * la saisie sans toucher aux comptes. `retired` dit lequel des deux a eu lieu.
+ */
+export async function removeModel(
+  formData: FormData,
+): Promise<{ ok: true; retired: boolean } | { ok: false; error: string }> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const outcome = await eraseModel(supabase, id);
+  if (outcome === "error") return { ok: false, error: "errors.generic" };
+
+  if (outcome === "inUse") {
+    const { error } = await supabase
+      .from("article_models")
+      .update({ is_active: false })
+      .eq("id", id);
+    if (error) return { ok: false, error: "errors.generic" };
+  }
 
   revalidatePath(`/${locale}/stock`);
-  redirectTo("/stock", locale);
+  return { ok: true, retired: outcome === "inUse" };
 }
 
 /**

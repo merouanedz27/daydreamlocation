@@ -9,16 +9,15 @@ import { notificationPrefsSchema, teamMessageSchema } from "@/lib/validation/not
 import { routing, type Locale } from "@/i18n/routing";
 
 export type NotifyResult =
-  | { ok: true; sent?: number }
-  | { ok: false; error: string; field?: string };
+  { ok: true; sent?: number } | { ok: false; error: string; field?: string };
 
 function resolveLocale(value: unknown): Locale {
   return routing.locales.includes(value as Locale) ? (value as Locale) : routing.defaultLocale;
 }
 
 /**
- * Le message de l'administrateur, par e-mail, à toute l'équipe ou à quelques
- * membres. Le rôle est revérifié ICI : une Server Action est un point
+ * Le message de l'administrateur, par e-mail, à tous les administrateurs ou à quelques-uns
+ * d'entre eux. Le rôle est revérifié ICI : une Server Action est un point
  * d'entrée réseau à part entière, la page `requireOwner` ne suffit pas.
  */
 export async function sendTeamMessageAction(input: {

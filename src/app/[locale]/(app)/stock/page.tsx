@@ -128,7 +128,7 @@ export default async function StockPage({
           )}
         </div>
       ) : (
-        <StockModels models={rows} archived={archived} />
+        <StockModels models={rows} archived={archived} canEdit={canEdit} />
       )}
 
       {/* Unique porte d'entrée vers les modèles retirés. Discrète — et

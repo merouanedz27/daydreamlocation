@@ -39,11 +39,14 @@ export function fitTicket(el: HTMLElement) {
 
   let lo = FIT_MIN;
   let hi = FIT_MAX;
-  if (fits(hi)) return;
-  for (let i = 0; i < FIT_STEPS; i++) {
-    const mid = (lo + hi) / 2;
-    if (fits(mid)) lo = mid;
-    else hi = mid;
+  if (fits(hi)) {
+    lo = hi;
+  } else {
+    for (let i = 0; i < FIT_STEPS; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(mid)) lo = mid;
+      else hi = mid;
+    }
   }
   el.style.setProperty("--fit", lo.toFixed(3));
 }
