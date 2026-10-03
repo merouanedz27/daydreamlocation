@@ -512,8 +512,7 @@
     "saved": "Informations de la boutique enregistrées."
   },
   "print": {
-    "print": "Imprimer / PDF",
-    "pdfHint": "Pour envoyer le document au client, choisissez « Enregistrer au format PDF » comme imprimante.",
+    "print": "Imprimer",
     "slipButton": "Bon de location",
     "slipTitle": "Bon de location",
     "cancelled": "Commande annulée — ce bon n'est plus valable",

@@ -47,10 +47,14 @@ export async function generateMetadata(props: {
  */
 export default async function OrderSlipPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  /** `auto=1` : arrivé par le bouton « Bon de location », on imprime aussitôt. */
+  searchParams: Promise<{ auto?: string }>;
 }) {
   const { locale, id } = await params;
+  const { auto } = await searchParams;
   setRequestLocale(locale);
   const l = locale as Locale;
 
@@ -157,7 +161,7 @@ export default async function OrderSlipPage({
 
   return (
     <>
-      <PrintToolbar backHref={`/commandes/${order.id}`} hint={t("print.pdfHint")} />
+      <PrintToolbar backHref={`/commandes/${order.id}`} autoPrint={auto === "1"} />
 
       <div className="space-y-4 print:space-y-0">
         {/* --- Ticket du CLIENT ------------------------------------------- */}
@@ -174,7 +178,7 @@ export default async function OrderSlipPage({
           />
 
           {(shopPhone || terms) && (
-            <div className="mt-3 space-y-1 text-center text-xs leading-relaxed">
+            <div className="mt-3 space-y-1 text-center text-xs leading-relaxed print:mt-2 print:text-[8pt] print:leading-snug">
               {shopPhone && (
                 <p>
                   {t("print.ticket.shopPhone")}{" "}
@@ -226,8 +230,14 @@ export default async function OrderSlipPage({
  * l'écran, la même taille que le papier ; à l'impression, la hauteur suit le
  * contenu — une hauteur fixe risquerait de pousser une page blanche.
  */
-const TICKET =
-  "print-ticket flex max-w-[4in] min-h-[6in] flex-col p-[4mm] sm:p-[4mm] print:min-h-0";
+const TICKET = cn(
+  "print-ticket flex max-w-[4in] min-h-[6in] flex-col p-[4mm] sm:p-[4mm]",
+  // À l'impression, HAUTEUR FIXE = la page moins ses marges (152,4 − 2 × 4 mm),
+  // et rien ne déborde : un ticket trop long se coupait sur une 2ᵉ page, puis
+  // une 3ᵉ — cinq feuilles pour deux tickets. Deux tickets = deux pages, point.
+  // Sur une imprimante qui ignore le format 4 × 6 (A4), ça tient d'autant mieux.
+  "print:min-h-0 print:h-[144mm] print:overflow-hidden print:break-inside-avoid",
+);
 
 /** Le numéro de commande en tête de CHAQUE ticket : une fois séparés, les deux se retrouvent. */
 function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
@@ -242,7 +252,7 @@ function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
 /** « Libellé : valeur », une ligne par champ ; un champ vide garde sa ligne, comme sur son modèle. */
 function TicketRows({ rows }: { rows: [string, string | null][] }) {
   return (
-    <dl className="mt-3 space-y-1">
+    <dl className="mt-3 space-y-1 print:mt-2 print:space-y-0.5">
       {rows.map(([label, value]) => (
         <div key={label} className="flex items-baseline gap-2">
           <dt className="shrink-0">{label}</dt>

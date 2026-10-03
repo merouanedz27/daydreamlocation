@@ -204,7 +204,7 @@ export default async function OrderPage({
           une fois par commande, ce n'est pas le geste du quotidien. */}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button asChild variant="outline" className="h-11">
-          <Link href={`/imprimer/commande/${order.id}`}>
+          <Link href={`/imprimer/commande/${order.id}?auto=1`}>
             <Printer className="size-4" aria-hidden />
             {t("print.slipButton")}
           </Link>
