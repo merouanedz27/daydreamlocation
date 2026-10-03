@@ -7,31 +7,56 @@ import { cn } from "@/lib/utils";
 /** 4 pouces en px CSS (96 px au pouce) : la largeur EXACTE de l'étiquette. */
 const TICKET_WIDTH_PX = 384;
 
-/** Le texte part de ce facteur et descend jusqu'à ce que tout tienne. */
-const FIT_MAX = 1.8;
-const FIT_MIN = 0.6;
-const FIT_STEP = 0.95;
+/** Bornes du facteur de taille : la recherche garde le plus GRAND qui tient. */
+const FIT_MAX = 2.2;
+const FIT_MIN = 0.5;
+const FIT_STEPS = 10;
 /** Quelques px de marge : le moteur d'impression arrondit autrement que l'écran. */
-const FIT_SLACK_PX = 4;
+const FIT_SLACK_PX = 6;
 
 /**
  * Ajuste la taille du texte d'un ticket pour qu'il REMPLISSE son étiquette
- * 4 × 6 sans jamais déborder : on part grand, on réduit par paliers.
+ * 4 × 6 sans jamais déborder.
  *
- * Toutes les tailles du ticket sont en `em` d'une seule taille racine,
- * `calc(10.5pt * var(--fit))` : un seul nombre à changer. Le ticket a une
- * hauteur FIXE (6 po) et `justify-center-safe` : ce qui dépasse dépasse vers
- * le bas, et `scrollHeight` le voit.
+ * Toutes les tailles du ticket — logos compris — sont en `em` d'une seule
+ * taille racine, `calc(10.5pt * var(--fit))` : un seul nombre à changer. On
+ * cherche par dichotomie le plus GRAND `--fit` pour lequel le contenu tient.
+ *
+ * On mesure le CONTENU (`[data-ticket-content]`, à sa hauteur naturelle) et
+ * non la feuille : le `scrollHeight` d'une boîte n'est jamais inférieur à sa
+ * hauteur visible — le comparer à elle disait « déborde » à tous les coups, et
+ * le texte tombait toujours au minimum (tout petit au milieu de l'étiquette).
  *
  * Exporté pour `ticket-share.tsx`, qui le rejoue sur sa copie avant la photo.
  */
 export function fitTicket(el: HTMLElement) {
-  let fit = FIT_MAX;
-  el.style.setProperty("--fit", String(fit));
-  while (fit > FIT_MIN && el.scrollHeight > el.clientHeight - FIT_SLACK_PX) {
-    fit = Math.max(FIT_MIN, fit * FIT_STEP);
+  const content = el.querySelector<HTMLElement>("[data-ticket-content]");
+  if (!content) return;
+  const style = getComputedStyle(el);
+  const available =
+    el.clientHeight -
+    parseFloat(style.paddingTop) -
+    parseFloat(style.paddingBottom) -
+    FIT_SLACK_PX;
+
+  const fits = (fit: number) => {
     el.style.setProperty("--fit", fit.toFixed(3));
+    return (
+      content.offsetHeight <= available &&
+      // Un mot trop long pour la largeur déborderait sur le côté.
+      content.scrollWidth <= content.clientWidth + 1
+    );
+  };
+
+  let lo = FIT_MIN;
+  let hi = FIT_MAX;
+  if (fits(hi)) return;
+  for (let i = 0; i < FIT_STEPS; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
   }
+  el.style.setProperty("--fit", lo.toFixed(3));
 }
 
 /**
@@ -108,7 +133,11 @@ export function TicketFrame({
           className,
         )}
       >
-        {children}
+        {/* À sa hauteur NATURELLE (élément flex de la colonne, sans
+            étirement) : c'est elle que `fitTicket` mesure. */}
+        <div data-ticket-content className="w-full shrink-0">
+          {children}
+        </div>
       </PrintSheet>
     </div>
   );

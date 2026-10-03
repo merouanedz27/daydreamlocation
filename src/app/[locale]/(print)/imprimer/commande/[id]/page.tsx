@@ -187,7 +187,7 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             unoptimized
-            className="mx-auto h-auto w-[60mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[16em] max-w-full [print-color-adjust:exact]"
           />
 
           {/* Téléphone et avertissements en GRAS, comme sur son modèle. */}
@@ -224,7 +224,7 @@ export default async function OrderSlipPage({
             alt=""
             priority
             unoptimized
-            className="mx-auto h-auto w-[28mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[7.5em] max-w-[45%] [print-color-adjust:exact]"
           />
           {cancelledBanner}
           <TicketRows rows={costumeRows} className="mt-[0.6em] text-[1.15em]" />
