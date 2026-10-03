@@ -4,7 +4,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { WifiOff } from "lucide-react";
 import { RetryButton } from "@/components/retry-button";
 import { routing } from "@/i18n/routing";
-import ddLogo from "../../../../public/dd-logo.png";
+import suit from "../../../../public/logo-suit.png";
+import wordmark from "../../../../public/logo-wordmark.png";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -41,12 +42,13 @@ export default async function OfflinePage({
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm text-center">
+        <Image src={suit} alt="" unoptimized priority className="mx-auto h-auto w-16" />
         <Image
-          src={ddLogo}
+          src={wordmark}
           alt={t("app.name")}
           unoptimized
           priority
-          className="mx-auto h-auto w-32"
+          className="mx-auto mt-3 h-auto w-52"
         />
 
         <div className="ornament my-8" aria-hidden>

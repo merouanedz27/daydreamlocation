@@ -6,7 +6,8 @@ import { redirectTo } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SignInForm } from "@/components/sign-in-form";
-import ddLogo from "../../../../../public/dd-logo.png";
+import suit from "../../../../../public/logo-suit.png";
+import wordmark from "../../../../../public/logo-wordmark.png";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -38,30 +39,26 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm">
-        {/* Ici le logo COMPLET, mot « location » compris : c'est le seul écran
-            qui ait la place de le montrer en entier, et le seul où l'on arrive
-            sans savoir encore où l'on est.
-            Aucune plaque n'est nécessaire — la page est blanche, exactement le
-            fond pour lequel le logo a été dessiné (son bloc clair #EEEEEE ne
-            s'en détache que de 1,16:1, ce qui est voulu). À surveiller le jour
-            où le mode sombre s'ouvrira : ce logo est un bitmap à deux tons
-            fait pour un fond clair, et son brun #522504 s'y effacerait.
+        {/* Ici le logo COMPLET du bon : la veste, puis le mot « DAYDREAM ·
+            LOCATION ». C'est le seul écran qui ait la place de les montrer
+            ensemble, et le seul où l'on arrive sans savoir encore où l'on est.
+            Encre sur page blanche, comme sur le papier.
             Le nom de l'application reste le NOM ACCESSIBLE du titre, via
             `alt` : le logo est un bitmap, un lecteur d'écran n'y lit rien. */}
         <header className="text-center">
           <h1 className="leading-none">
+            {/* Largeurs d'affichage FIXES (`sizes`) : sans elles, next/image
+                raisonne sur la largeur de l'écran et sert un fichier de
+                1080 px pour une image de 64 — sur un forfait mobile algérien,
+                c'est du gâchis pur. Petit, aussi : à 390 px de large, un grand
+                logo poussait « Se connecter » sous le clavier ouvert. */}
+            <Image src={suit} alt="" priority sizes="64px" className="mx-auto h-auto w-16" />
             <Image
-              src={ddLogo}
+              src={wordmark}
               alt={t("app.name")}
               priority
-              /* Largeur d'affichage FIXE. Sans cette indication, next/image
-                 raisonne sur la largeur de l'écran et sert un fichier de
-                 1080 px pour une image de 112 px — sur un forfait mobile
-                 algérien, c'est du gâchis pur.
-                 112 px et non plus 176 : à 390 px de large, l'ancien logo
-                 poussait le bouton « Se connecter » sous le clavier ouvert. */
-              sizes="112px"
-              className="mx-auto h-auto w-28"
+              sizes="208px"
+              className="mx-auto mt-3 h-auto w-52"
             />
           </h1>
           <p className="text-muted-foreground mt-3 text-sm">{t("app.tagline")}</p>

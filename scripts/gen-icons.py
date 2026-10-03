@@ -1,30 +1,42 @@
 """
-Génère les icônes de l'application à partir de public/dd-logo.png.
+Génère les logos et les icônes de l'application à partir des deux images du
+modèle Word du propriétaire (« Daydream Ticket ») :
+
+- public/ticket-wordmark.png — « DAYDREAM · LOCATION », encre sur transparent ;
+- public/ticket-suit.png     — la veste et la cravate, encre sur BLANC.
 
 À relancer quand le logo change :  python scripts/gen-icons.py   (Pillow requis)
 
-- Petites tailles (onglet) : les deux tuiles « DD » seules, fond transparent.
-  À 16-32 px le mot « location » serait illisible.
-- Écran d'accueil : le logo complet centré sur BLANC. iOS noircit la
-  transparence, et Android découpe l'icône « maskable » dans un cercle :
-  le logo tient alors dans la zone sûre de 80 %.
+Sorties :
+- public/logo-wordmark.png : le mot, rogné au plus juste (barre, pied de page) ;
+- public/logo-suit.png     : la veste, fond rendu TRANSPARENT et rognée (connexion,
+  hors-ligne, onglet du navigateur) ;
+- les icônes : petites tailles (onglet) = la veste seule sur transparent ;
+  écran d'accueil = la veste centrée sur BLANC. iOS noircit la transparence, et
+  Android découpe l'icône « maskable » dans un cercle : elle tient alors dans la
+  zone sûre de 80 %.
 """
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-LOGO = Image.open(ROOT / "public" / "dd-logo.png").convert("RGBA")
+PUBLIC = ROOT / "public"
 
-# Bande des tuiles « DD » : tout ce qui précède le premier rang vide sous elles.
-alpha = LOGO.split()[3]
-top = alpha.getbbox()[1]
-bottom = next(
-    y for y in range(top, LOGO.height)
-    if not any(alpha.getpixel((x, y)) for x in range(LOGO.width))
-)
-TILES = LOGO.crop((0, top, LOGO.width, bottom))
-FULL = LOGO.crop(alpha.getbbox())
+# --- Le mot -----------------------------------------------------------------
+WORDMARK = Image.open(PUBLIC / "ticket-wordmark.png").convert("RGBA")
+WORDMARK = WORDMARK.crop(WORDMARK.split()[3].getbbox())
+WORDMARK.save(PUBLIC / "logo-wordmark.png", optimize=True)
+
+# --- La veste : le blanc devient transparent ----------------------------------
+# L'encre garde son anti-crénelage : l'opacité suit la noirceur du pixel, et le
+# pixel lui-même devient noir pur. Sur un fond coloré, pas de liseré blanc.
+suit = Image.open(PUBLIC / "ticket-suit.png").convert("L")
+ink = suit.point(lambda v: 0 if v > 245 else min(255, round((255 - v) * 255 / 235)))
+SUIT = Image.new("RGBA", suit.size, (0, 0, 0, 255))
+SUIT.putalpha(ink)
+SUIT = SUIT.crop(ink.getbbox())
+SUIT.save(PUBLIC / "logo-suit.png", optimize=True)
 
 
 def square(art: Image.Image, size: int, padding: float, background) -> Image.Image:
@@ -44,17 +56,17 @@ TRANSPARENT = (0, 0, 0, 0)
 WHITE = (255, 255, 255, 255)
 
 app = ROOT / "src" / "app"
-icons = ROOT / "public" / "icons"
+icons = PUBLIC / "icons"
 icons.mkdir(exist_ok=True)
 
 # Onglet du navigateur.
-square(TILES, 256, 0.02, TRANSPARENT).save(app / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
-square(TILES, 96, 0.02, TRANSPARENT).save(app / "icon.png", optimize=True)
+square(SUIT, 256, 0.02, TRANSPARENT).save(app / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+square(SUIT, 96, 0.02, TRANSPARENT).save(app / "icon.png", optimize=True)
 
 # Écran d'accueil.
-square(FULL, 180, 0.10, WHITE).convert("RGB").save(app / "apple-icon.png", optimize=True)
-square(FULL, 192, 0.10, WHITE).convert("RGB").save(icons / "icon-192.png", optimize=True)
-square(FULL, 512, 0.10, WHITE).convert("RGB").save(icons / "icon-512.png", optimize=True)
-square(FULL, 512, 0.20, WHITE).convert("RGB").save(icons / "maskable-512.png", optimize=True)
+square(SUIT, 180, 0.12, WHITE).convert("RGB").save(app / "apple-icon.png", optimize=True)
+square(SUIT, 192, 0.12, WHITE).convert("RGB").save(icons / "icon-192.png", optimize=True)
+square(SUIT, 512, 0.12, WHITE).convert("RGB").save(icons / "icon-512.png", optimize=True)
+square(SUIT, 512, 0.22, WHITE).convert("RGB").save(icons / "maskable-512.png", optimize=True)
 
-print("OK")
+print("OK", WORDMARK.size, SUIT.size)

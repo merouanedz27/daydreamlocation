@@ -13,8 +13,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "DD Location",
-    short_name: "DD Location",
+    name: "Daydream Location",
+    short_name: "Daydream Location",
     description: "Gestion des locations de costumes",
     start_url: "/",
     scope: "/",

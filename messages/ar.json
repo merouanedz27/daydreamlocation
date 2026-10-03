@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "DD Location",
+    "name": "Daydream Location",
     "tagline": "تسيير كراء البدلات"
   },
   "nav": {
@@ -512,6 +512,8 @@
     "saved": "تم حفظ معلومات المحل."
   },
   "print": {
+    "share": "مشاركة / طباعة PDF",
+    "preparing": "جارٍ تحضير PDF…",
     "print": "طباعة",
     "slipButton": "وصل الكراء",
     "slipTitle": "وصل الكراء",

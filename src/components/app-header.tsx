@@ -38,7 +38,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { signOut } from "@/lib/actions/auth";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
-import ddLogoTrim from "../../public/dd-logo-trim.png";
+import wordmark from "../../public/logo-wordmark.png";
 
 export function AppHeader({
   fullName,
@@ -110,35 +110,21 @@ export function AppHeader({
        de bordure fait toujours la séparation. Voir `daydream-ui`.) */
     <header className="border-nav-border bg-nav supports-[backdrop-filter]:bg-nav/92 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="relative mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
-        {/* LE LOGO, À NU SUR LA BARRE — fond transparent, aucune plaque.
-            À savoir si l'on reprend cette barre un jour : le logo est un
-            bitmap à deux tons, dessiné pour un fond CLAIR. Contrastes MESURÉS
-            contre la barre éclaircie, à son pire cas (#816753) :
-              « D » blanc du bloc gauche  5,25:1  — franc
-              bloc gris clair #EEEEEE     4,53:1  — franc
-              bloc brun      #522504      2,46:1  — se devine
-              mot « location » #401B01    2,91:1  — faible
-            Les deux « D » portent donc la marque ; le mot reste en retrait.
-            L'éclaircissement de la barre l'a nettement amélioré (1,73 et 2,04
-            auparavant) sans le rendre franc — il ne peut pas aller plus loin
-            sans basculer la barre en texte encre, cf. `globals.css`.
-            PAS d'ombre portée pour compenser : elle salirait le gris clair du
-            logo sans rien gagner sur le brun.
-
-            `dd-logo-trim.png` est le MÊME verrou que `dd-logo.png`, seulement
-            débarrassé de sa marge transparente (42 px en haut, 16 px en bas
-            sur 454) — c'est l'endroit qui décide du calage, pas le fichier.
-            Le pied de page s'en sert aussi.
+        {/* LE LOGO DU BON — « DAYDREAM · LOCATION », celui du modèle Word du
+            propriétaire, pour que l'écran et le papier portent la même marque.
+            Le fichier est en encre noire sur transparent : `brightness-0
+            invert` le passe en BLANC, lisible sur le brun de la barre. Pas de
+            second fichier à tenir à jour.
 
             Le `alt` n'est pas décoratif : plus aucun texte n'accompagne le
             logo, il est donc le SEUL nom accessible de ce lien. */}
         <Link href="/commandes" className="flex shrink-0 items-center">
           <Image
-            src={ddLogoTrim}
+            src={wordmark}
             alt={t("app.name")}
             priority
-            sizes="44px"
-            className="h-9 w-auto"
+            sizes="140px"
+            className="h-5 w-auto brightness-0 invert sm:h-6"
           />
         </Link>
 

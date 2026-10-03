@@ -9,15 +9,10 @@ import { cn } from "@/lib/utils";
  * Encre sur blanc, sans aplat de couleur : une impression noir et blanc de
  * boutique ne doit rien perdre, et un fond coloré vide une cartouche.
  */
-export function PrintSheet({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
+export function PrintSheet({ className, children, ...props }: React.ComponentProps<"article">) {
   return (
     <article
+      {...props}
       className={cn(
         "bg-background text-foreground border-border mx-auto max-w-[210mm] rounded-sm border p-5 text-sm sm:p-[12mm]",
         "print:max-w-none print:rounded-none print:border-0 print:p-0",

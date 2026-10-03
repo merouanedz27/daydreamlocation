@@ -2,7 +2,7 @@ import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import pkg from "../../package.json";
-import ddLogoTrim from "../../public/dd-logo-trim.png";
+import wordmark from "../../public/logo-wordmark.png";
 
 /**
  * Pied de page — GRANDS ÉCRANS UNIQUEMENT.
@@ -58,23 +58,15 @@ export async function AppFooter({ showOwnerLinks }: { showOwnerLinks: boolean })
           en faisaient plus du double. */}
       <div className="mx-auto grid max-w-5xl gap-6 px-4 py-5 text-xs md:grid-cols-3">
         <div>
-          {/* LE LOGO À LA PLACE DU NOM ÉCRIT — il porte déjà « DD location ».
-              Ici, contrairement à la barre, il n'a besoin d'aucune plaque : le
-              pied de page est en `brown-soft` (#F1E9E1), un fond clair.
-              MESURÉ dessus : son brun #522504 tient 10,76:1 et son mot
-              « location » 12,71:1. C'est l'endroit du produit où ce logo se
-              lit le mieux.
+          {/* LE LOGO À LA PLACE DU NOM ÉCRIT — le mot du bon, en encre, tel
+              quel : le pied de page est en `brown-soft` (#F1E9E1), un fond
+              clair.
               Pas de `priority` : le pied de page est sous la ligne de
               flottaison, il se charge en différé — contrairement à celui de la
               barre.
               Le `alt` porte le nom : c'est la seule chose qui identifie encore
               cette colonne pour un lecteur d'écran. */}
-          <Image
-            src={ddLogoTrim}
-            alt={t("app.name")}
-            sizes="39px"
-            className="h-8 w-auto"
-          />
+          <Image src={wordmark} alt={t("app.name")} sizes="125px" className="h-6 w-auto" />
           <p className="text-muted-foreground mt-1.5">{t("app.tagline")}</p>
           <p className="text-muted-foreground mt-2">
             {/* L'année est calculée au rendu : le serveur rend cette page à la

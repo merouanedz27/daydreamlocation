@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/drawer";
 
 /**
- * « Installer l'application » — pour que l'équipe ouvre DD Location d'une icône,
+ * « Installer l'application » — pour que l'équipe ouvre Daydream Location d'une icône,
  * sans chercher le menu ⋮ de Chrome ni la feuille Partager de Safari.
  *
  * Deux mécanismes, un seul bouton :

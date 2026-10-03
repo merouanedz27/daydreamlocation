@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PrintSheet } from "@/components/print-sheet";
 import { PrintToolbar } from "@/components/print-toolbar";
+import { TicketShare } from "@/components/ticket-share";
 import {
   getOrder,
   getOrderCatalogue,
@@ -47,14 +48,10 @@ export async function generateMetadata(props: {
  */
 export default async function OrderSlipPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
-  /** `auto=1` : arrivé par le bouton « Bon de location », on imprime aussitôt. */
-  searchParams: Promise<{ auto?: string }>;
 }) {
   const { locale, id } = await params;
-  const { auto } = await searchParams;
   setRequestLocale(locale);
   const l = locale as Locale;
 
@@ -161,11 +158,14 @@ export default async function OrderSlipPage({
 
   return (
     <>
-      <PrintToolbar backHref={`/commandes/${order.id}`} autoPrint={auto === "1"} />
+      <PrintToolbar
+        backHref={`/commandes/${order.id}`}
+        action={<TicketShare fileName={`${t("print.slipTitle")} ${order.order_no}`} />}
+      />
 
       <div className="space-y-4 print:space-y-0">
         {/* --- Ticket du CLIENT ------------------------------------------- */}
-        <PrintSheet className={cn(TICKET, "print:break-after-page")}>
+        <PrintSheet data-ticket className={cn(TICKET, "print:break-after-page")}>
           <TicketHead orderNo={order.order_no} label={t("print.ticket.clientCopy")} />
           {/* `print-color-adjust: exact` : sans lui, Chrome « économise
               l'encre » et délave le logo. */}
@@ -174,11 +174,11 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             sizes="260px"
-            className="mx-auto mt-1 h-auto w-[60mm] [print-color-adjust:exact]"
+            className="mx-auto mt-2 h-auto w-[70mm] [print-color-adjust:exact]"
           />
 
           {(shopPhone || terms) && (
-            <div className="mt-3 space-y-1 text-center text-xs leading-relaxed print:mt-2 print:text-[8pt] print:leading-snug">
+            <div className="mt-3 space-y-1 text-center text-sm leading-snug print:mt-2 print:text-[9pt]">
               {shopPhone && (
                 <p>
                   {t("print.ticket.shopPhone")}{" "}
@@ -198,24 +198,24 @@ export default async function OrderSlipPage({
           {cancelledBanner}
 
           <TicketRows rows={rows} />
-          <dl className="border-foreground mt-2 grid grid-cols-3 gap-2 border-t pt-2">
+          <dl className="border-foreground mt-3 grid grid-cols-3 gap-2 border-t-2 pt-2 text-center">
             {money.map(([label, value]) => (
               <div key={label}>
-                <dt className="text-muted-foreground text-xs">{label}</dt>
-                <dd className="tabular text-base font-medium">{value}</dd>
+                <dt className="text-sm">{label}</dt>
+                <dd className="tabular text-lg font-bold">{value}</dd>
               </div>
             ))}
           </dl>
         </PrintSheet>
 
         {/* --- Ticket du COSTUME : sans argent ---------------------------- */}
-        <PrintSheet className={cn(TICKET, "text-base")}>
+        <PrintSheet data-ticket className={cn(TICKET, "text-lg")}>
           <TicketHead orderNo={order.order_no} label={t("print.ticket.costumeCopy")} />
           <Image
             src={suit}
             alt=""
             sizes="96px"
-            className="mx-auto mt-1 h-auto w-[30mm] [print-color-adjust:exact]"
+            className="mx-auto mt-2 h-auto w-[40mm] [print-color-adjust:exact]"
           />
           {cancelledBanner}
           <TicketRows rows={rows} />
@@ -226,12 +226,14 @@ export default async function OrderSlipPage({
 }
 
 /**
- * Une feuille 4 × 6 pouces par ticket (page nommée `ticket`, globals.css). À
- * l'écran, la même taille que le papier ; à l'impression, la hauteur suit le
- * contenu — une hauteur fixe risquerait de pousser une page blanche.
+ * Une feuille 4 × 6 pouces par ticket (page nommée `ticket`, globals.css), à
+ * l'écran comme sur le papier. GROS caractères (16 px ≈ 12 pt, 18 px sur le
+ * ticket du costume) : il se lit à bout de bras, accroché au cintre.
+ * Le contenu est CENTRÉ sur la feuille ; `justify-center-safe` le recolle en
+ * haut s'il dépasse, pour que ce soit le bas — jamais l'en-tête — qui se coupe.
  */
 const TICKET = cn(
-  "print-ticket flex max-w-[4in] min-h-[6in] flex-col p-[4mm] sm:p-[4mm]",
+  "print-ticket flex max-w-[4in] min-h-[6in] flex-col justify-center-safe p-[4mm] text-base sm:p-[4mm]",
   // À l'impression, HAUTEUR FIXE = la page moins ses marges (152,4 − 2 × 4 mm),
   // et rien ne déborde : un ticket trop long se coupait sur une 2ᵉ page, puis
   // une 3ᵉ — cinq feuilles pour deux tickets. Deux tickets = deux pages, point.
@@ -242,9 +244,9 @@ const TICKET = cn(
 /** Le numéro de commande en tête de CHAQUE ticket : une fois séparés, les deux se retrouvent. */
 function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
   return (
-    <div className="text-muted-foreground flex items-baseline justify-between text-xs">
+    <div className="flex items-baseline justify-between text-sm">
       <span>{label}</span>
-      <bdi className="text-foreground font-medium">{orderNo}</bdi>
+      <bdi className="text-base font-bold">{orderNo}</bdi>
     </div>
   );
 }
@@ -252,13 +254,13 @@ function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
 /** « Libellé : valeur », une ligne par champ ; un champ vide garde sa ligne, comme sur son modèle. */
 function TicketRows({ rows }: { rows: [string, string | null][] }) {
   return (
-    <dl className="mt-3 space-y-1 print:mt-2 print:space-y-0.5">
+    <dl className="mt-3 space-y-1.5 leading-snug print:mt-3">
       {rows.map(([label, value]) => (
         <div key={label} className="flex items-baseline gap-2">
           <dt className="shrink-0">{label}</dt>
           <dd
             className={cn(
-              "border-border min-w-0 flex-1 border-b border-dotted font-medium",
+              "border-foreground/40 min-w-0 flex-1 border-b border-dotted font-bold",
               !value && "text-muted-foreground",
             )}
           >

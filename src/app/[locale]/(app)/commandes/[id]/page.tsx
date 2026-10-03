@@ -199,12 +199,12 @@ export default async function OrderPage({
         </Badge>
       </div>
 
-      {/* Le bon de location, à imprimer ou à enregistrer en PDF pour l'envoyer
-          au client. Sous le titre et non dans la barre d'action : on l'édite
+      {/* Le bon de location, à partager en PDF — vers l'imprimante
+          d'étiquettes ou au client. Sous le titre et non dans la barre d'action : on l'édite
           une fois par commande, ce n'est pas le geste du quotidien. */}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button asChild variant="outline" className="h-11">
-          <Link href={`/imprimer/commande/${order.id}?auto=1`}>
+          <Link href={`/imprimer/commande/${order.id}`}>
             <Printer className="size-4" aria-hidden />
             {t("print.slipButton")}
           </Link>
