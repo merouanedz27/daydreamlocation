@@ -24,7 +24,7 @@ import type { Locale } from "@/i18n/routing";
  * - ✓ : elle est revenue (« Retour validé »). Les DEUX cochées, la commande
  *   est terminée et son nom est BARRÉ (`isOrderDone`) — c'est ainsi que
  *   l'équipe repère d'un coup d'œil ce qui n'appelle plus rien ;
- * - 📞 et 💬 appellent le client ou lui ouvrent WhatsApp, le message type de
+ * - 📞 et 💬 appellent le client ou lui ouvrent Messages (SMS), le message type de
  *   la boutique déjà rempli, sans ouvrir la fiche : c'est le geste le plus
  *   fréquent de « Demain » et de « Pas rentrés ».
  *

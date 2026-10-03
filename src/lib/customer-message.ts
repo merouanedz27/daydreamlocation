@@ -2,7 +2,7 @@
  * Message au client — module PUR, importé des deux côtés.
  *
  * Le propriétaire écrit UN texte type dans « Boutique » ; chaque bouton 💬
- * le remplit avec la commande de sa ligne, puis ouvre WhatsApp sur le numéro
+ * le remplit avec la commande de sa ligne, puis ouvre l'application Messages sur le numéro
  * du client, message déjà tapé. L'employé n'a plus qu'à appuyer sur Envoyer.
  */
 import { formatDate, formatMoney } from "@/lib/format";
@@ -23,7 +23,7 @@ export type MessageOrder = {
 
 /**
  * Remplace `{nom}`, `{date}`… par les valeurs de la commande. Un champ
- * inconnu est laissé tel quel : une faute de frappe se voit dans WhatsApp
+ * inconnu est laissé tel quel : une faute de frappe se voit dans Messages
  * avant l'envoi, au lieu de disparaître en silence.
  */
 export function fillMessage(template: string, order: MessageOrder, locale: Locale): string {
@@ -41,14 +41,17 @@ export function fillMessage(template: string, order: MessageOrder, locale: Local
 }
 
 /**
- * Lien WhatsApp. `wa.me` exige le numéro INTERNATIONAL sans « + » :
- * « 0551 23 45 67 » → « 213551234567 ». Un numéro déjà international (autre
- * pays) est gardé tel quel, sans son « + » ou son « 00 ».
+ * Lien SMS : ouvre l'application Messages du téléphone, numéro et texte déjà
+ * remplis. Numéro mis au format international (« 0551 23 45 67 » →
+ * « +213551234567 ») pour qu'il passe aussi depuis une puce étrangère.
+ *
+ * `?&body=` et non `?body=` : Android lit le premier, iOS le second — cette
+ * forme est comprise par les deux.
  */
-export function whatsappHref(phone: string, text: string): string {
+export function smsHref(phone: string, text: string): string {
   const normalized = normalizePhone(phone).replace(/^\+|^00/, "");
   const international = normalized.startsWith("0") ? `213${normalized.slice(1)}` : normalized;
   return text
-    ? `https://wa.me/${international}?text=${encodeURIComponent(text)}`
-    : `https://wa.me/${international}`;
+    ? `sms:+${international}?&body=${encodeURIComponent(text)}`
+    : `sms:+${international}`;
 }

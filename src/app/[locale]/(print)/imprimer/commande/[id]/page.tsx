@@ -4,11 +4,20 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PrintSheet } from "@/components/print-sheet";
 import { PrintToolbar } from "@/components/print-toolbar";
-import { getOrder, getSettings } from "@/lib/queries/orders";
+import {
+  getOrder,
+  getOrderCatalogue,
+  getQuickSuggestions,
+  getSettings,
+} from "@/lib/queries/orders";
+import { draftFromOrder, type Slot } from "@/lib/quick-draft";
+import { normalizeSearch } from "@/lib/search";
+import { defaultWindow } from "@/lib/rental-range";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
-import ddLogo from "../../../../../../../public/dd-logo.png";
+import wordmark from "../../../../../../../public/ticket-wordmark.png";
+import suit from "../../../../../../../public/ticket-suit.png";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string; id: string }>;
@@ -24,13 +33,19 @@ export async function generateMetadata(props: {
 }
 
 /**
- * Bon de location d'une commande — le document remis ou envoyé au client.
+ * Bon de location — DEUX TICKETS sur une feuille, comme le modèle Word du
+ * propriétaire (« Daydream Ticket ») :
  *
- * CE QUI N'Y FIGURE JAMAIS
- * - Le coût payé au confrère pour une pièce externe, ni le nom du confrère :
- *   c'est la marge de la boutique, pas l'affaire du client.
- * - La note de la commande : elle est interne (« client difficile », « a
- *   payé en deux fois »). La fiche la range d'ailleurs dans sa propre carte.
+ * - en haut, le ticket du CLIENT : logo, téléphone de la boutique, conditions,
+ *   les pièces et l'argent (versement, prix, reste). Il repart avec lui ;
+ * - en bas, le ticket du COSTUME : les mêmes pièces et tailles, SANS argent.
+ *   Il s'accroche au cintre (يتعلق في الكوستوم) : c'est lui qui dit à l'équipe
+ *   à qui appartient la housse.
+ *
+ * On découpe sur le pointillé du milieu.
+ *
+ * CE QUI N'Y FIGURE JAMAIS : le coût et le nom du confrère d'une pièce
+ * externe, ni la note interne de la commande.
  */
 export default async function OrderSlipPage({
   params,
@@ -41,217 +56,207 @@ export default async function OrderSlipPage({
   setRequestLocale(locale);
   const l = locale as Locale;
 
-  const [order, settings] = await Promise.all([getOrder(Number(id)), getSettings()]);
+  const [order, settings, { models }, { items }] = await Promise.all([
+    getOrder(Number(id)),
+    getSettings(),
+    getOrderCatalogue(),
+    getQuickSuggestions(),
+  ]);
   if (!order) notFound();
 
   const t = await getTranslations();
 
-  // `?? null` : tant que la migration des coordonnées n'est pas appliquée, ces
-  // colonnes n'existent pas — le bon s'imprime alors sans elles.
-  const address = settings.shop_address ?? null;
-  const shopPhone = settings.shop_phone ?? null;
-  const terms = (l === "ar" ? settings.rental_terms_ar : settings.rental_terms_fr) ?? null;
+  // Les pièces remises dans les cases de la saisie (costume, chemise,
+  // chaussures, accessoires) — exactement comme le formulaire de modification
+  // les retrouve, pour que le ticket dise la même chose que l'écran.
+  const slotByLabel = new Map(items.map((i) => [normalizeSearch(i.label), i.slot]));
+  const categoryByUnit = new Map<number, string | null>();
+  for (const model of models) {
+    for (const unit of model.units) categoryByUnit.set(unit.id, model.category_slug);
+  }
+  const draft = draftFromOrder(
+    { ...order, order_lines: order.order_lines.filter((line) => line.is_active) },
+    {
+      slotOf: (label) => slotByLabel.get(normalizeSearch(label)) ?? null,
+      categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
+      defaultWindow: defaultWindow(
+        order.event_date,
+        settings.days_before_event,
+        settings.days_after_event,
+      ),
+    },
+  );
+
+  // Un costume DU STOCK, c'est une veste et un pantalon, deux pièces : la
+  // seconde n'a pas de case à elle. Sa taille va sur « Taille pantalon » (ou
+  // « gilet ») au lieu de s'égarer dans les accessoires.
+  const [costume, shirt, shoes, accessory, ...extras] = draft.slots;
+  let pantsSize = draft.pantsSize;
+  let vestSize = draft.vestSize;
+  const others: Slot[] = [];
+  for (const slot of extras) {
+    const slug = slot.unitId ? categoryByUnit.get(slot.unitId) : null;
+    if (slug === "pantalon" && !pantsSize) pantsSize = slot.size;
+    else if (slug === "gilet" && !vestSize) vestSize = slot.size;
+    else others.push(slot);
+  }
+
+  const piece = (slot: Slot | undefined, withSize = true) => {
+    if (!slot?.name) return null;
+    const name = slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
+    return withSize && slot.size ? `${name} (${slot.size})` : name;
+  };
+
+  const jacketSize = costume?.size
+    ? vestSize
+      ? `${costume.size} · ${t("print.ticket.vest")} ${vestSize}`
+      : costume.size
+    : null;
+
+  const field = (key: string) => t("print.ticket.field", { label: t(`print.ticket.${key}`) });
+  const rows: [string, string | null][] = [
+    [field("customer"), order.customer_name],
+    [field("phone"), order.customer_phone],
+    [field("date"), formatDate(order.event_date, l)],
+    [field("costume"), piece(costume, false)],
+    [field("jacketSize"), jacketSize],
+    // Pantalon non précisé = même taille que la veste, comme sur son tableur.
+    [field("pantsSize"), costume?.name ? pantsSize || costume.size || null : null],
+    [field("tailor"), draft.tailor || null],
+    [field("shirt"), piece(shirt)],
+    [field("shoes"), piece(shoes)],
+    [
+      field("accessories"),
+      [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
+    ],
+  ];
 
   const balance = order.balance ?? 0;
+  const money: [string, string][] = [
+    [t("print.ticket.paid"), formatMoney(order.amount_paid, l)],
+    [t("print.ticket.price"), formatMoney(order.total_price, l)],
+    [
+      balance < 0 ? t("orders.toRefund") : t("print.ticket.rest"),
+      formatMoney(Math.abs(balance), l),
+    ],
+  ];
+
+  // Les conditions s'impriment dans la langue du bon, sinon dans l'autre :
+  // le modèle du propriétaire les porte en arabe même sur un bon français.
+  const terms =
+    (l === "ar"
+      ? (settings.rental_terms_ar ?? settings.rental_terms_fr)
+      : (settings.rental_terms_fr ?? settings.rental_terms_ar)) ?? null;
+  const shopPhone = settings.shop_phone ?? null;
   const cancelled = order.status === "annulee";
+
+  const cancelledBanner = cancelled && (
+    // Un bon d'une commande annulée reste imprimable — pour le dossier — mais
+    // ne doit JAMAIS pouvoir passer pour un bon valable : en encre, encadré.
+    <p className="border-foreground mt-3 border-2 px-3 py-1.5 text-center font-medium">
+      {t("print.cancelled")}
+    </p>
+  );
 
   return (
     <>
       <PrintToolbar backHref={`/commandes/${order.id}`} hint={t("print.pdfHint")} />
 
       <PrintSheet>
-        {/* --- En-tête : la boutique d'un côté, le document de l'autre ------- */}
-        <header className="border-foreground flex items-start justify-between gap-6 border-b pb-5">
-          <div className="min-w-0">
-            {/* `print-color-adjust: exact` sur le LOGO SEUL : sans lui, Chrome
-                « économise l'encre » et délave le brun du logo. Le reste du
-                bon est déjà en encre, il n'en a pas besoin. */}
-            <Image
-              src={ddLogo}
-              alt={t("app.name")}
-              priority
-              sizes="144px"
-              className="h-auto w-36 [print-color-adjust:exact]"
-            />
-            {(address || shopPhone) && (
-              <div className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-                {address && <p className="whitespace-pre-line">{address}</p>}
-                {shopPhone && (
-                  <p>
-                    <bdi dir="ltr" className="tabular">
-                      {shopPhone}
-                    </bdi>
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+        {/* --- Ticket du CLIENT ------------------------------------------- */}
+        <section className="flex min-h-[128mm] break-inside-avoid flex-col">
+          <TicketHead orderNo={order.order_no} label={t("print.ticket.clientCopy")} />
+          {/* `print-color-adjust: exact` : sans lui, Chrome « économise
+              l'encre » et délave le logo. */}
+          <Image
+            src={wordmark}
+            alt={t("app.name")}
+            priority
+            sizes="260px"
+            className="mx-auto mt-1 h-auto w-[65mm] [print-color-adjust:exact]"
+          />
 
-          <div className="shrink-0 text-end">
-            <h1 className="font-heading text-xl font-medium">{t("print.slipTitle")}</h1>
-            <p className="mt-1 text-base font-medium">
-              <bdi>{order.order_no}</bdi>
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {t("print.issuedOn", { date: formatDate(order.created_at, l) })}
-            </p>
-          </div>
-        </header>
+          {(shopPhone || terms) && (
+            <div className="mt-3 space-y-1 text-center text-xs leading-relaxed">
+              {shopPhone && (
+                <p>
+                  {t("print.ticket.shopPhone")}{" "}
+                  <bdi dir="ltr" className="tabular font-medium">
+                    {shopPhone}
+                  </bdi>
+                </p>
+              )}
+              {terms && (
+                <p dir="auto" className="whitespace-pre-line">
+                  {terms}
+                </p>
+              )}
+            </div>
+          )}
 
-        {/* Un bon d'une commande annulée reste imprimable — pour le dossier —
-            mais ne doit JAMAIS pouvoir passer pour un bon valable. Le mot le
-            dit, en encre et encadré : pas de rouge seul, qui disparaît sur
-            une impression noir et blanc. */}
-        {cancelled && (
-          <p className="border-foreground mt-5 border-2 px-4 py-2 text-center text-base font-medium">
-            {t("print.cancelled")}
-          </p>
-        )}
+          {cancelledBanner}
 
-        {/* --- Client et dates -------------------------------------------- */}
-        <section className="mt-5 grid gap-4 sm:grid-cols-2 print:grid-cols-2">
-          <div>
-            <h2 className="text-muted-foreground text-xs">{t("orders.customer")}</h2>
-            <p className="mt-1 text-base font-medium">{order.customer_name}</p>
-            {order.customer_phone && (
-              <p className="mt-0.5">
-                <bdi dir="ltr" className="tabular">
-                  {order.customer_phone}
-                </bdi>
-              </p>
-            )}
-          </div>
-
-          <dl className="grid grid-cols-3 gap-2">
-            {(
-              [
-                ["orders.pickupDate", order.pickup_date],
-                ["orders.event", order.event_date],
-                ["orders.returnDate", order.return_due_date],
-              ] as const
-            ).map(([label, date]) => (
+          <TicketRows rows={rows} />
+          <dl className="border-foreground mt-2 grid grid-cols-3 gap-2 border-t pt-2">
+            {money.map(([label, value]) => (
               <div key={label}>
-                <dt className="text-muted-foreground text-xs">{t(label)}</dt>
-                <dd
-                  className={cn("tabular mt-1", label === "orders.event" && "font-medium")}
-                >
-                  {formatDate(date, l)}
-                </dd>
+                <dt className="text-muted-foreground text-xs">{label}</dt>
+                <dd className="tabular text-base font-medium">{value}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        {/* --- Pièces ----------------------------------------------------- */}
-        <table className="mt-6 w-full border-collapse">
-          <thead>
-            <tr className="border-foreground border-b text-xs">
-              <th className="py-2 pe-3 text-start font-medium">{t("print.designation")}</th>
-              <th className="py-2 pe-3 text-start font-medium">{t("stock.reference")}</th>
-              <th className="py-2 pe-3 text-start font-medium">{t("stock.size")}</th>
-              <th className="py-2 text-end font-medium">{t("orders.linePrice")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.order_lines.map((line) => (
-              <tr key={line.id} className="border-border break-inside-avoid border-b">
-                <td className="py-2 pe-3 align-top">
-                  {line.model_name_snapshot ?? line.external_label}
-                </td>
-                <td className="py-2 pe-3 align-top">
-                  {line.article_units ? <bdi>{line.article_units.ref_code}</bdi> : null}
-                </td>
-                <td className="tabular py-2 pe-3 align-top">{line.size_snapshot}</td>
-                <td className="tabular py-2 text-end align-top">
-                  {formatMoney(line.unit_price, l)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* --- Le pointillé où l'on découpe -------------------------------- */}
+        <div className="text-muted-foreground my-4 flex items-center gap-2 text-xs" aria-hidden>
+          <span>✂</span>
+          <span className="border-foreground flex-1 border-t border-dashed" />
+        </div>
 
-        {/* --- Montants, puis la caution À PART ---------------------------- */}
-        <section className="mt-5 flex break-inside-avoid flex-wrap items-start justify-between gap-4">
-          {/* La caution n'est ni le prix ni un versement : de l'argent DÉTENU,
-              rendu au retour. Elle a son cadre, comme sur la fiche — la mêler
-              aux montants est l'erreur que le tableur faisait. */}
-          <div className="border-border min-w-48 rounded-sm border px-4 py-3">
-            <p className="text-muted-foreground text-xs">{t("orders.caution")}</p>
-            <p className="tabular mt-1 text-base font-medium">
-              {formatMoney(order.caution_amount, l)}
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {order.caution_returned
-                ? t("orders.cautionReturned")
-                : t("print.cautionNotIncluded")}
-            </p>
-          </div>
-
-          <dl className="ms-auto w-full max-w-72 space-y-1.5">
-            {order.discount > 0 && (
-              <>
-                <SlipAmount label={t("orders.subtotal")} value={formatMoney(order.subtotal, l)} />
-                <SlipAmount
-                  label={t("orders.discount")}
-                  value={`− ${formatMoney(order.discount, l)}`}
-                />
-              </>
-            )}
-            <SlipAmount
-              label={t("orders.total")}
-              value={formatMoney(order.total_price, l)}
-              strong
-            />
-            <SlipAmount label={t("orders.paid")} value={formatMoney(order.amount_paid, l)} />
-            <div className="border-foreground border-t pt-1.5">
-              <SlipAmount
-                label={balance < 0 ? t("orders.toRefund") : t("orders.balance")}
-                value={balance === 0 ? t("orders.settled") : formatMoney(Math.abs(balance), l)}
-                strong
-              />
-            </div>
-          </dl>
-        </section>
-
-        {/* --- Conditions : le texte du propriétaire, dans la langue du bon -- */}
-        {terms && (
-          <section className="border-border mt-6 break-inside-avoid border-t pt-4">
-            <h2 className="text-xs font-medium">{t("print.conditions")}</h2>
-            <p className="text-muted-foreground mt-2 text-xs leading-relaxed whitespace-pre-line">
-              {terms}
-            </p>
-          </section>
-        )}
-
-        {/* --- Signatures ------------------------------------------------- */}
-        <section className="mt-8 grid break-inside-avoid grid-cols-2 gap-8">
-          {[t("print.customerSignature"), t("print.shopSignature")].map((label) => (
-            <div key={label}>
-              <p className="text-muted-foreground text-xs">{label}</p>
-              {/* La ligne où l'on signe : un vrai espace vide, pas un filet
-                  collé au libellé. */}
-              <div className="border-foreground mt-14 border-b" />
-            </div>
-          ))}
+        {/* --- Ticket du COSTUME : sans argent ---------------------------- */}
+        <section className="flex break-inside-avoid flex-col">
+          <TicketHead orderNo={order.order_no} label={t("print.ticket.costumeCopy")} />
+          <Image
+            src={suit}
+            alt=""
+            sizes="96px"
+            className="mx-auto h-auto w-[24mm] [print-color-adjust:exact]"
+          />
+          {cancelledBanner}
+          <TicketRows rows={rows} />
         </section>
       </PrintSheet>
     </>
   );
 }
 
-function SlipAmount({
-  label,
-  value,
-  strong,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
+/** Le numéro de commande en tête de CHAQUE moitié : une fois découpées, les deux se retrouvent. */
+function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className={cn(strong ? "font-medium" : "text-muted-foreground")}>{label}</dt>
-      <dd className={cn("tabular text-end", strong && "text-base font-medium")}>{value}</dd>
+    <div className="text-muted-foreground flex items-baseline justify-between text-xs">
+      <span>{label}</span>
+      <bdi className="text-foreground font-medium">{orderNo}</bdi>
     </div>
+  );
+}
+
+/** « Libellé : valeur », une ligne par champ ; un champ vide garde sa ligne, comme sur son modèle. */
+function TicketRows({ rows }: { rows: [string, string | null][] }) {
+  return (
+    <dl className="mt-3 space-y-1">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex items-baseline gap-2">
+          <dt className="shrink-0">{label}</dt>
+          <dd
+            className={cn(
+              "border-border min-w-0 flex-1 border-b border-dotted font-medium",
+              !value && "text-muted-foreground",
+            )}
+          >
+            {value ? <bdi>{value}</bdi> : " "}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

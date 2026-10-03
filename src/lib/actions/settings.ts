@@ -18,7 +18,7 @@ function resolveLocale(value: FormDataEntryValue | null): Locale {
 
 /**
  * Coordonnées de la boutique et conditions de location, imprimées sur le bon,
- * et message type envoyé au client par WhatsApp.
+ * et message type envoyé au client par SMS.
  *
  * Le contrôle de rôle est refait ici : une Server Action est un point d'entrée
  * réseau. La policy `settings_write` refuserait de toute façon — mais un refus

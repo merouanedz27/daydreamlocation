@@ -4,7 +4,7 @@ import { createContext, useContext } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { MessageCircle } from "lucide-react";
-import { fillMessage, whatsappHref, type MessageOrder } from "@/lib/customer-message";
+import { fillMessage, smsHref, type MessageOrder } from "@/lib/customer-message";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
@@ -26,7 +26,7 @@ export function CustomerMessageProvider({
 }
 
 /**
- * 💬 : ouvre WhatsApp sur le numéro du client, le message type déjà rempli
+ * 💬 : ouvre l'application Messages (SMS) sur le numéro du client, le message type déjà rempli
  * avec SA commande. Rien ne part sans que l'employé appuie sur Envoyer.
  */
 export function MessageButton({
@@ -49,9 +49,7 @@ export function MessageButton({
   return (
     <a
       {...rest}
-      href={whatsappHref(phone, template ? fillMessage(template, order, locale) : "")}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={smsHref(phone, template ? fillMessage(template, order, locale) : "")}
       aria-label={t("orders.messageNamed", { name: order.customer_name })}
       className={cn(
         !children &&
