@@ -196,8 +196,7 @@ export default async function OrderSlipPage({
 
       <div className="space-y-4 print:space-y-0">
         {/* --- Ticket du CLIENT ------------------------------------------- */}
-        <PrintSheet data-ticket className={cn(TICKET, "print:break-after-page")}>
-          <TicketHead orderNo={order.order_no} label={t("print.ticket.clientCopy")} />
+        <PrintSheet data-ticket className={TICKET}>
           {/* `print-color-adjust: exact` : sans lui, Chrome « économise
               l'encre » et délave le logo. */}
           <Image
@@ -205,7 +204,7 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             sizes="260px"
-            className="mx-auto mt-2 h-auto w-[80mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[80mm] [print-color-adjust:exact]"
           />
 
           {/* Téléphone et conditions en GRAS, comme sur son modèle. */}
@@ -232,14 +231,16 @@ export default async function OrderSlipPage({
           <TicketRows rows={[...clientRows, ...money]} className="mt-3 text-[11pt]" />
         </PrintSheet>
 
-        {/* --- Ticket du COSTUME : sans argent ---------------------------- */}
-        <PrintSheet data-ticket className={TICKET}>
-          <TicketHead orderNo={order.order_no} label={t("print.ticket.costumeCopy")} />
+        {/* --- Ticket du COSTUME : sans argent ----------------------------
+            Le saut de page est AVANT ce ticket, et lui seul : un saut APRÈS
+            le premier, sur une feuille pile à sa hauteur, faisait sortir une
+            page blanche entre les deux. */}
+        <PrintSheet data-ticket className={cn(TICKET, "print:break-before-page")}>
           <Image
             src={suit}
             alt=""
             sizes="96px"
-            className="mx-auto mt-2 h-auto w-[38mm] [print-color-adjust:exact]"
+            className="mx-auto h-auto w-[38mm] [print-color-adjust:exact]"
           />
           {cancelledBanner}
           <TicketRows rows={costumeRows} className="mt-2 text-[13pt]" />
@@ -262,25 +263,15 @@ const TICKET = cn(
   "print-ticket flex max-w-[4in] min-h-[6in] flex-col justify-center-safe p-[4mm] sm:p-[4mm]",
   // Arial comme son modèle ; l'arabe retombe sur Cairo si Arial n'a pas les glyphes.
   "font-[family-name:Arial,Helvetica,var(--font-cairo),sans-serif]",
-  // À l'impression, HAUTEUR FIXE = la page moins ses marges (152,4 − 2 × 4 mm),
-  // et rien ne déborde : un ticket trop long se coupait sur une 2ᵉ page, puis
-  // une 3ᵉ — cinq feuilles pour deux tickets. Deux tickets = deux pages, point.
-  // Sur une imprimante qui ignore le format 4 × 6 (A4), ça tient d'autant mieux.
-  "print:min-h-0 print:h-[144mm] print:overflow-hidden print:break-inside-avoid",
+  // À l'impression, HAUTEUR FIXE et rien ne déborde : un ticket trop long se
+  // coupait sur une 2ᵉ page, puis une 3ᵉ. Deux tickets = deux pages, point.
+  // 140 mm et non les 144,4 de la zone imprimable (152,4 − 2 × 4 mm) : à la
+  // hauteur exacte, l'arrondi du navigateur poussait parfois une page blanche.
+  "print:min-h-0 print:h-[140mm] print:overflow-hidden print:break-inside-avoid",
 );
 
 type RowStyle = { big?: boolean; underline?: boolean; bullet?: boolean };
 type Row = RowStyle & { label: string; value: string | null };
-
-/** Le numéro de commande en tête de CHAQUE ticket : une fois séparés, les deux se retrouvent. */
-function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
-  return (
-    <div className="flex items-baseline justify-between text-sm">
-      <span>{label}</span>
-      <bdi className="text-base font-bold">{orderNo}</bdi>
-    </div>
-  );
-}
 
 /**
  * « **Libellé :** valeur », une ligne centrée par champ ; un champ vide garde

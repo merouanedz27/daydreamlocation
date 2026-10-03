@@ -530,8 +530,6 @@
     "toCollect": "Reste à encaisser",
     "cautionToReturn": "Caution à rendre",
     "ticket": {
-      "clientCopy": "Ticket client",
-      "costumeCopy": "Ticket costume — à accrocher à la housse",
       "shopPhone": "☎️ Téléphone du magasin :",
       "field": "{label} :",
       "customer": "Client 🙆‍♂️",

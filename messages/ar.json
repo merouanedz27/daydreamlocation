@@ -530,8 +530,6 @@
     "toCollect": "الباقي للتحصيل",
     "cautionToReturn": "ضمان يجب رده",
     "ticket": {
-      "clientCopy": "تذكرة الزبون",
-      "costumeCopy": "تذكرة الكوستيم — تُعلَّق في الكوستيم",
       "shopPhone": "☎️ هاتف المحل:",
       "field": "{label}:",
       "customer": "الزبون 🙆‍♂️",
