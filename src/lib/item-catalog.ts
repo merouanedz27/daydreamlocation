@@ -2,8 +2,8 @@
  * Les listes de vêtements de la saisie rapide — module PUR.
  *
  * Ce sont les listes « Enum » de son AppSheet, recopiées telles quelles : la
- * case COSTUME propose les tenues, la case CHAUSSURES les chaussures, dans SON
- * ordre (pas l'ordre alphabétique : « Jabador S, M, L, XL » se lit ainsi).
+ * case COSTUME propose les tenues, la case CHEMISE les chemises, la case
+ * CHAUSSURES les chaussures, dans SON ordre (pas l'ordre alphabétique : « Jabador S, M, L, XL » se lit ainsi).
  *
  * Elles REMPLACENT les libellés appris des anciennes commandes, qui
  * proposaient toutes les variantes déjà tapées (fautes comprises). Un libellé
@@ -37,7 +37,15 @@ export const COSTUME_ITEMS = [
   "Jabador M - Grenat", "Jabador M - Grenat avec Beige", "Jabador M - Beige", "Jabador M - Vert",
   "Jabador L - Grenat", "Jabador L - Grenat avec Beige", "Jabador L - Beige", "Jabador L - Vert",
   "Jabador XL - Grenat", "Jabador XL - Grenat avec Beige", "Jabador XL - Beige", "Jabador XL - Vert",
-  "Barnous Dore", "Barnous Dore Max",
+  "Barnous Dore", "Barnous Dore Max", "Barnous Beige Wafa",
+] as const;
+
+export const SHIRT_ITEMS = [
+  "Chemise Papillon Blanc S", "Chemise Papillon Blanc M", "Chemise Papillon Blanc L", "Chemise Papillon Blanc XL", "Chemise Papillon Blanc 2XL", "Chemise Papillon Blanc 3XL", "Chemise Papillon Blanc 4XL",
+  "Chemise Cravate Blanc S", "Chemise Cravate Blanc M", "Chemise Cravate Blanc L", "Chemise Cravate Blanc XL", "Chemise Cravate Blanc 2XL", "Chemise Cravate Blanc 3XL", "Chemise Cravate Blanc 4XL",
+  "Chemise Cravate Bleu S", "Chemise Cravate Bleu M", "Chemise Cravate Bleu L", "Chemise Cravate Bleu XL", "Chemise Cravate Bleu 2XL", "Chemise Cravate Bleu 3XL", "Chemise Cravate Bleu 4XL",
+  "Chemise Cravate Noir S", "Chemise Cravate Noir M", "Chemise Cravate Noir L", "Chemise Cravate Noir XL", "Chemise Cravate Noir 2XL", "Chemise Cravate Noir 3XL", "Chemise Cravate Noir 4XL",
+  "Chemise Zara Noir S", "Chemise Zara Noir M", "Chemise Zara Noir L", "Chemise Zara Noir XL", "Chemise Zara Noir 2XL", "Chemise Zara Noir 3XL", "Chemise Zara Noir 4XL",
 ] as const;
 
 export const SHOE_ITEMS = [

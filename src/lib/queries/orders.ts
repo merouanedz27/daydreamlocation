@@ -2,7 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
-import { COSTUME_ITEMS, SHOE_ITEMS } from "@/lib/item-catalog";
+import { COSTUME_ITEMS, SHIRT_ITEMS, SHOE_ITEMS } from "@/lib/item-catalog";
 import { normalizeSearch } from "@/lib/search";
 
 export type Settings = Tables<"settings">;
@@ -159,6 +159,7 @@ export async function getQuickSuggestions(): Promise<{
   return {
     items: [
       ...COSTUME_ITEMS.map((label) => ({ label, uses: 0, slot: 1 })),
+      ...SHIRT_ITEMS.map((label) => ({ label, uses: 0, slot: 2 })),
       ...SHOE_ITEMS.map((label) => ({ label, uses: 0, slot: 3 })),
     ],
     customers: (customers.data ?? []).map((r) => ({ name: r.name, phone: r.phone })),
@@ -178,6 +179,7 @@ export async function getLabelSlots(): Promise<Map<string, number>> {
   for (const r of data ?? []) slots.set(normalizeSearch(r.label), Number(r.slot));
   // Les listes fixes ont le dernier mot : un costume reste un costume.
   for (const label of COSTUME_ITEMS) slots.set(normalizeSearch(label), 1);
+  for (const label of SHIRT_ITEMS) slots.set(normalizeSearch(label), 2);
   for (const label of SHOE_ITEMS) slots.set(normalizeSearch(label), 3);
   return slots;
 }

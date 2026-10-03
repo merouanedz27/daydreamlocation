@@ -388,6 +388,9 @@ export type Database = {
           is_active: boolean;
           created_at: string;
           email: string | null;
+          email_locale: string;
+          notify_daily: boolean;
+          notify_new_order: boolean;
         };
         Insert: {
           id: string;
@@ -396,6 +399,9 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           email?: string | null;
+          email_locale?: string;
+          notify_daily?: boolean;
+          notify_new_order?: boolean;
         };
         Update: {
           id?: string;
@@ -404,6 +410,9 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           email?: string | null;
+          email_locale?: string;
+          notify_daily?: boolean;
+          notify_new_order?: boolean;
         };
         Relationships: [
           {

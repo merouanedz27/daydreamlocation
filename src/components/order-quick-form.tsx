@@ -851,23 +851,47 @@ export function OrderQuickForm({
                   )}
                 </div>
 
-                <PickerField
-                  id={`q-slot-${index}`}
-                  value={slot.name}
-                  placeholder={t("orders.quick.pickPlaceholder")}
-                  onOpen={() => openPicker(index)}
-                  onClear={() => applyPicked(index, [])}
-                  invalid={!!issues.lines && index === 0}
-                  // Une ancienne saisie avec sa taille à part (avant les
-                  // listes) : on la montre plutôt que de la perdre de vue.
-                  secondary={
-                    index > 0 && !slot.unitId && slot.size ? (
-                      <span className="text-muted-foreground">
-                        {t("orders.quick.size")} {slot.size}
-                      </span>
-                    ) : undefined
-                  }
-                />
+                {/* Accessoires : TEXTE LIBRE. Le patron ne les met pas en
+                    stock — « Ceinture + cravate rouge » se tape, ne se choisit
+                    pas. Une ancienne commande dont l'accessoire est une pièce
+                    du stock garde sa liste, pour ne pas perdre la pièce. */}
+                {index === ACCESSORIES_SLOT && !slot.unitId ? (
+                  <Input
+                    id={`q-slot-${index}`}
+                    value={slot.name}
+                    placeholder={t("orders.quick.accessoryPlaceholder")}
+                    autoComplete="off"
+                    enterKeyHint="next"
+                    onChange={(e) =>
+                      setSlot(index, {
+                        name: e.target.value,
+                        unitId: null,
+                        ref: null,
+                        stockPrice: null,
+                        external: null,
+                      })
+                    }
+                    className="h-12 text-base"
+                  />
+                ) : (
+                  <PickerField
+                    id={`q-slot-${index}`}
+                    value={slot.name}
+                    placeholder={t("orders.quick.pickPlaceholder")}
+                    onOpen={() => openPicker(index)}
+                    onClear={() => applyPicked(index, [])}
+                    invalid={!!issues.lines && index === 0}
+                    // Une ancienne saisie avec sa taille à part (avant les
+                    // listes) : on la montre plutôt que de la perdre de vue.
+                    secondary={
+                      index > 0 && !slot.unitId && slot.size ? (
+                        <span className="text-muted-foreground">
+                          {t("orders.quick.size")} {slot.size}
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                )}
 
                 {slot.unitId && (
                   <p

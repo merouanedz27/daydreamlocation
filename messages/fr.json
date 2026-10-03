@@ -206,6 +206,7 @@
       "sizeVest": "Taille gilet",
       "sizePants": "Taille pantalon",
       "pickPlaceholder": "Choisir…",
+      "accessoryPlaceholder": "Ceinture, cravate, papillon…",
       "sizeJacketLong": "Taille veste",
       "sizeVestShort": "Gilet",
       "sizePantsShort": "Pantalon",
@@ -415,7 +416,11 @@
     "currentPasswordWrong": "Mot de passe actuel incorrect.",
     "ensembleUnitsRequired": "Ajoutez au moins une pièce.",
     "ensembleUnitInvalid": "Une pièce retirée du stock ne peut pas faire partie d'un ensemble.",
-    "orderCancelledEdit": "Une commande annulée ne se modifie pas : rétablissez-la d’abord depuis sa fiche."
+    "orderCancelledEdit": "Une commande annulée ne se modifie pas : rétablissez-la d’abord depuis sa fiche.",
+    "tooLong": "Ce texte est trop long.",
+    "emailNotConfigured": "L'envoi d'e-mails n'est pas encore configuré.",
+    "noRecipients": "Aucun destinataire avec une adresse e-mail.",
+    "emailFailed": "L'e-mail n'a pas pu partir. Réessayez."
   },
   "roles": {
     "owner": "Administrateur",
@@ -633,5 +638,48 @@
     "ok": "OK",
     "clearSize": "Sans taille",
     "clearValue": "Effacer « {value} »"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "hint": "Écrivez à l'équipe par e-mail, et choisissez qui reçoit les e-mails automatiques.",
+    "notConfigured": "L'envoi d'e-mails n'est pas encore configuré sur le serveur : rien ne partira tant que les réglages SMTP manquent.",
+    "compose": "Écrire à l'équipe",
+    "subject": "Objet",
+    "message": "Message",
+    "recipients": "Destinataires",
+    "everyone": "Toute l'équipe ({count})",
+    "choose": "Choisir",
+    "send": "Envoyer",
+    "sentToast": "{count, plural, one {Envoyé à # membre} other {Envoyé à # membres}}",
+    "automatic": "E-mails automatiques",
+    "automaticHint": "Chaque changement s'enregistre aussitôt.",
+    "newOrder": "Nouvelle commande saisie par un collègue",
+    "daily": "Chaque soir : les mariages de demain",
+    "emailLanguage": "Langue des e-mails",
+    "langFr": "FR",
+    "langAr": "ع",
+    "noEmail": "Pas d'adresse e-mail"
+  },
+  "email": {
+    "footer": "DayDream Location — e-mail envoyé par l'application.",
+    "openApp": "Ouvrir l'application",
+    "openOrder": "Ouvrir la commande",
+    "openTomorrow": "Voir la liste de demain",
+    "messageFrom": "Message de {name}",
+    "customer": "Client :",
+    "phone": "Téléphone :",
+    "eventDate": "Date :",
+    "items": "Tenue :",
+    "newOrder": {
+      "subject": "Nouvelle commande {orderNo} — {customer}",
+      "title": "Nouvelle commande {orderNo}",
+      "by": "Saisie par {name}"
+    },
+    "daily": {
+      "subject": "Demain, {date} : {count, plural, one {# mariage} other {# mariages}}",
+      "title": "Demain, {date}",
+      "intro": "{count, plural, one {# client a son mariage demain.} other {# clients ont leur mariage demain.}}",
+      "pickedUp": "déjà sorti ✈"
+    }
   }
 }

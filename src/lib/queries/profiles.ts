@@ -31,3 +31,35 @@ export async function getTeam(): Promise<Member[]> {
 
   return (data ?? []).map((row) => ({ ...row, role: row.role as Role }));
 }
+
+export type NotificationMember = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  is_active: boolean;
+  notify_new_order: boolean;
+  notify_daily: boolean;
+  email_locale: "fr" | "ar";
+};
+
+/**
+ * L'équipe ACTIVE et ses préférences d'e-mail, pour l'écran Notifications.
+ * Même garde que `getTeam` : `profiles_read` ne montre tout qu'à un
+ * administrateur, la page ajoute `requireOwner`.
+ */
+export async function getNotificationTeam(): Promise<NotificationMember[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, is_active, notify_new_order, notify_daily, email_locale")
+    .eq("is_active", true)
+    .order("full_name");
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    ...row,
+    email_locale: row.email_locale === "ar" ? "ar" : "fr",
+  }));
+}

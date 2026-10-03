@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { MemberForm } from "@/components/member-form";
 import { TeamList } from "@/components/team-list";
 import { requireOwner } from "@/lib/auth";
 import { getTeam } from "@/lib/queries/profiles";
 import { matchesSearch } from "@/lib/search";
+import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -45,7 +48,15 @@ export default async function TeamPage({
           <h1 className="font-heading text-xl font-medium">{t("team.title")}</h1>
           <p className="text-muted-foreground mt-1 text-sm">{t("team.hint")}</p>
         </div>
-        <MemberForm />
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="h-11">
+            <Link href="/equipe/notifications">
+              <Bell className="size-4" aria-hidden />
+              {t("notifications.title")}
+            </Link>
+          </Button>
+          <MemberForm />
+        </div>
       </div>
 
       <div className="ornament mt-5" aria-hidden>

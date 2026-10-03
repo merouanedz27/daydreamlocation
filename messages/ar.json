@@ -206,6 +206,7 @@
       "sizeVest": "مقاس الصدرية",
       "sizePants": "مقاس السروال",
       "pickPlaceholder": "اختيار…",
+      "accessoryPlaceholder": "حزام، ربطة عنق، بابيون…",
       "sizeJacketLong": "مقاس السترة",
       "sizeVestShort": "الصدرية",
       "sizePantsShort": "السروال",
@@ -415,7 +416,11 @@
     "currentPasswordWrong": "كلمة المرور الحالية غير صحيحة.",
     "ensembleUnitsRequired": "أضف قطعة واحدة على الأقل.",
     "ensembleUnitInvalid": "لا يمكن أن تكون قطعة مسحوبة من المخزون ضمن طقم.",
-    "orderCancelledEdit": "لا يمكن تعديل طلبية ملغاة: أعِد تفعيلها أولًا من صفحتها."
+    "orderCancelledEdit": "لا يمكن تعديل طلبية ملغاة: أعِد تفعيلها أولًا من صفحتها.",
+    "tooLong": "هذا النص طويل جدًا.",
+    "emailNotConfigured": "إرسال البريد الإلكتروني غير مُعدّ بعد.",
+    "noRecipients": "لا يوجد مستلم لديه بريد إلكتروني.",
+    "emailFailed": "تعذّر إرسال البريد. حاول مرة أخرى."
   },
   "roles": {
     "owner": "مسؤول",
@@ -633,5 +638,48 @@
     "ok": "موافق",
     "clearSize": "بدون مقاس",
     "clearValue": "مسح «{value}»"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "hint": "راسل الفريق عبر البريد الإلكتروني، واختر من يتلقى الرسائل التلقائية.",
+    "notConfigured": "إرسال البريد غير مُعدّ بعد على الخادم: لن يُرسل شيء ما دامت إعدادات SMTP ناقصة.",
+    "compose": "مراسلة الفريق",
+    "subject": "الموضوع",
+    "message": "الرسالة",
+    "recipients": "المستلمون",
+    "everyone": "كل الفريق ({count})",
+    "choose": "اختيار",
+    "send": "إرسال",
+    "sentToast": "{count, plural, one {أُرسلت إلى عضو واحد} other {أُرسلت إلى # أعضاء}}",
+    "automatic": "الرسائل التلقائية",
+    "automaticHint": "كل تغيير يُحفظ فورًا.",
+    "newOrder": "طلبية جديدة يسجلها زميل",
+    "daily": "كل مساء: أعراس الغد",
+    "emailLanguage": "لغة الرسائل",
+    "langFr": "FR",
+    "langAr": "ع",
+    "noEmail": "لا يوجد بريد إلكتروني"
+  },
+  "email": {
+    "footer": "DayDream Location — رسالة مرسلة من التطبيق.",
+    "openApp": "فتح التطبيق",
+    "openOrder": "فتح الطلبية",
+    "openTomorrow": "قائمة الغد",
+    "messageFrom": "رسالة من {name}",
+    "customer": "الزبون:",
+    "phone": "الهاتف:",
+    "eventDate": "التاريخ:",
+    "items": "اللباس:",
+    "newOrder": {
+      "subject": "طلبية جديدة {orderNo} — {customer}",
+      "title": "طلبية جديدة {orderNo}",
+      "by": "سجّلها {name}"
+    },
+    "daily": {
+      "subject": "غدًا، {date}: {count, plural, one {عرس واحد} other {# أعراس}}",
+      "title": "غدًا، {date}",
+      "intro": "{count, plural, one {زبون واحد عرسه غدًا.} other {# زبائن أعراسهم غدًا.}}",
+      "pickedUp": "خرج ✈"
+    }
   }
 }

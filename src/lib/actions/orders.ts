@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { notifyNewOrder } from "@/lib/email/notify";
 import { getProfile, isOwner } from "@/lib/auth";
 import { fieldErrorsOf, orderSchema, paymentSchema } from "@/lib/validation/orders";
 import type { z } from "zod";
@@ -228,6 +230,12 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   }
 
   revalidatePath(`/${locale}/commandes`, "layout");
+
+  // E-mail « Nouvelle commande » aux collègues, APRÈS la réponse : la saisie
+  // n'attend pas le serveur de messagerie, et un échec d'envoi ne touche pas
+  // la commande, déjà enregistrée.
+  const creatorId = profile.id;
+  after(() => notifyNewOrder(Number(orderId), creatorId));
 
   // La saisie rapide navigue elle-même : elle doit d'abord vider son brouillon,
   // puis soit ouvrir la fiche, soit rester sur place pour la commande suivante.

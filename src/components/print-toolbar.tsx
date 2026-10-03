@@ -22,8 +22,11 @@ export function PrintToolbar({
   hint,
   children,
   action,
+  printButton = true,
 }: {
   backHref: string;
+  /** `false` : le document fournit son propre « Imprimer » dans `action` (le bon). */
+  printButton?: boolean;
   /** Le geste principal du document ; « Imprimer » reste à côté, en second. */
   action?: React.ReactNode;
   /** Une ligne d'aide sous la barre — le bon l'utilise pour dire comment obtenir un PDF. */
@@ -46,15 +49,17 @@ export function PrintToolbar({
         <div className="ms-auto flex items-center gap-2">
           <LocaleSwitcher />
           {action}
-          <Button
-            type="button"
-            variant={action ? "outline" : "default"}
-            onClick={() => window.print()}
-            className="h-11"
-          >
-            <Printer className="size-4" aria-hidden />
-            {t("print.print")}
-          </Button>
+          {printButton && (
+            <Button
+              type="button"
+              variant={action ? "outline" : "default"}
+              onClick={() => window.print()}
+              className="h-11"
+            >
+              <Printer className="size-4" aria-hidden />
+              {t("print.print")}
+            </Button>
+          )}
         </div>
       </div>
 

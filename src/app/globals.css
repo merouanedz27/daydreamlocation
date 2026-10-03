@@ -373,10 +373,11 @@
 
 /* Bon de location : chaque ticket (client, costume) sur sa propre feuille
    4 × 6 pouces (101,6 × 152,4 mm), le format des imprimantes d'étiquettes.
-   Page NOMMÉE : la feuille du jour, elle, reste en A4. */
+   Page NOMMÉE : la feuille du jour, elle, reste en A4. Marge NULLE : le
+   ticket fait pile 4 × 6 et porte sa propre marge (ticket-fit.tsx). */
 @page ticket {
   size: 4in 6in;
-  margin: 4mm;
+  margin: 0;
 }
 
 .print-ticket {

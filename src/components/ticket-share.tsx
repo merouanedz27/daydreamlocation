@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2, Share2 } from "lucide-react";
+import { Loader2, Printer, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fitTicket } from "@/components/ticket-fit";
 
 /** 4 × 6 pouces : 384 × 576 px CSS (96 px au pouce), 288 × 432 points PDF. */
 const WIDTH_PX = 384;
@@ -30,20 +31,9 @@ const PIXEL_RATIO = 3;
  * feuille de partage si le toucher remonte à plus d'un instant — il faut que
  * le fichier soit déjà prêt quand on appuie.
  */
-export function TicketShare({ fileName }: { fileName: string }) {
+export function TicketActions({ fileName }: { fileName: string }) {
   const t = useTranslations("print");
-  const [file, setFile] = useState<File | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    buildPdf(fileName)
-      .then((built) => !cancelled && setFile(built))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [fileName]);
+  const { file, failed } = useTicketPdf(fileName);
 
   async function share() {
     if (!file) return;
@@ -64,18 +54,82 @@ export function TicketShare({ fileName }: { fileName: string }) {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }
 
-  if (failed) return null;
-
   return (
-    <Button type="button" onClick={share} disabled={!file} className="h-11">
-      {file ? (
-        <Share2 className="size-4" aria-hidden />
-      ) : (
-        <Loader2 className="size-4 animate-spin" aria-hidden />
+    <>
+      {!failed && (
+        <Button type="button" onClick={share} disabled={!file} className="h-11">
+          {file ? (
+            <Share2 className="size-4" aria-hidden />
+          ) : (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          )}
+          {file ? t("share") : t("preparing")}
+        </Button>
       )}
-      {file ? t("share") : t("preparing")}
-    </Button>
+      <Button type="button" variant="outline" onClick={() => printTickets(file)} className="h-11">
+        <Printer className="size-4" aria-hidden />
+        {t("print")}
+      </Button>
+    </>
   );
+}
+
+/**
+ * « Imprimer » — le PDF 4 × 6 lui-même quand le navigateur sait l'afficher
+ * (Chrome, Edge, Firefox sur ordinateur) : l'imprimante reçoit des pages de
+ * 4 × 6 pouces, quels que soient les réglages de papier et de marges de la
+ * boîte d'impression. Ailleurs (Android, iPhone), l'impression de la page,
+ * elle aussi réglée à 4 × 6.
+ */
+function printTickets(file: File | null) {
+  const ua = navigator.userAgent;
+  const inlinePdf =
+    file &&
+    navigator.pdfViewerEnabled &&
+    /Chrome|Edg|Firefox/.test(ua) &&
+    !/Mobi|Android/.test(ua);
+  if (!inlinePdf) {
+    window.print();
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  const frame = document.createElement("iframe");
+  Object.assign(frame.style, { position: "fixed", width: "0", height: "0", border: "0" });
+  frame.src = url;
+  frame.onload = () => {
+    try {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    } catch {
+      window.print();
+    }
+    // La boîte d'impression est modale ailleurs, pas dans un PDF intégré :
+    // on laisse une minute avant de tout retirer.
+    setTimeout(() => {
+      frame.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
+  };
+  document.body.appendChild(frame);
+}
+
+/** Le PDF du bon, préparé une fois à l'ouverture et partagé par les deux boutons. */
+function useTicketPdf(fileName: string): { file: File | null; failed: boolean } {
+  const [file, setFile] = useState<File | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    buildPdf(fileName)
+      .then((built) => !cancelled && setFile(built))
+      .catch(() => !cancelled && setFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [fileName]);
+
+  return { file, failed };
 }
 
 async function buildPdf(fileName: string): Promise<File> {
@@ -107,12 +161,8 @@ async function buildPdf(fileName: string): Promise<File> {
     );
     const image = await pdf.embedJpg(bytes);
     const page = pdf.addPage(PAGE_PT);
-    // Un ticket plus long que 6 pouces est RÉDUIT pour tenir sur sa page,
-    // jamais coupé sur une seconde.
-    const scale = Math.min(PAGE_PT[0] / image.width, PAGE_PT[1] / image.height);
-    const w = image.width * scale;
-    const h = image.height * scale;
-    page.drawImage(image, { x: (PAGE_PT[0] - w) / 2, y: PAGE_PT[1] - h, width: w, height: h });
+    // La photo fait pile 4 × 6 (texte déjà ajusté) : elle couvre la page.
+    page.drawImage(image, { x: 0, y: 0, width: PAGE_PT[0], height: PAGE_PT[1] });
   }
 
   const bytes = await pdf.save();
@@ -136,18 +186,21 @@ async function snapshot(
     top: "0",
     left: "-10000px",
     width: `${WIDTH_PX}px`,
+    height: `${HEIGHT_PX}px`,
     maxWidth: "none",
-    minHeight: `${HEIGHT_PX}px`,
     margin: "0",
     border: "0",
     borderRadius: "0",
+    // À l'écran, la feuille est réduite pour tenir sur le téléphone : pas la copie.
+    scale: "none",
   });
   ticket.parentElement!.appendChild(copy);
   try {
     await new Promise((resolve) => requestAnimationFrame(resolve));
+    fitTicket(copy);
     const options = {
       width: WIDTH_PX,
-      height: Math.max(HEIGHT_PX, copy.scrollHeight),
+      height: HEIGHT_PX,
       pixelRatio: PIXEL_RATIO,
       backgroundColor: "#ffffff",
       // Sans lui, deux images qui ne diffèrent que par `?url=…` (le cas de
@@ -155,7 +208,7 @@ async function snapshot(
       // devenait le 1ᵉʳ.
       includeQueryParams: true,
       // La copie est hors de l'écran : dans l'image, elle se pose à l'origine.
-      style: { position: "static", left: "auto" },
+      style: { position: "static", left: "auto", scale: "none" },
     };
     // Safari n'intègre les images et les polices qu'au DEUXIÈME passage : le
     // premier sert d'échauffement.

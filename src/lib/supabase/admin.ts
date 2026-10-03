@@ -10,11 +10,15 @@ import type { Database } from "./database.types";
  * contre une clé secrète expédiée au navigateur ; l'absence de préfixe
  * `NEXT_PUBLIC_` en est la seconde.
  *
- * UNE SEULE RAISON D'EXISTER : créer un compte `auth.users`, ce que l'API Data
- * ne permet pas — et l'inscription publique est fermée par conception, puisque
- * la clé publiable est visible dans chaque navigateur. Deux appelants, tous
- * deux dans `src/lib/actions/team.ts` : `createMember` et, pour couper le
- * renouvellement de session d'un membre désactivé, `setMemberActive`.
+ * DEUX RAISONS D'EXISTER :
+ * - créer un compte `auth.users`, ce que l'API Data ne permet pas — et
+ *   l'inscription publique est fermée par conception, puisque la clé publiable
+ *   est visible dans chaque navigateur. Appelants : `createMember` et, pour
+ *   couper le renouvellement de session d'un membre désactivé,
+ *   `setMemberActive` (`src/lib/actions/team.ts`) ;
+ * - les e-mails de l'équipe (`src/lib/email/notify.ts`) : la tâche du soir n'a
+ *   pas de session, et un membre `staff` ne lit pas les profils des autres.
+ *   LECTURE SEULE, et rien qui sorte de l'e-mail : noms, adresses, commande.
  * Tout le reste de l'application passe par `src/lib/supabase/server.ts`,
  * donc par RLS.
  *
@@ -32,7 +36,7 @@ export function createAdminClient() {
   const secret = process.env.SUPABASE_SECRET_KEY;
 
   if (!url || !secret) {
-    throw new Error("SUPABASE_SECRET_KEY absente : gestion de l'équipe indisponible.");
+    throw new Error("SUPABASE_SECRET_KEY absente : gestion de l'équipe et e-mails indisponibles.");
   }
 
   return createSupabaseClient<Database>(url, secret, {
