@@ -5,6 +5,7 @@ import {
   SORTABLE,
   orderSearchFilter,
   ordersFilters,
+  searchTerm,
   type OrderRow,
   type OrderTableRow,
   type OrdersQuery,
@@ -14,6 +15,33 @@ import {
 const ROW_COLUMNS = `id, order_no, customer_name, customer_phone, event_date,
   pickup_date, return_due_date, status, picked_up, returned, total_price,
   amount_paid, balance, caution_amount`;
+
+/** Au-delà, le terme est trop vague (« a ») pour servir : on s'en tient aux commandes les plus récentes. */
+const MAX_PIECE_MATCHES = 300;
+
+/**
+ * Les commandes dont une PIÈCE porte le terme cherché — « Tuxedo B »,
+ * « Bligha 44 », une référence du stock. Le nom vient de l'instantané posé sur
+ * la ligne à la saisie (`model_name_snapshot`) ou du libellé d'une pièce
+ * externe : c'est ce que montre la colonne « Pièces » du tableau.
+ *
+ * Une seconde requête plutôt qu'une jointure filtrée : PostgREST ne sait pas
+ * mettre un filtre sur une table liée DANS le `.or(...)` de la commande. Les
+ * identifiants trouvés rejoignent donc la recherche par nom et téléphone.
+ */
+export async function pieceOrderIds(q: string | null | undefined): Promise<number[]> {
+  const term = searchTerm(q);
+  if (!term) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("order_lines")
+    .select("order_id")
+    .eq("is_active", true)
+    .or(`model_name_snapshot.ilike.%${term}%,external_label.ilike.%${term}%`)
+    .order("order_id", { ascending: false })
+    .limit(MAX_PIECE_MATCHES);
+  return [...new Set((data ?? []).map((l) => l.order_id))];
+}
 
 /**
  * Une tranche du tableau des commandes : recherche, filtre, tri, puis
@@ -32,7 +60,7 @@ export async function getOrdersTable(
   offset = 0,
   limit = ORDERS_BATCH,
 ): Promise<{ rows: OrderTableRow[]; total: number }> {
-  const supabase = await createClient();
+  const [supabase, pieceIds] = await Promise.all([createClient(), pieceOrderIds(query.q)]);
 
   let request = supabase
     .from("orders")
@@ -44,7 +72,7 @@ export async function getOrdersTable(
     );
 
   // Mêmes filtres que l'export Excel : voir `ordersFilters`.
-  const { search, status } = ordersFilters(query);
+  const { search, status } = ordersFilters(query, pieceIds);
   if (search) request = request.or(search);
   if (status) request = request.eq("status", status);
 
@@ -101,14 +129,14 @@ export async function getOrdersByEventDate(
   to: IsoDate,
   q?: string,
 ): Promise<OrderRow[]> {
-  const supabase = await createClient();
+  const [supabase, pieceIds] = await Promise.all([createClient(), pieceOrderIds(q)]);
   let request = supabase
     .from("orders")
     .select(ROW_COLUMNS)
     .gte("event_date", from)
     .lte("event_date", to)
     .neq("status", "annulee");
-  const search = orderSearchFilter(q);
+  const search = orderSearchFilter(q, pieceIds);
   if (search) request = request.or(search);
 
   const { data } = await request
@@ -128,14 +156,14 @@ export async function getOrdersByEventDate(
  * retour prévu le plus ancien.
  */
 export async function getNotReturned(q?: string): Promise<OrderRow[]> {
-  const supabase = await createClient();
+  const [supabase, pieceIds] = await Promise.all([createClient(), pieceOrderIds(q)]);
   let request = supabase
     .from("orders")
     .select(ROW_COLUMNS)
     .eq("picked_up", true)
     .eq("returned", false)
     .neq("status", "annulee");
-  const search = orderSearchFilter(q);
+  const search = orderSearchFilter(q, pieceIds);
   if (search) request = request.or(search);
 
   const { data } = await request

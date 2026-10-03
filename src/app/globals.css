@@ -355,6 +355,18 @@
   margin: 12mm;
 }
 
+/* Bon de location : chaque ticket (client, costume) sur sa propre feuille
+   4 × 6 pouces (101,6 × 152,4 mm), le format des imprimantes d'étiquettes.
+   Page NOMMÉE : la feuille du jour, elle, reste en A4. */
+@page ticket {
+  size: 4in 6in;
+  margin: 4mm;
+}
+
+.print-ticket {
+  page: ticket;
+}
+
 @utility bottom-above-nav {
   bottom: calc(3.5rem + 1px + max(env(safe-area-inset-bottom), 0.5rem));
 }

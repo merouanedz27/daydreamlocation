@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Une feuille A4. À l'écran : une page blanche bordée, à la largeur du papier.
+ * Une feuille (A4 par défaut ; `className` change le format). À l'écran : une page blanche bordée, à la largeur du papier.
  * À l'impression : plus de bordure ni de marge propre — les marges du papier
  * sont celles de `@page` dans `globals.css`, et les doubler ferait perdre un
  * centimètre de chaque côté.

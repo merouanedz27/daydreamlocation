@@ -119,13 +119,16 @@ export function sanitizeSearch(term: string): string {
  * contenir EXACTEMENT les commandes qu'on voit filtrées à l'écran. Deux copies
  * de cette logique finiraient par diverger, et l'export mentirait sans bruit.
  */
-export function ordersFilters(query: OrdersQuery): {
+export function ordersFilters(
+  query: OrdersQuery,
+  pieceOrderIds: number[] = [],
+): {
   /** Argument de `.or(...)`, ou `null` sans recherche. */
   search: string | null;
   status: OrderStatus | null;
 } {
   return {
-    search: orderSearchFilter(query.q),
+    search: orderSearchFilter(query.q, pieceOrderIds),
     status: query.status,
   };
 }
@@ -137,13 +140,24 @@ export function ordersFilters(query: OrdersQuery): {
  * chose partout.
  *
  * On cherche sur ce que l'équipe a sous les yeux quand le client appelle :
- * son nom, le numéro de commande, son téléphone.
+ * son nom, le numéro de commande, son téléphone — et ce qu'il emporte : les
+ * commandes dont une PIÈCE porte ce nom (« Tuxedo B », « Bligha ») arrivent par
+ * `pieceOrderIds`, trouvées au préalable dans `order_lines` (voir
+ * `orderSearch` dans `queries/orders-list.ts`).
  */
-export function orderSearchFilter(q: string | null | undefined): string | null {
-  const term = sanitizeSearch((q ?? "").trim().slice(0, 80));
-  return term
-    ? `customer_name.ilike.%${term}%,order_no.ilike.%${term}%,customer_phone.ilike.%${term}%`
-    : null;
+export function orderSearchFilter(
+  q: string | null | undefined,
+  pieceOrderIds: number[] = [],
+): string | null {
+  const term = searchTerm(q);
+  if (!term) return null;
+  const filter = `customer_name.ilike.%${term}%,order_no.ilike.%${term}%,customer_phone.ilike.%${term}%`;
+  return pieceOrderIds.length ? `${filter},id.in.(${pieceOrderIds.join(",")})` : filter;
+}
+
+/** Le terme de recherche nettoyé, ou une chaîne vide. */
+export function searchTerm(q: string | null | undefined): string {
+  return sanitizeSearch((q ?? "").trim().slice(0, 80));
 }
 
 /**

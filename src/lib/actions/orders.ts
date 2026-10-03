@@ -552,3 +552,95 @@ export async function deleteOrder(formData: FormData): Promise<ActionResult> {
   revalidatePath(`/${locale}/depenses`);
   redirectTo("/commandes", locale);
 }
+
+/** Ce que la base a gardé de chaque commande touchée : l'écran recopie, il ne devine pas. */
+export type BulkResult =
+  | {
+      ok: true;
+      rows: {
+        id: number;
+        picked_up: boolean;
+        returned: boolean;
+        status: string;
+      }[];
+    }
+  | { ok: false; error: string };
+
+/** Au plus une tranche raisonnable par geste : la sélection se fait au doigt, pas par milliers. */
+const MAX_BULK = 500;
+
+function parseIds(value: FormDataEntryValue | null): number[] | null {
+  const ids = String(value ?? "")
+    .split(",")
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0);
+  return ids.length && ids.length <= MAX_BULK ? [...new Set(ids)] : null;
+}
+
+/**
+ * « Aller validé » / « Retour validé » sur PLUSIEURS commandes à la fois,
+ * depuis la sélection du tableau. Même règle que `setOrderChecks` : on écrit
+ * la case, le trigger en déduit le statut.
+ *
+ * Les commandes annulées sont laissées de côté : cocher leur case ne changerait
+ * pas leur statut (le trigger la garde annulée) et ne ferait qu'embrouiller.
+ */
+export async function setOrdersChecks(formData: FormData): Promise<BulkResult> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const ids = parseIds(formData.get("ids"));
+  if (!ids) return { ok: false, error: "errors.generic" };
+
+  const field = String(formData.get("field"));
+  if (field !== "picked_up" && field !== "returned") {
+    return { ok: false, error: "errors.generic" };
+  }
+  const value = formData.get("value") === "1";
+  const patch = field === "picked_up" ? { picked_up: value } : { returned: value };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .update(patch)
+    .in("id", ids)
+    .neq("status", "annulee")
+    .select("id, picked_up, returned, status");
+
+  if (error) return { ok: false, error: "errors.generic" };
+
+  revalidatePath(`/${locale}/commandes`, "layout");
+  return { ok: true, rows: data ?? [] };
+}
+
+/**
+ * Supprimer PLUSIEURS commandes — propriétaire uniquement, comme `deleteOrder`.
+ * La policy `orders_delete_owner` reste le vrai juge ; les lignes et les frais
+ * suivent les mêmes règles de cascade.
+ */
+export async function deleteOrders(formData: FormData): Promise<BulkResult> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const ids = parseIds(formData.get("ids"));
+  if (!ids) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .delete()
+    .in("id", ids)
+    .select("id, picked_up, returned, status");
+
+  if (error) return { ok: false, error: "errors.generic" };
+  if (!data?.length) return { ok: false, error: "errors.forbidden" };
+
+  revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/tableau-de-bord`);
+  revalidatePath(`/${locale}/depenses`);
+  return { ok: true, rows: data };
+}

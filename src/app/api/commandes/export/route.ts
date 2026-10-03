@@ -4,6 +4,7 @@ import writeXlsxFile, { type Row } from "write-excel-file/node";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
 import { ordersFilters, parseOrdersQuery, SORTABLE } from "@/lib/orders-query";
+import { pieceOrderIds } from "@/lib/queries/orders-list";
 import { todayIso } from "@/lib/rental-range";
 import { routing, type Locale } from "@/i18n/routing";
 
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     tri: params.get("tri") ?? undefined,
     sens: params.get("sens") ?? undefined,
   });
-  const { search, status } = ordersFilters(query);
+  const { search, status } = ordersFilters(query, await pieceOrderIds(query.q));
 
   const supabase = await createClient();
   const orders: ExportOrder[] = [];

@@ -33,16 +33,14 @@ export async function generateMetadata(props: {
 }
 
 /**
- * Bon de location — DEUX TICKETS sur une feuille, comme le modèle Word du
- * propriétaire (« Daydream Ticket ») :
+ * Bon de location — DEUX TICKETS, chacun sur sa feuille 4 × 6 pouces, d'après
+ * le modèle Word du propriétaire (« Daydream Ticket ») :
  *
  * - en haut, le ticket du CLIENT : logo, téléphone de la boutique, conditions,
  *   les pièces et l'argent (versement, prix, reste). Il repart avec lui ;
  * - en bas, le ticket du COSTUME : les mêmes pièces et tailles, SANS argent.
  *   Il s'accroche au cintre (يتعلق في الكوستوم) : c'est lui qui dit à l'équipe
  *   à qui appartient la housse.
- *
- * On découpe sur le pointillé du milieu.
  *
  * CE QUI N'Y FIGURE JAMAIS : le coût et le nom du confrère d'une pièce
  * externe, ni la note interne de la commande.
@@ -161,9 +159,9 @@ export default async function OrderSlipPage({
     <>
       <PrintToolbar backHref={`/commandes/${order.id}`} hint={t("print.pdfHint")} />
 
-      <PrintSheet>
+      <div className="space-y-4 print:space-y-0">
         {/* --- Ticket du CLIENT ------------------------------------------- */}
-        <section className="flex min-h-[128mm] break-inside-avoid flex-col">
+        <PrintSheet className={cn(TICKET, "print:break-after-page")}>
           <TicketHead orderNo={order.order_no} label={t("print.ticket.clientCopy")} />
           {/* `print-color-adjust: exact` : sans lui, Chrome « économise
               l'encre » et délave le logo. */}
@@ -172,7 +170,7 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             sizes="260px"
-            className="mx-auto mt-1 h-auto w-[65mm] [print-color-adjust:exact]"
+            className="mx-auto mt-1 h-auto w-[60mm] [print-color-adjust:exact]"
           />
 
           {(shopPhone || terms) && (
@@ -204,32 +202,34 @@ export default async function OrderSlipPage({
               </div>
             ))}
           </dl>
-        </section>
-
-        {/* --- Le pointillé où l'on découpe -------------------------------- */}
-        <div className="text-muted-foreground my-4 flex items-center gap-2 text-xs" aria-hidden>
-          <span>✂</span>
-          <span className="border-foreground flex-1 border-t border-dashed" />
-        </div>
+        </PrintSheet>
 
         {/* --- Ticket du COSTUME : sans argent ---------------------------- */}
-        <section className="flex break-inside-avoid flex-col">
+        <PrintSheet className={cn(TICKET, "text-base")}>
           <TicketHead orderNo={order.order_no} label={t("print.ticket.costumeCopy")} />
           <Image
             src={suit}
             alt=""
             sizes="96px"
-            className="mx-auto h-auto w-[24mm] [print-color-adjust:exact]"
+            className="mx-auto mt-1 h-auto w-[30mm] [print-color-adjust:exact]"
           />
           {cancelledBanner}
           <TicketRows rows={rows} />
-        </section>
-      </PrintSheet>
+        </PrintSheet>
+      </div>
     </>
   );
 }
 
-/** Le numéro de commande en tête de CHAQUE moitié : une fois découpées, les deux se retrouvent. */
+/**
+ * Une feuille 4 × 6 pouces par ticket (page nommée `ticket`, globals.css). À
+ * l'écran, la même taille que le papier ; à l'impression, la hauteur suit le
+ * contenu — une hauteur fixe risquerait de pousser une page blanche.
+ */
+const TICKET =
+  "print-ticket flex max-w-[4in] min-h-[6in] flex-col p-[4mm] sm:p-[4mm] print:min-h-0";
+
+/** Le numéro de commande en tête de CHAQUE ticket : une fois séparés, les deux se retrouvent. */
 function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
   return (
     <div className="text-muted-foreground flex items-baseline justify-between text-xs">

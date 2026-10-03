@@ -217,6 +217,15 @@
     "messageCustomer": "Envoyer un SMS",
     "checkedToast": "{label} — {name}",
     "countTotal": "{count, plural, =0 {Aucune commande} =1 {1 commande} other {{n} commandes}}",
+    "selectAll": "Tout sélectionner",
+    "selectNamed": "Sélectionner {name}",
+    "selectedCount": "{count, plural, =1 {1 sélectionnée} other {{n} sélectionnées}}",
+    "clearSelection": "Désélectionner",
+    "bulkChecked": "{label} — {count, plural, =1 {1 commande} other {{n} commandes}}",
+    "bulkSkipped": "Les commandes annulées ont été laissées de côté.",
+    "deleteManyTitle": "Supprimer {count, plural, =1 {1 commande} other {{n} commandes}} ?",
+    "deleteManyBody": "{names}. Elles sont effacées du registre et du chiffre d’affaires, et leurs pièces redeviennent disponibles. Leurs frais restent dans les dépenses. Cette action est irréversible.",
+    "deletedMany": "{count, plural, =1 {1 commande supprimée} other {{n} commandes supprimées}}",
     "endOfList": "Fin de la liste",
     "edit": {
       "action": "Modifier",
@@ -598,7 +607,7 @@
     "empty": "Aucun frais noté pour l'instant."
   },
   "search": {
-    "orders": "Chercher une commande : nom, n°, téléphone",
+    "orders": "Chercher : nom, n°, téléphone, costume",
     "stock": "Chercher dans le stock",
     "ensembles": "Chercher un ensemble ou une pièce",
     "frais": "Chercher un frais",

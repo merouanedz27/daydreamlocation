@@ -1,14 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowDown, ArrowUp, CalendarPlus, Check, Plus, X } from "lucide-react";
+import { toast } from "sonner";
+import {
+  ArrowDown,
+  ArrowUp,
+  CalendarPlus,
+  Check,
+  CircleCheck,
+  Plane,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MessageButton } from "@/components/customer-message";
+import { deleteOrders, setOrdersChecks, type BulkResult } from "@/lib/actions/orders";
 import { loadMoreOrders } from "@/lib/actions/orders-list";
 import {
   DONE_NAME_CLASS,
@@ -126,9 +139,15 @@ export function OrdersList({
   const [loading, setLoading] = useState(false);
   /** Le serveur n'a plus rien rendu (commandes supprimées entre-temps). */
   const [exhausted, setExhausted] = useState(false);
+  /** Commandes supprimées depuis ce tableau : le total affiché les retire. */
+  const [removed, setRemoved] = useState(0);
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, startTransition] = useTransition();
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
-  const done = exhausted || rows.length >= total;
+  const shownTotal = Math.max(total - removed, rows.length);
+  const done = exhausted || rows.length >= shownTotal;
   const columns = isOwner ? COLUMNS : COLUMNS.filter((c) => !OWNER_ONLY.includes(c));
 
   // Une tranche de plus quand le bas du tableau approche (200 px d'avance :
@@ -164,6 +183,102 @@ export function OrdersList({
 
   const hasFilters = Boolean(params.get("q") || params.get("statut"));
 
+  /**
+   * La sélection ne porte que sur les lignes CHARGÉES : « tout sélectionner »
+   * prend ce que l'équipe a sous les yeux, jamais des commandes qu'elle n'a
+   * pas vues plus bas dans la liste.
+   */
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  function toggleOne(id: number) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
+  }
+
+  /** Recopie ce que la base a gardé : le statut vient du trigger, pas de l'écran. */
+  function applyRows(changed: Extract<BulkResult, { ok: true }>["rows"]) {
+    const byId = new Map(changed.map((r) => [r.id, r]));
+    setRows((current) =>
+      current.map((row) => {
+        const fresh = byId.get(row.id);
+        return fresh ? { ...row, ...fresh } : row;
+      }),
+    );
+  }
+
+  function checksData(ids: number[], field: "picked_up" | "returned", value: boolean) {
+    const data = new FormData();
+    data.set("ids", ids.join(","));
+    data.set("locale", locale);
+    data.set("field", field);
+    data.set("value", value ? "1" : "0");
+    return data;
+  }
+
+  /** ✈ / ✓ sur toute la sélection : on VALIDE, on ne bascule pas. */
+  function bulkCheck(field: "picked_up" | "returned") {
+    const ids = [...selected];
+    const label = field === "picked_up" ? t("orders.pickedUp") : t("orders.returned");
+    startTransition(async () => {
+      const result = await setOrdersChecks(checksData(ids, field, true));
+      if (!result.ok) {
+        toast.error(t(result.error));
+        return;
+      }
+      applyRows(result.rows);
+      setSelected(new Set());
+      toast.success(
+        t("orders.bulkChecked", {
+          label,
+          count: result.rows.length,
+          n: formatNumber(result.rows.length, locale),
+        }),
+      );
+      if (result.rows.length < ids.length) toast.info(t("orders.bulkSkipped"));
+    });
+  }
+
+  /**
+   * Une case ✗ / ✓ du tableau se coche au doigt, comme la case de la fiche.
+   * Optimiste : elle répond tout de suite et revient en arrière si la base
+   * refuse (commande annulée, droits).
+   */
+  function toggleCell(order: OrderTableRow, field: "picked_up" | "returned") {
+    const next = !order[field];
+    const before = {
+      picked_up: order.picked_up,
+      returned: order.returned,
+      status: order.status,
+    };
+    setRows((current) => current.map((r) => (r.id === order.id ? { ...r, [field]: next } : r)));
+    startTransition(async () => {
+      const result = await setOrdersChecks(checksData([order.id], field, next));
+      if (result.ok && result.rows.length) {
+        applyRows(result.rows);
+        return;
+      }
+      setRows((current) => current.map((r) => (r.id === order.id ? { ...r, ...before } : r)));
+      toast.error(t(result.ok ? "orders.bulkSkipped" : result.error));
+    });
+  }
+
+  const selectedRows = rows.filter((r) => selected.has(r.id));
+  const NAMES_SHOWN = 5;
+  const deleteNames =
+    selectedRows
+      .slice(0, NAMES_SHOWN)
+      .map((r) => `${r.customer_name} (${r.order_no})`)
+      .join(", ") + (selectedRows.length > NAMES_SHOWN ? "…" : "");
+
   if (!rows.length) {
     return (
       <div className="border-border mt-6 flex flex-col items-center rounded-lg border border-dashed px-6 py-16 text-center">
@@ -197,15 +312,22 @@ export function OrdersList({
     switch (column) {
       case "customer_name":
         return (
-          <Link
-            href={`/commandes/${order.id}`}
-            className={cn(
-              "hover:text-gold-strong font-medium underline-offset-4 hover:underline",
-              isOrderDone(order) && DONE_NAME_CLASS,
-            )}
-          >
-            {order.customer_name}
-          </Link>
+          <div className="flex items-center">
+            <SelectBox
+              checked={selected.has(order.id)}
+              onChange={() => toggleOne(order.id)}
+              label={t("orders.selectNamed", { name: order.customer_name })}
+            />
+            <Link
+              href={`/commandes/${order.id}`}
+              className={cn(
+                "hover:text-gold-strong text-foreground min-w-0 truncate text-base font-semibold underline-offset-4 hover:underline",
+                isOrderDone(order) && DONE_NAME_CLASS,
+              )}
+            >
+              {order.customer_name}
+            </Link>
+          </div>
         );
       case "customer_phone":
         return order.customer_phone ? (
@@ -226,13 +348,30 @@ export function OrdersList({
       case "return_due_date":
         return <span className="tabular">{formatDate(order[column], locale)}</span>;
       case "picked_up":
-      case "returned":
-        // ✗ / ✓ comme les deux colonnes de son AppSheet.
-        return order[column] ? (
-          <Check className="text-success-foreground mx-auto size-5" aria-label={t("common.yes")} />
-        ) : (
-          <X className="text-destructive/70 mx-auto size-4" aria-label={t("common.no")} />
+      case "returned": {
+        // ✗ / ✓ comme les deux colonnes de son AppSheet — et un toucher les bascule.
+        const label = column === "picked_up" ? t("orders.pickedUp") : t("orders.returned");
+        return (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={order[column]}
+            aria-label={t("orders.checkedToast", {
+              label,
+              name: order.customer_name,
+            })}
+            disabled={busy || order.status === "annulee"}
+            onClick={() => toggleCell(order, column)}
+            className="hover:bg-muted mx-auto flex size-11 items-center justify-center rounded-full disabled:opacity-60"
+          >
+            {order[column] ? (
+              <Check className="text-success-foreground size-5" aria-hidden />
+            ) : (
+              <X className="text-destructive/70 size-4" aria-hidden />
+            )}
+          </button>
         );
+      }
       case "pieces":
         return order.pieces.length ? order.pieces.join(" · ") : "—";
       case "tailor":
@@ -270,9 +409,111 @@ export function OrdersList({
 
   return (
     <>
-      <p className="text-muted-foreground mt-4 text-sm">
-        {t("orders.countTotal", { count: total, n: formatNumber(total, locale) })}
-      </p>
+      {selected.size ? (
+        // La barre de la sélection prend la place du compteur : les gestes
+        // restent au-dessus du tableau, sous le pouce.
+        <div
+          role="toolbar"
+          aria-label={t("orders.selectedCount", {
+            count: selected.size,
+            n: formatNumber(selected.size, locale),
+          })}
+          className="bg-gold-soft mt-3 flex flex-wrap items-center gap-2 rounded-lg p-1.5"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setSelected(new Set())}
+            aria-label={t("orders.clearSelection")}
+            className="size-11"
+          >
+            <X className="size-5" aria-hidden />
+          </Button>
+          <span className="me-auto text-sm font-medium">
+            {t("orders.selectedCount", {
+              count: selected.size,
+              n: formatNumber(selected.size, locale),
+            })}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => bulkCheck("picked_up")}
+            className="bg-background h-11"
+          >
+            {busy ? (
+              <Spinner className="size-4" />
+            ) : (
+              <Plane className="size-4 rtl:-scale-x-100" aria-hidden />
+            )}
+            {t("orders.pickedUp")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => bulkCheck("returned")}
+            className="bg-background h-11"
+          >
+            {busy ? <Spinner className="size-4" /> : <CircleCheck className="size-4" aria-hidden />}
+            {t("orders.returned")}
+          </Button>
+          {/* Supprimer reste au propriétaire, comme sur la fiche. */}
+          {isOwner && (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={busy}
+              onClick={() => setConfirmDelete(true)}
+              className="h-11"
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {t("common.delete")}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <p className="text-muted-foreground mt-4 text-sm">
+          {t("orders.countTotal", {
+            count: shownTotal,
+            n: formatNumber(shownTotal, locale),
+          })}
+        </p>
+      )}
+
+      {isOwner && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          icon={<Trash2 className="size-4" />}
+          title={t("orders.deleteManyTitle", {
+            count: selectedRows.length,
+            n: formatNumber(selectedRows.length, locale),
+          })}
+          description={t("orders.deleteManyBody", { names: deleteNames })}
+          confirmLabel={t("orders.deleteOrder")}
+          cancelLabel={t("orders.keepOrder")}
+          onConfirm={async () => {
+            const data = new FormData();
+            data.set("ids", selectedRows.map((r) => r.id).join(","));
+            data.set("locale", locale);
+            const result = await deleteOrders(data);
+            if (!result.ok) return result;
+            const gone = new Set(result.rows.map((r) => r.id));
+            setRows((current) => current.filter((r) => !gone.has(r.id)));
+            setRemoved((n) => n + gone.size);
+            setSelected(new Set());
+            toast.success(
+              t("orders.deletedMany", {
+                count: gone.size,
+                n: formatNumber(gone.size, locale),
+              }),
+            );
+            return { ok: true };
+          }}
+        />
+      )}
 
       <div
         ref={scroller}
@@ -300,26 +541,36 @@ export function OrdersList({
                       money ? "text-end" : "text-start",
                     )}
                   >
-                    {sortable ? (
-                      <Link
-                        href={sortHref(column as SortKey)}
-                        className={cn(
-                          "hover:text-foreground flex min-h-11 items-center gap-1",
-                          money && "justify-end",
-                          active && "text-foreground",
-                        )}
-                      >
-                        {label}
-                        {active &&
-                          (ascending ? (
-                            <ArrowUp className="size-3.5 shrink-0" aria-hidden />
-                          ) : (
-                            <ArrowDown className="size-3.5 shrink-0" aria-hidden />
-                          ))}
-                      </Link>
-                    ) : (
-                      <span className="flex min-h-11 items-center">{label}</span>
-                    )}
+                    <div className="flex items-center">
+                      {i === 0 && (
+                        <SelectBox
+                          checked={allSelected}
+                          indeterminate={someSelected}
+                          onChange={toggleAll}
+                          label={t("orders.selectAll")}
+                        />
+                      )}
+                      {sortable ? (
+                        <Link
+                          href={sortHref(column as SortKey)}
+                          className={cn(
+                            "hover:text-foreground flex min-h-11 flex-1 items-center gap-1",
+                            money && "justify-end",
+                            active && "text-foreground",
+                          )}
+                        >
+                          {label}
+                          {active &&
+                            (ascending ? (
+                              <ArrowUp className="size-3.5 shrink-0" aria-hidden />
+                            ) : (
+                              <ArrowDown className="size-3.5 shrink-0" aria-hidden />
+                            ))}
+                        </Link>
+                      ) : (
+                        <span className="flex min-h-11 flex-1 items-center">{label}</span>
+                      )}
+                    </div>
                   </th>
                 );
               })}
@@ -332,10 +583,14 @@ export function OrdersList({
                 // Toute la ligne s'ouvre au toucher ; le vrai lien reste sur
                 // le nom (focus clavier, nom accessible).
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a,button")) return;
+                  if ((e.target as HTMLElement).closest("a,button,label,input")) return;
                   router.push(`/commandes/${order.id}`, { locale });
                 }}
-                className="hover:[&>td]:bg-accent cursor-pointer"
+                aria-selected={selected.has(order.id)}
+                className={cn(
+                  "hover:[&>td]:bg-accent cursor-pointer",
+                  selected.has(order.id) && "[&>td]:bg-gold-soft",
+                )}
               >
                 {columns.map((column, i) => (
                   <td
@@ -344,7 +599,7 @@ export function OrdersList({
                       "border-border h-12 border-b px-3 align-middle whitespace-nowrap",
                       r % 2 ? STRIPE : "bg-background",
                       i > 0 && "border-s",
-                      i === 0 && "sticky start-0 z-1 max-w-44 truncate border-e",
+                      i === 0 && "sticky start-0 z-1 max-w-56 border-e ps-0",
                       MONEY.includes(column) && "tabular text-end",
                       (column === "picked_up" || column === "returned" || column === "message") &&
                         "text-center",
@@ -381,5 +636,36 @@ export function OrdersList({
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Une case de sélection, avec une cible de 44 px autour d'une case de 20 :
+ * on la touche au pouce sans ouvrir la commande par mégarde.
+ */
+function SelectBox({
+  checked,
+  indeterminate = false,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  return (
+    <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
+      <input
+        type="checkbox"
+        checked={checked}
+        ref={(el) => {
+          if (el) el.indeterminate = indeterminate;
+        }}
+        onChange={onChange}
+        aria-label={label}
+        className="accent-primary size-5 cursor-pointer"
+      />
+    </label>
   );
 }
