@@ -170,12 +170,9 @@ export default async function OrderSlipPage({
     },
   ];
 
-  // Les conditions s'impriment dans la langue du bon, sinon dans l'autre :
-  // le modèle du propriétaire les porte en arabe même sur un bon français.
-  const terms =
-    (l === "ar"
-      ? (settings.rental_terms_ar ?? settings.rental_terms_fr)
-      : (settings.rental_terms_fr ?? settings.rental_terms_ar)) ?? null;
+  // Conditions supplémentaires de la boutique (réglages) : en ARABE, sur un
+  // bon français comme sur un bon arabe — c'est la langue de ses clients.
+  const terms = settings.rental_terms_ar ?? null;
   const shopPhone = settings.shop_phone ?? null;
   const cancelled = order.status === "annulee";
 
@@ -219,24 +216,24 @@ export default async function OrderSlipPage({
             className="mx-auto h-auto w-[70mm] [print-color-adjust:exact]"
           />
 
-          {/* Téléphone et conditions en GRAS, comme sur son modèle. */}
-          {(shopPhone || terms) && (
-            <div className="mt-2 space-y-0.5 text-center text-[9pt] leading-snug font-bold">
-              {shopPhone && (
-                <p>
-                  {t("print.ticket.shopPhone")}{" "}
-                  <bdi dir="ltr" className="tabular">
-                    {shopPhone}
-                  </bdi>
-                </p>
-              )}
-              {terms && (
-                <p dir="auto" className="whitespace-pre-line">
-                  {terms}
-                </p>
-              )}
+          {/* Téléphone et avertissements en GRAS, comme sur son modèle. */}
+          <div className="mt-2 space-y-0.5 text-center text-[9pt] leading-snug font-bold">
+            {shopPhone && (
+              <p>
+                {t("print.ticket.shopPhone")}{" "}
+                <bdi dir="ltr" className="tabular">
+                  {shopPhone}
+                </bdi>
+              </p>
+            )}
+            {/* TOUJOURS imprimés, et TOUJOURS en arabe (fr.json porte le même
+                texte que ar.json) : ce sont les deux lignes de son modèle. */}
+            <div lang="ar" dir="rtl">
+              <p className="underline underline-offset-2">{t("print.ticket.idRequired")}</p>
+              <p>{t("print.ticket.liability")}</p>
+              {terms && <p className="whitespace-pre-line">{terms}</p>}
             </div>
-          )}
+          </div>
 
           {cancelledBanner}
 

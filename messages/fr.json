@@ -532,6 +532,8 @@
     "cautionToReturn": "Caution à rendre",
     "ticket": {
       "shopPhone": "☎️ Téléphone du magasin :",
+      "idRequired": "⚠️ بطاقة التعريف اجبارية 🪪",
+      "liability": "⚠️ يتحمل المستأجر مسؤولية أي تلف أو ضرر يلحق بالأغراض المستأجرة، ويلتزم بتعويض قيمتها.",
       "field": "{label} :",
       "customer": "Client 🙆‍♂️",
       "phone": "N° Tél",
