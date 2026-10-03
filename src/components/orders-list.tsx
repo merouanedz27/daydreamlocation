@@ -204,6 +204,11 @@ export function OrdersList({
    */
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
   const someSelected = selected.size > 0 && !allSelected;
+  /**
+   * Les cases n'apparaissent qu'en MODE SÉLECTION, ouvert par un appui long :
+   * au repos, le tableau reste celui de son AppSheet, sans colonne en plus.
+   */
+  const selecting = selected.size > 0;
 
   function toggleOne(id: number) {
     setSelected((current) => {
@@ -359,11 +364,13 @@ export function OrdersList({
       case "customer_name":
         return (
           <div className="flex items-center">
-            <SelectBox
-              checked={selected.has(order.id)}
-              onChange={() => toggleOne(order.id)}
-              label={t("orders.selectNamed", { name: order.customer_name })}
-            />
+            {selecting && (
+              <SelectBox
+                checked={selected.has(order.id)}
+                onChange={() => toggleOne(order.id)}
+                label={t("orders.selectNamed", { name: order.customer_name })}
+              />
+            )}
             <Link
               href={`/commandes/${order.id}`}
               data-row-link
@@ -585,11 +592,12 @@ export function OrdersList({
                       // Le nom du client reste collé au bord pendant qu'on
                       // fait glisser les colonnes — et passe au-dessus d'elles.
                       i === 0 && "start-0 z-20 border-e",
+                      i === 0 && selecting && "ps-0",
                       money ? "text-end" : "text-start",
                     )}
                   >
                     <div className="flex items-center">
-                      {i === 0 && (
+                      {i === 0 && selecting && (
                         <SelectBox
                           checked={allSelected}
                           indeterminate={someSelected}
@@ -672,7 +680,8 @@ export function OrdersList({
                       "border-border h-12 border-b px-3 align-middle whitespace-nowrap",
                       r % 2 ? STRIPE : "bg-background",
                       i > 0 && "border-s",
-                      i === 0 && "sticky start-0 z-1 max-w-56 border-e ps-0",
+                      i === 0 && "sticky start-0 z-1 max-w-56 border-e",
+                      i === 0 && selecting && "ps-0",
                       MONEY.includes(column) && "tabular text-end",
                       (column === "picked_up" || column === "returned" || column === "message") &&
                         "text-center",
