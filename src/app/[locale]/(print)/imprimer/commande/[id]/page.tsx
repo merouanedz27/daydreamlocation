@@ -204,12 +204,18 @@ export default async function OrderSlipPage({
         {/* --- Ticket du CLIENT ------------------------------------------- */}
         <PrintSheet data-ticket className={TICKET}>
           {/* `print-color-adjust: exact` : sans lui, Chrome « économise
-              l'encre » et délave le logo. */}
+              l'encre » et délave le logo.
+              `unoptimized` : chaque logo est servi par SON fichier, et non par
+              `/_next/image?url=…`. html-to-image (le PDF partagé) met les images
+              en cache par adresse SANS la requête : les deux logos devenaient
+              `/_next/image`, et le ticket du costume sortait avec DAYDREAM.
+              `priority` sur les deux : une image paresseuse hors de l'écran
+              n'est pas encore chargée quand on imprime. */}
           <Image
             src={wordmark}
             alt={t("app.name")}
             priority
-            sizes="260px"
+            unoptimized
             className="mx-auto h-auto w-[70mm] [print-color-adjust:exact]"
           />
 
@@ -245,7 +251,8 @@ export default async function OrderSlipPage({
           <Image
             src={suit}
             alt=""
-            sizes="96px"
+            priority
+            unoptimized
             className="mx-auto h-auto w-[28mm] [print-color-adjust:exact]"
           />
           {cancelledBanner}

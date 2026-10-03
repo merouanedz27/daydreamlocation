@@ -150,6 +150,10 @@ async function snapshot(
       height: Math.max(HEIGHT_PX, copy.scrollHeight),
       pixelRatio: PIXEL_RATIO,
       backgroundColor: "#ffffff",
+      // Sans lui, deux images qui ne diffèrent que par `?url=…` (le cas de
+      // `/_next/image`) partagent la même entrée de cache : le 2ᵉ logo
+      // devenait le 1ᵉʳ.
+      includeQueryParams: true,
       // La copie est hors de l'écran : dans l'image, elle se pose à l'origine.
       style: { position: "static", left: "auto" },
     };
