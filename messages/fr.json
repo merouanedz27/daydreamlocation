@@ -666,10 +666,6 @@
     "openOrder": "Ouvrir la commande",
     "openTomorrow": "Voir la liste de demain",
     "messageFrom": "Message de {name}",
-    "customer": "Client :",
-    "phone": "Téléphone :",
-    "eventDate": "Date :",
-    "items": "Tenue :",
     "newOrder": {
       "subject": "Nouvelle commande {orderNo} — {customer}",
       "title": "Nouvelle commande {orderNo}",
@@ -680,6 +676,28 @@
       "title": "Demain, {date}",
       "intro": "{count, plural, one {# client a son mariage demain.} other {# clients ont leur mariage demain.}}",
       "pickedUp": "déjà sorti ✈"
+    },
+    "openSlip": "Bon de location",
+    "order": {
+      "customer": "Clients 🙆‍♂️ :",
+      "phone": "Numéro Tél :",
+      "date": "Date :",
+      "pickedUp": "Allez Validé :",
+      "returned": "Retour Validé :",
+      "costume": "COSTUMES 🤵 :",
+      "jacketSize": "Taille 🦺 :",
+      "vestSize": "Taille Gelly 🙆‍♂️ :",
+      "pantsSize": "Taille pantalon 👖 :",
+      "tailor": "Tailleur :",
+      "shirt": "Chemises 🥼 :",
+      "shoes": "Chaussures 👞 :",
+      "accessories": "Accessoires 🦋 :",
+      "paid": "VERS :",
+      "price": "PRIX :",
+      "rest": "REST :",
+      "refund": "À REMBOURSER :",
+      "yes": "Y",
+      "no": "N"
     }
   }
 }

@@ -666,10 +666,6 @@
     "openOrder": "فتح الطلبية",
     "openTomorrow": "قائمة الغد",
     "messageFrom": "رسالة من {name}",
-    "customer": "الزبون:",
-    "phone": "الهاتف:",
-    "eventDate": "التاريخ:",
-    "items": "اللباس:",
     "newOrder": {
       "subject": "طلبية جديدة {orderNo} — {customer}",
       "title": "طلبية جديدة {orderNo}",
@@ -680,6 +676,28 @@
       "title": "غدًا، {date}",
       "intro": "{count, plural, one {زبون واحد عرسه غدًا.} other {# زبائن أعراسهم غدًا.}}",
       "pickedUp": "خرج ✈"
+    },
+    "openSlip": "وصل الكراء",
+    "order": {
+      "customer": "الزبون 🙆‍♂️:",
+      "phone": "رقم الهاتف:",
+      "date": "التاريخ:",
+      "pickedUp": "خرج:",
+      "returned": "رجع:",
+      "costume": "الكوستيم 🤵:",
+      "jacketSize": "المقاس 🦺:",
+      "vestSize": "مقاس الجيلي 🙆‍♂️:",
+      "pantsSize": "مقاس السروال 👖:",
+      "tailor": "الخياط:",
+      "shirt": "القميص 🥼:",
+      "shoes": "الحذاء 👞:",
+      "accessories": "الإكسسوارات 🦋:",
+      "paid": "المدفوع:",
+      "price": "السعر:",
+      "rest": "الباقي:",
+      "refund": "للإرجاع:",
+      "yes": "نعم",
+      "no": "لا"
     }
   }
 }

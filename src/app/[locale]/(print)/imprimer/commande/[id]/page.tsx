@@ -6,9 +6,8 @@ import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
 import { TicketFrame } from "@/components/ticket-fit";
 import { getOrder, getOrderCatalogue, getLabelSlots, getSettings } from "@/lib/queries/orders";
-import { draftFromOrder, type Slot } from "@/lib/quick-draft";
+import { ticketFields } from "@/lib/ticket-fields";
 import { normalizeSearch } from "@/lib/search";
-import { defaultWindow } from "@/lib/rental-range";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
@@ -62,48 +61,24 @@ export default async function OrderSlipPage({
 
   // Les pièces remises dans les cases de la saisie (costume, chemise,
   // chaussures, accessoires) — exactement comme le formulaire de modification
-  // les retrouve, pour que le ticket dise la même chose que l'écran.
+  // les retrouve, pour que le ticket dise la même chose que l'écran. Le même
+  // calcul sert à l'e-mail « Nouvelle commande » (`ticket-fields.ts`).
   const categoryByUnit = new Map<number, string | null>();
   for (const model of models) {
     for (const unit of model.units) categoryByUnit.set(unit.id, model.category_slug);
   }
-  const draft = draftFromOrder(
+  const fields = ticketFields(
     { ...order, order_lines: order.order_lines.filter((line) => line.is_active) },
     {
       slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
       categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
-      defaultWindow: defaultWindow(
-        order.event_date,
-        settings.days_before_event,
-        settings.days_after_event,
-      ),
     },
   );
 
-  // Un costume DU STOCK, c'est une veste et un pantalon, deux pièces : la
-  // seconde n'a pas de case à elle. Sa taille va sur « Taille pantalon » (ou
-  // « gilet ») au lieu de s'égarer dans les accessoires.
-  const [costume, shirt, shoes, accessory, ...extras] = draft.slots;
-  let pantsSize = draft.pantsSize;
-  let vestSize = draft.vestSize;
-  const others: Slot[] = [];
-  for (const slot of extras) {
-    const slug = slot.unitId ? categoryByUnit.get(slot.unitId) : null;
-    if (slug === "pantalon" && !pantsSize) pantsSize = slot.size;
-    else if (slug === "gilet" && !vestSize) vestSize = slot.size;
-    else others.push(slot);
-  }
-
-  const piece = (slot: Slot | undefined, withSize = true) => {
-    if (!slot?.name) return null;
-    const name = slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
-    return withSize && slot.size ? `${name} (${slot.size})` : name;
-  };
-
-  const jacketSize = costume?.size
-    ? vestSize
-      ? `${costume.size} · ${t("print.ticket.vest")} ${vestSize}`
-      : costume.size
+  const jacketSize = fields.jacketSize
+    ? fields.vestSize
+      ? `${fields.jacketSize} · ${t("print.ticket.vest")} ${fields.vestSize}`
+      : fields.jacketSize
     : null;
 
   const label = (key: string) => t("print.ticket.field", { label: t(key) });
@@ -111,18 +86,13 @@ export default async function OrderSlipPage({
     customer: order.customer_name,
     phone: order.customer_phone,
     date: formatDate(order.event_date, l),
-    costume: piece(costume, false),
+    costume: fields.costume,
     jacketSize,
-    // Pantalon non précisé = même taille que la veste, comme sur son tableur.
-    pantsSize: costume?.name ? pantsSize || costume.size || null : null,
-    tailor: draft.tailor || null,
-    shirt: piece(shirt),
-    shoes: piece(shoes),
-    accessories:
-      [accessory, ...others]
-        .map((s) => piece(s))
-        .filter(Boolean)
-        .join(" · ") || null,
+    pantsSize: fields.pantsSize,
+    tailor: fields.tailor,
+    shirt: fields.shirt,
+    shoes: fields.shoes,
+    accessories: fields.accessories,
   };
   // Une pièce absente de la commande (pas de chaussures, pas de tailleur) ne
   // prend pas de ligne : sur 4 × 6, chaque ligne vide rapetisse tout le texte.

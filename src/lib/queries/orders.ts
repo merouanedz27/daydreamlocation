@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
-import type { Tables } from "@/lib/supabase/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, Tables } from "@/lib/supabase/database.types";
 import { COSTUME_ITEMS, SHIRT_ITEMS, SHOE_ITEMS } from "@/lib/item-catalog";
 import { normalizeSearch } from "@/lib/search";
 
@@ -172,8 +173,11 @@ export async function getQuickSuggestions(): Promise<{
  * Ne sert qu'à REPLACER les pièces d'une commande existante dans leurs cases
  * (modification, bon de location), jamais à proposer quoi que ce soit.
  */
-export async function getLabelSlots(): Promise<Map<string, number>> {
-  const supabase = await createClient();
+export async function getLabelSlots(
+  /** Le client admin de l'e-mail « Nouvelle commande », qui n'a pas de session. */
+  client?: SupabaseClient<Database>,
+): Promise<Map<string, number>> {
+  const supabase = client ?? (await createClient());
   const { data } = await supabase.rpc("order_item_suggestions");
   const slots = new Map<string, number>();
   for (const r of data ?? []) slots.set(normalizeSearch(r.label), Number(r.slot));
