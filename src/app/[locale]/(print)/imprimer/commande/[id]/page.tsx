@@ -111,32 +111,63 @@ export default async function OrderSlipPage({
       : costume.size
     : null;
 
-  const field = (key: string) => t("print.ticket.field", { label: t(`print.ticket.${key}`) });
-  const rows: [string, string | null][] = [
-    [field("customer"), order.customer_name],
-    [field("phone"), order.customer_phone],
-    [field("date"), formatDate(order.event_date, l)],
-    [field("costume"), piece(costume, false)],
-    [field("jacketSize"), jacketSize],
+  const label = (key: string) => t("print.ticket.field", { label: t(key) });
+  const values: Record<string, string | null> = {
+    customer: order.customer_name,
+    phone: order.customer_phone,
+    date: formatDate(order.event_date, l),
+    costume: piece(costume, false),
+    jacketSize,
     // Pantalon non précisé = même taille que la veste, comme sur son tableur.
-    [field("pantsSize"), costume?.name ? pantsSize || costume.size || null : null],
-    [field("tailor"), draft.tailor || null],
-    [field("shirt"), piece(shirt)],
-    [field("shoes"), piece(shoes)],
-    [
-      field("accessories"),
-      [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
-    ],
+    pantsSize: costume?.name ? pantsSize || costume.size || null : null,
+    tailor: draft.tailor || null,
+    shirt: piece(shirt),
+    shoes: piece(shoes),
+    accessories: [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
+  };
+  const row = (key: string, style: RowStyle = {}): Row => ({
+    label: label(`print.ticket.${key}`),
+    value: values[key],
+    ...style,
+  });
+
+  // Les mêmes champs, mis en page comme les DEUX pages de son modèle Word :
+  // le client lit d'abord son nom et la date ; l'équipe, devant le cintre,
+  // lit le nom, le costume et le tailleur — soulignés, avec des puces.
+  const clientRows = [
+    row("customer", { big: true }),
+    row("phone"),
+    row("date", { big: true }),
+    row("costume"),
+    row("jacketSize"),
+    row("pantsSize"),
+    row("tailor"),
+    row("shirt"),
+    row("shoes"),
+    row("accessories"),
+  ];
+  const costumeRows = [
+    row("customer", { big: true, underline: true }),
+    row("phone"),
+    row("date"),
+    row("costume", { big: true, underline: true, bullet: true }),
+    row("jacketSize"),
+    row("pantsSize", { bullet: true }),
+    row("tailor", { big: true, underline: true, bullet: true }),
+    row("shirt", { bullet: true }),
+    row("shoes", { bullet: true }),
+    row("accessories", { bullet: true }),
   ];
 
+  // VERS / PRIX / REST : trois lignes de plus, comme sur son modèle.
   const balance = order.balance ?? 0;
-  const money: [string, string][] = [
-    [t("print.ticket.paid"), formatMoney(order.amount_paid, l)],
-    [t("print.ticket.price"), formatMoney(order.total_price, l)],
-    [
-      balance < 0 ? t("orders.toRefund") : t("print.ticket.rest"),
-      formatMoney(Math.abs(balance), l),
-    ],
+  const money: Row[] = [
+    { label: label("print.ticket.paid"), value: formatMoney(order.amount_paid, l) },
+    { label: label("print.ticket.price"), value: formatMoney(order.total_price, l) },
+    {
+      label: label(balance < 0 ? "orders.toRefund" : "print.ticket.rest"),
+      value: formatMoney(Math.abs(balance), l),
+    },
   ];
 
   // Les conditions s'impriment dans la langue du bon, sinon dans l'autre :
@@ -174,15 +205,16 @@ export default async function OrderSlipPage({
             alt={t("app.name")}
             priority
             sizes="260px"
-            className="mx-auto mt-2 h-auto w-[70mm] [print-color-adjust:exact]"
+            className="mx-auto mt-2 h-auto w-[80mm] [print-color-adjust:exact]"
           />
 
+          {/* Téléphone et conditions en GRAS, comme sur son modèle. */}
           {(shopPhone || terms) && (
-            <div className="mt-3 space-y-1 text-center text-sm leading-snug print:mt-2 print:text-[9pt]">
+            <div className="mt-3 space-y-1 text-center text-[10pt] leading-snug font-bold">
               {shopPhone && (
                 <p>
                   {t("print.ticket.shopPhone")}{" "}
-                  <bdi dir="ltr" className="tabular font-medium">
+                  <bdi dir="ltr" className="tabular">
                     {shopPhone}
                   </bdi>
                 </p>
@@ -197,28 +229,20 @@ export default async function OrderSlipPage({
 
           {cancelledBanner}
 
-          <TicketRows rows={rows} />
-          <dl className="border-foreground mt-3 grid grid-cols-3 gap-2 border-t-2 pt-2 text-center">
-            {money.map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-sm">{label}</dt>
-                <dd className="tabular text-lg font-bold">{value}</dd>
-              </div>
-            ))}
-          </dl>
+          <TicketRows rows={[...clientRows, ...money]} className="mt-3 text-[11pt]" />
         </PrintSheet>
 
         {/* --- Ticket du COSTUME : sans argent ---------------------------- */}
-        <PrintSheet data-ticket className={cn(TICKET, "text-lg")}>
+        <PrintSheet data-ticket className={TICKET}>
           <TicketHead orderNo={order.order_no} label={t("print.ticket.costumeCopy")} />
           <Image
             src={suit}
             alt=""
             sizes="96px"
-            className="mx-auto mt-2 h-auto w-[40mm] [print-color-adjust:exact]"
+            className="mx-auto mt-2 h-auto w-[38mm] [print-color-adjust:exact]"
           />
           {cancelledBanner}
-          <TicketRows rows={rows} />
+          <TicketRows rows={costumeRows} className="mt-2 text-[13pt]" />
         </PrintSheet>
       </div>
     </>
@@ -227,19 +251,26 @@ export default async function OrderSlipPage({
 
 /**
  * Une feuille 4 × 6 pouces par ticket (page nommée `ticket`, globals.css), à
- * l'écran comme sur le papier. GROS caractères (16 px ≈ 12 pt, 18 px sur le
- * ticket du costume) : il se lit à bout de bras, accroché au cintre.
+ * l'écran comme sur le papier. Mise en page de son modèle « Daydream Ticket » :
+ * Arial, chaque ligne CENTRÉE, « **Libellé :** valeur ». Les tailles du modèle
+ * (page Letter de 8,5 po) sont ramenées à 4 po de large — × 0,47, arrondi vers
+ * le haut pour rester lisible : 26 pt → 17 pt, 20 pt → 13 pt, 16 pt → 11 pt.
  * Le contenu est CENTRÉ sur la feuille ; `justify-center-safe` le recolle en
  * haut s'il dépasse, pour que ce soit le bas — jamais l'en-tête — qui se coupe.
  */
 const TICKET = cn(
-  "print-ticket flex max-w-[4in] min-h-[6in] flex-col justify-center-safe p-[4mm] text-base sm:p-[4mm]",
+  "print-ticket flex max-w-[4in] min-h-[6in] flex-col justify-center-safe p-[4mm] sm:p-[4mm]",
+  // Arial comme son modèle ; l'arabe retombe sur Cairo si Arial n'a pas les glyphes.
+  "font-[family-name:Arial,Helvetica,var(--font-cairo),sans-serif]",
   // À l'impression, HAUTEUR FIXE = la page moins ses marges (152,4 − 2 × 4 mm),
   // et rien ne déborde : un ticket trop long se coupait sur une 2ᵉ page, puis
   // une 3ᵉ — cinq feuilles pour deux tickets. Deux tickets = deux pages, point.
   // Sur une imprimante qui ignore le format 4 × 6 (A4), ça tient d'autant mieux.
   "print:min-h-0 print:h-[144mm] print:overflow-hidden print:break-inside-avoid",
 );
+
+type RowStyle = { big?: boolean; underline?: boolean; bullet?: boolean };
+type Row = RowStyle & { label: string; value: string | null };
 
 /** Le numéro de commande en tête de CHAQUE ticket : une fois séparés, les deux se retrouvent. */
 function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
@@ -251,23 +282,26 @@ function TicketHead({ orderNo, label }: { orderNo: string; label: string }) {
   );
 }
 
-/** « Libellé : valeur », une ligne par champ ; un champ vide garde sa ligne, comme sur son modèle. */
-function TicketRows({ rows }: { rows: [string, string | null][] }) {
+/**
+ * « **Libellé :** valeur », une ligne centrée par champ ; un champ vide garde
+ * son libellé, comme sur son modèle. `big` = 17 pt, `underline` souligne le
+ * libellé, `bullet` le précède d'un ●.
+ */
+function TicketRows({ rows, className }: { rows: Row[]; className?: string }) {
   return (
-    <dl className="mt-3 space-y-1.5 leading-snug print:mt-3">
-      {rows.map(([label, value]) => (
-        <div key={label} className="flex items-baseline gap-2">
-          <dt className="shrink-0">{label}</dt>
-          <dd
-            className={cn(
-              "border-foreground/40 min-w-0 flex-1 border-b border-dotted font-bold",
-              !value && "text-muted-foreground",
-            )}
-          >
-            {value ? <bdi>{value}</bdi> : " "}
-          </dd>
-        </div>
+    <div className={cn("space-y-0.5 text-center leading-tight", className)}>
+      {rows.map(({ label, value, big, underline, bullet }) => (
+        <p key={label} className={cn(big && "text-[17pt]")}>
+          {bullet && <span aria-hidden>● </span>}
+          <b className={cn(underline && "underline decoration-2 underline-offset-2")}>{label}</b>
+          {value && (
+            <>
+              {" "}
+              <bdi>{value}</bdi>
+            </>
+          )}
+        </p>
       ))}
-    </dl>
+    </div>
   );
 }

@@ -53,7 +53,7 @@ export function OrderListRow({
     <li className="border-border flex items-center gap-1 border-b last:border-b-0">
       <Link
         href={`/commandes/${order.id}`}
-        className="hover:bg-muted/60 flex min-h-14 min-w-0 flex-1 items-center gap-2 py-2 ps-3 pe-1"
+        className="press-row hover:bg-muted/60 flex min-h-14 min-w-0 flex-1 items-center gap-2 py-2 ps-3 pe-1"
       >
         <StatusIcons pickedUp={order.picked_up} returned={order.returned} />
         <span className="min-w-0 flex-1">
@@ -85,7 +85,7 @@ export function OrderListRow({
           <a
             href={`tel:${order.customer_phone}`}
             aria-label={t("orders.callNamed", { name: order.customer_name })}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full"
+            className="press text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full"
           >
             <Phone className="size-5" aria-hidden />
           </a>
@@ -175,7 +175,7 @@ function QuickCheck({
       disabled={isPending}
       onClick={toggle}
       className={cn(
-        "me-2 flex h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border px-3 text-sm transition-colors",
+        "press me-2 flex h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border px-3 text-sm",
         shown
           ? "bg-primary text-primary-foreground border-transparent"
           : "border-border bg-card hover:border-gold-strong",

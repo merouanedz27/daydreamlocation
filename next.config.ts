@@ -5,6 +5,13 @@ import type { NextConfig } from "next";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Le routeur garde les pages déjà vues 30 s : revenir de la fiche à la
+    // liste (ou passer de Commandes à Demain) devient instantané. Chaque Server
+    // Action appelle `revalidatePath`, qui vide ce cache — une modification se
+    // voit donc tout de suite.
+    staleTimes: { dynamic: 30, static: 180 },
+  },
   images: {
     // Photos du stock servies depuis Supabase Storage.
     remotePatterns: [

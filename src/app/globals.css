@@ -293,6 +293,22 @@
   html {
     @apply font-sans;
     font-variant-numeric: tabular-nums;
+    /* Pas de voile gris d'Android/iOS au toucher : chaque élément a son
+       propre état « pressé » (`press`, `active:` des boutons). */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Le toucher part TOUT DE SUITE : sans `manipulation`, le navigateur attend
+     de savoir si c'est un double-tap (zoom). Le pincement reste permis. */
+  a,
+  button,
+  input,
+  label,
+  select,
+  summary,
+  textarea,
+  [role="button"] {
+    touch-action: manipulation;
   }
 
   /* Une seule famille par langue (Inter / Cairo) : la hiérarchie se fait à la
@@ -369,6 +385,36 @@
 
 @utility bottom-above-nav {
   bottom: calc(3.5rem + 1px + max(env(safe-area-inset-bottom), 0.5rem));
+}
+
+/* Retour au toucher, comme une appli native : l'élément s'enfonce dès que le
+   doigt se pose. Pour les boutons, pastilles, cartes — pas les rangées pleine
+   largeur, qui prennent `press-row`. Propriété `scale` (et non `transform`)
+   pour ne pas écraser un `translate`/`rotate` déjà posé. Une grande carte
+   s'enfonce moins : `[--press-scale:0.98]`. */
+@utility press {
+  transition-property: scale, background-color, border-color, color, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+  &:active {
+    scale: var(--press-scale, 0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active {
+      scale: none;
+      opacity: 0.7;
+    }
+  }
+}
+
+/* Rangée pleine largeur (une commande de la liste) : elle ne rétrécit pas,
+   elle s'assombrit. */
+@utility press-row {
+  transition-property: background-color;
+  transition-duration: 120ms;
+  &:active {
+    background-color: var(--color-muted);
+  }
 }
 
 /* Défilement conservé, barre masquée. Réservé aux rangées de pastilles qui

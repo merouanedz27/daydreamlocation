@@ -416,7 +416,7 @@ export function OrdersList({
             })}
             disabled={busy || order.status === "annulee"}
             onClick={() => toggleCell(order, column)}
-            className="hover:bg-muted mx-auto flex size-11 items-center justify-center rounded-full disabled:opacity-60"
+            className="press hover:bg-muted active:bg-muted mx-auto flex size-11 items-center justify-center rounded-full disabled:opacity-60"
           >
             {order[column] ? (
               <Check className="text-success-foreground size-5" aria-hidden />
@@ -636,7 +636,12 @@ export function OrdersList({
               <tr
                 key={order.id}
                 // Appui long = sélection, comme dans la galerie du téléphone.
-                onPointerDown={(e) => startPress(e, order.id)}
+                onPointerDown={(e) => {
+                  startPress(e, order.id);
+                  // Le doigt se pose ~100 ms avant le clic : la commande se
+                  // charge déjà quand il se relève.
+                  if (!selected.size) router.prefetch(`/commandes/${order.id}`, { locale });
+                }}
                 onPointerMove={movePress}
                 onPointerUp={cancelPress}
                 onPointerCancel={cancelPress}
@@ -670,7 +675,11 @@ export function OrdersList({
                 aria-selected={selected.has(order.id)}
                 className={cn(
                   "hover:[&>td]:bg-accent cursor-pointer select-none [-webkit-touch-callout:none]",
-                  selected.has(order.id) && "[&>td]:bg-gold-soft",
+                  // Le toucher assombrit la ligne tout de suite ; si l'appui
+                  // dure, la sélection (or) prend le relais.
+                  selected.has(order.id)
+                    ? "[&>td]:bg-gold-soft"
+                    : "active:[&>td]:bg-muted [&>td]:transition-colors",
                 )}
               >
                 {columns.map((column, i) => (

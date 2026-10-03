@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
@@ -106,7 +107,7 @@ export type ModelDetail = ArticleModel & {
   article_units: UnitWithHistory[];
 };
 
-export async function getModel(id: number): Promise<ModelDetail | null> {
+async function fetchModel(id: number): Promise<ModelDetail | null> {
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -185,3 +186,9 @@ export function countStock(
   const available = units.filter((u) => isUnitFree(u, blockedUnitIds)).length;
   return { total, available, unavailable: total - available };
 }
+
+/**
+ * Une seule lecture par rendu : `cache()` partage le résultat entre
+ * `generateMetadata`, le layout et la page d'une même requête.
+ */
+export const getModel = cache(fetchModel);

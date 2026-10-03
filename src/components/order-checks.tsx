@@ -101,7 +101,7 @@ function CheckRow({
         disabled={isPending}
         onClick={toggle}
         className={cn(
-          "flex min-h-14 w-full items-center gap-3 rounded-lg border px-4 py-3 text-start transition-colors",
+          "press flex min-h-14 w-full items-center gap-3 rounded-lg border px-4 py-3 text-start [--press-scale:0.98]",
           "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
           shown
             ? "border-gold-strong bg-gold-soft"

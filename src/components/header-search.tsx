@@ -128,7 +128,7 @@ export function HeaderSearch() {
           type="button"
           onClick={clear}
           aria-label={t("search.clear")}
-          className="text-muted-foreground hover:text-foreground absolute end-0 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center"
+          className="text-muted-foreground hover:text-foreground active:text-foreground absolute end-0 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center"
         >
           {isPending ? <Spinner className="size-4" /> : <X className="size-4" aria-hidden />}
         </button>
@@ -152,7 +152,7 @@ export function HeaderSearch() {
         }}
         aria-label={t("search.open")}
         aria-expanded={open}
-        className="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground relative ms-auto flex size-11 items-center justify-center rounded-md md:hidden"
+        className="press text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground active:bg-nav-foreground/15 relative ms-auto flex size-11 items-center justify-center rounded-md md:hidden"
       >
         <Search className="size-5" aria-hidden />
         {/* Une recherche est active sur cette page : la pastille le rappelle
@@ -168,7 +168,7 @@ export function HeaderSearch() {
             type="button"
             onClick={close}
             aria-label={t("search.close")}
-            className="text-nav-foreground hover:bg-nav-foreground/8 flex size-11 shrink-0 items-center justify-center rounded-md"
+            className="press text-nav-foreground hover:bg-nav-foreground/8 active:bg-nav-foreground/15 flex size-11 shrink-0 items-center justify-center rounded-md"
           >
             <ArrowLeft className="size-5 rtl:-scale-x-100" aria-hidden />
           </button>

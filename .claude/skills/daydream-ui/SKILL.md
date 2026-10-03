@@ -213,7 +213,7 @@ Le nom affiché est **« DD Location »** (`app.name`, identique en fr et ar : c
 
 - **Icônes** — générées par `python scripts/gen-icons.py` depuis `public/dd-logo.png`, à relancer
   si le logo change. Onglet (`src/app/favicon.ico`, `icon.png`) : les tuiles « DD » seules, le mot
-  « location » est illisible à 16 px. Écran d'accueil (`apple-icon.png`, `public/icons/`) : logo
+  « location » est illisible à 16 px. Écran d'accueil (`apple-icon.png`, `public/icons/suit-*.png`) : logo
   complet sur **blanc** (iOS noircit la transparence) ; la version `maskable` tient dans le cercle
   de 80 %.
 - **Manifeste** — `src/app/manifest.ts`. `start_url: "/"` : la langue vient du cookie

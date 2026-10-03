@@ -64,7 +64,7 @@ export function StockModels({
             <li key={model.id}>
               <Link
                 href={`/stock/${model.id}`}
-                className="border-border bg-card hover:border-gold-strong flex gap-3 rounded-lg border p-3 transition-colors"
+                className="press border-border bg-card hover:border-gold-strong active:border-gold-strong flex [--press-scale:0.98] gap-3 rounded-lg border p-3"
               >
                 {/* Vignette carrée : sans photo, une icône plutôt qu'un trou. */}
                 <div className="bg-muted relative size-20 shrink-0 overflow-hidden rounded-md">

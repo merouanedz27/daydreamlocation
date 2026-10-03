@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
@@ -7,7 +8,7 @@ import { normalizeSearch } from "@/lib/search";
 export type Settings = Tables<"settings">;
 
 /** Fenêtre de location par défaut et battement de nettoyage. Ligne unique. */
-export async function getSettings(): Promise<Settings> {
+async function fetchSettings(): Promise<Settings> {
   const supabase = await createClient();
   const { data } = await supabase.from("settings").select("*").single();
 
@@ -272,7 +273,7 @@ export type OrderDetail = Order & {
 };
 
 /** Une commande et toutes ses lignes, pour la fiche. */
-export async function getOrder(id: number): Promise<OrderDetail | null> {
+async function fetchOrder(id: number): Promise<OrderDetail | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("orders")
@@ -309,3 +310,10 @@ export async function countOrderExpenses(orderId: number): Promise<number> {
     .eq("order_id", orderId);
   return count ?? 0;
 }
+
+/**
+ * Une seule lecture par rendu : `cache()` partage le résultat entre
+ * `generateMetadata`, le layout et la page d'une même requête.
+ */
+export const getSettings = cache(fetchSettings);
+export const getOrder = cache(fetchOrder);

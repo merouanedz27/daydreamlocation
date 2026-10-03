@@ -53,7 +53,7 @@ export function MessageButton({
       aria-label={t("orders.messageNamed", { name: order.customer_name })}
       className={cn(
         !children &&
-          "text-muted-foreground hover:text-foreground hover:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full",
+          "press text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full",
         className,
       )}
     >

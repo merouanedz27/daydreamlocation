@@ -64,12 +64,13 @@ export default async function OrderPage({
 }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
-  const profile = await requireProfile(locale as Locale);
-
-  const t = await getTranslations();
   const l = locale as Locale;
 
-  const order = await getOrder(Number(id));
+  const [profile, t, order] = await Promise.all([
+    requireProfile(l),
+    getTranslations(),
+    getOrder(Number(id)),
+  ]);
   if (!order) notFound();
 
   const owner = isOwner(profile);

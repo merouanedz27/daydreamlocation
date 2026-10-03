@@ -65,8 +65,8 @@ square(SUIT, 96, 0.02, TRANSPARENT).save(app / "icon.png", optimize=True)
 
 # Écran d'accueil.
 square(SUIT, 180, 0.12, WHITE).convert("RGB").save(app / "apple-icon.png", optimize=True)
-square(SUIT, 192, 0.12, WHITE).convert("RGB").save(icons / "icon-192.png", optimize=True)
-square(SUIT, 512, 0.12, WHITE).convert("RGB").save(icons / "icon-512.png", optimize=True)
-square(SUIT, 512, 0.22, WHITE).convert("RGB").save(icons / "maskable-512.png", optimize=True)
+square(SUIT, 192, 0.12, WHITE).convert("RGB").save(icons / "suit-192.png", optimize=True)
+square(SUIT, 512, 0.12, WHITE).convert("RGB").save(icons / "suit-512.png", optimize=True)
+square(SUIT, 512, 0.22, WHITE).convert("RGB").save(icons / "suit-maskable-512.png", optimize=True)
 
 print("OK", WORDMARK.size, SUIT.size)

@@ -141,7 +141,7 @@ export function AppHeader({
                 aria-current={active ? "page" : undefined}
                 title={label}
                 className={cn(
-                  "flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-2 rounded-md px-2.5 text-sm whitespace-nowrap transition-colors",
+                  "press flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-2 rounded-md px-2.5 text-sm whitespace-nowrap",
                   active
                     ? // Pastille or clair sur le brun : 5,67:1 contre la barre,
                       // et l'encre dessus 14,65:1. L'onglet actif se voit de
@@ -179,7 +179,7 @@ export function AppHeader({
             showAdmin={showDashboard}
             onSignOut={() => setSignOutOpen(true)}
             onInstall={installApp.available ? installApp.install : undefined}
-            triggerClassName="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground md:hidden"
+            triggerClassName="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground active:bg-nav-foreground/15 md:hidden"
           />
 
           <DropdownMenu>
@@ -187,7 +187,7 @@ export function AppHeader({
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground hidden size-10 md:inline-flex"
+                className="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground active:bg-nav-foreground/15 hidden size-10 md:inline-flex"
               >
                 <User className="size-5" aria-hidden />
                 <span className="sr-only">{fullName}</span>

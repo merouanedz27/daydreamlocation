@@ -25,10 +25,14 @@ export default async function AppLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const profile = await requireProfile(locale as Locale);
-  const t = await getTranslations("roles");
-  // Le message type de la boutique, pour chaque bouton 💬 des listes.
-  const settings = await getSettings();
+  // En parallèle : chaque attente en série retardait l'affichage de TOUTES les
+  // pages. Les réglages ne fuient pas sans session : RLS les refuse.
+  const [profile, t, settings] = await Promise.all([
+    requireProfile(locale as Locale),
+    getTranslations("roles"),
+    // Le message type de la boutique, pour chaque bouton 💬 des listes.
+    getSettings(),
+  ]);
 
   return (
     <div className="flex min-h-dvh flex-col">

@@ -22,22 +22,25 @@ export type Role = "owner" | "staff";
  * navigation et la page peuvent tous demander le profil sans multiplier les
  * requêtes.
  *
- * On utilise `getUser()` et non `getSession()` : `getSession()` lit le cookie
- * sans le vérifier auprès du serveur d'auth, il est donc falsifiable. Ne jamais
- * fonder une décision d'accès sur `getSession()` côté serveur.
+ * On utilise `getClaims()` et non `getSession()` : `getSession()` lit le
+ * cookie sans le vérifier, il est donc falsifiable. Ne jamais fonder une
+ * décision d'accès sur `getSession()` côté serveur. `getClaims()` VÉRIFIE la
+ * signature du jeton (clés publiques du projet, mises en cache) — sans l'aller-
+ * retour réseau de `getUser()` vers le serveur d'auth à chaque page. Si le
+ * projet signe encore ses jetons avec l'ancienne clé partagée, il retombe de
+ * lui-même sur `getUser()`.
  */
 export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: auth } = await supabase.auth.getClaims();
+  const userId = auth?.claims.sub;
+  if (!userId) return null;
 
   const { data } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   // Compte désactivé : traité comme non connecté.
