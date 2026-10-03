@@ -100,6 +100,20 @@ const OWNER_ONLY: Column[] = ["created_by_name"];
 
 const MONEY: Column[] = ["amount_paid", "total_price", "balance", "caution_amount"];
 
+/** Durée d'un appui long, en millisecondes — celle des menus d'Android. */
+const LONG_PRESS_MS = 500;
+
+/**
+ * Les éléments d'une ligne qui gardent LEUR geste : cases, boutons ✈ / ✓,
+ * téléphone, message. Le nom du client, lui, se comporte comme la ligne.
+ */
+function keepsOwnTap(target: EventTarget): boolean {
+  const el = target as HTMLElement;
+  if (el.closest("button,label,input")) return true;
+  const link = el.closest("a");
+  return Boolean(link && !link.hasAttribute("data-row-link"));
+}
+
 /** Rayure des lignes impaires, OPAQUE : la colonne collée doit cacher ce qui glisse dessous. */
 const STRIPE = "bg-[color-mix(in_oklab,var(--muted)_45%,var(--background))]";
 
@@ -198,6 +212,38 @@ export function OrdersList({
       else next.add(id);
       return next;
     });
+  }
+
+  /**
+   * Appui long sur une ligne : elle se sélectionne. Le doigt qui glisse fait
+   * défiler le tableau — au-delà de quelques pixels, ce n'est plus un appui.
+   */
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
+  /** L'appui long vient d'aboutir : le « clic » du relâché est avalé. */
+  const longPressed = useRef(false);
+
+  function startPress(e: React.PointerEvent, id: number) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (keepsOwnTap(e.target)) return;
+    cancelPress();
+    longPressed.current = false;
+    const timer = window.setTimeout(() => {
+      press.current = null;
+      longPressed.current = true;
+      navigator.vibrate?.(30);
+      toggleOne(id);
+    }, LONG_PRESS_MS);
+    press.current = { timer, x: e.clientX, y: e.clientY };
+  }
+
+  function movePress(e: React.PointerEvent) {
+    const p = press.current;
+    if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) cancelPress();
+  }
+
+  function cancelPress() {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
   }
 
   function toggleAll() {
@@ -320,6 +366,7 @@ export function OrdersList({
             />
             <Link
               href={`/commandes/${order.id}`}
+              data-row-link
               className={cn(
                 "hover:text-gold-strong text-foreground min-w-0 truncate text-base font-semibold underline-offset-4 hover:underline",
                 isOrderDone(order) && DONE_NAME_CLASS,
@@ -580,6 +627,32 @@ export function OrdersList({
             {rows.map((order, r) => (
               <tr
                 key={order.id}
+                // Appui long = sélection, comme dans la galerie du téléphone.
+                onPointerDown={(e) => startPress(e, order.id)}
+                onPointerMove={movePress}
+                onPointerUp={cancelPress}
+                onPointerCancel={cancelPress}
+                onPointerLeave={cancelPress}
+                // Sans cela, Android ouvre son menu « Ouvrir le lien… » sous le doigt.
+                onContextMenu={(e) => {
+                  if (press.current || longPressed.current) e.preventDefault();
+                }}
+                // En PHASE DE CAPTURE : le relâché d'un appui long, et tout
+                // toucher en mode sélection, ne doivent pas atteindre le lien
+                // du nom — sinon la commande s'ouvrirait.
+                onClickCapture={(e) => {
+                  if (longPressed.current) {
+                    longPressed.current = false;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                  }
+                  if (selected.size && !keepsOwnTap(e.target)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleOne(order.id);
+                  }
+                }}
                 // Toute la ligne s'ouvre au toucher ; le vrai lien reste sur
                 // le nom (focus clavier, nom accessible).
                 onClick={(e) => {
@@ -588,7 +661,7 @@ export function OrdersList({
                 }}
                 aria-selected={selected.has(order.id)}
                 className={cn(
-                  "hover:[&>td]:bg-accent cursor-pointer",
+                  "hover:[&>td]:bg-accent cursor-pointer select-none [-webkit-touch-callout:none]",
                   selected.has(order.id) && "[&>td]:bg-gold-soft",
                 )}
               >
