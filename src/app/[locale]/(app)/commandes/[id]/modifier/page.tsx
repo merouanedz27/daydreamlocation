@@ -9,6 +9,7 @@ import { requireProfile } from "@/lib/auth";
 import {
   getOrder,
   getOrderCatalogue,
+  getLabelSlots,
   getQuickSuggestions,
   getSettings,
 } from "@/lib/queries/orders";
@@ -48,11 +49,12 @@ export default async function EditOrderPage({
   if (!Number.isInteger(orderId) || orderId <= 0) notFound();
 
   const t = await getTranslations();
-  const [order, { models }, { items, customers }, settings] = await Promise.all([
+  const [order, { models }, { items, customers }, settings, labelSlots] = await Promise.all([
     getOrder(orderId),
     getOrderCatalogue(),
     getQuickSuggestions(),
     getSettings(),
+    getLabelSlots(),
   ]);
   if (!order) notFound();
 
@@ -84,14 +86,13 @@ export default async function EditOrderPage({
   }
 
   // Ce que la page sait pour remettre chaque pièce dans sa case.
-  const slotByLabel = new Map(items.map((i) => [normalizeSearch(i.label), i.slot]));
   const categoryByUnit = new Map<number, string | null>();
   for (const model of models) {
     for (const unit of model.units) categoryByUnit.set(unit.id, model.category_slug);
   }
 
   const initial = draftFromOrder(order, {
-    slotOf: (label) => slotByLabel.get(normalizeSearch(label)) ?? null,
+    slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
     categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
     defaultWindow: defaultWindow(
       order.event_date,

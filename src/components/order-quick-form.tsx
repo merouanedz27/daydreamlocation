@@ -393,14 +393,6 @@ export function OrderQuickForm({
     return map;
   }, [models, locale]);
 
-  /** Ses libellés, dans l'ordre alphabétique « naturel » de sa liste AppSheet. */
-  const sortedItems = useMemo(
-    () =>
-      [...items].sort((a, b) =>
-        a.label.localeCompare(b.label, locale, { numeric: true, sensitivity: "base" }),
-      ),
-    [items, locale],
-  );
 
   function pickerOptions(index: number): PickerOption[] {
     const slotNo = Math.min(index + 1, 4);
@@ -440,7 +432,8 @@ export function OrderQuickForm({
     }
 
     // 2. Ses vêtements déjà saisis — ceux de CETTE case montrés d'office.
-    for (const item of sortedItems) {
+    // Dans l'ordre de SES listes (`item-catalog`), pas l'ordre alphabétique.
+    for (const item of items) {
       options.push({ key: `h:${item.label}`, label: item.label, featured: extra || item.slot === slotNo });
     }
     return options;

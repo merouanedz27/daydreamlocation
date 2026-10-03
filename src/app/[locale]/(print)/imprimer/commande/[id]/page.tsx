@@ -7,7 +7,7 @@ import { PrintToolbar } from "@/components/print-toolbar";
 import {
   getOrder,
   getOrderCatalogue,
-  getQuickSuggestions,
+  getLabelSlots,
   getSettings,
 } from "@/lib/queries/orders";
 import { draftFromOrder, type Slot } from "@/lib/quick-draft";
@@ -56,11 +56,11 @@ export default async function OrderSlipPage({
   setRequestLocale(locale);
   const l = locale as Locale;
 
-  const [order, settings, { models }, { items }] = await Promise.all([
+  const [order, settings, { models }, labelSlots] = await Promise.all([
     getOrder(Number(id)),
     getSettings(),
     getOrderCatalogue(),
-    getQuickSuggestions(),
+    getLabelSlots(),
   ]);
   if (!order) notFound();
 
@@ -69,7 +69,6 @@ export default async function OrderSlipPage({
   // Les pièces remises dans les cases de la saisie (costume, chemise,
   // chaussures, accessoires) — exactement comme le formulaire de modification
   // les retrouve, pour que le ticket dise la même chose que l'écran.
-  const slotByLabel = new Map(items.map((i) => [normalizeSearch(i.label), i.slot]));
   const categoryByUnit = new Map<number, string | null>();
   for (const model of models) {
     for (const unit of model.units) categoryByUnit.set(unit.id, model.category_slug);
@@ -77,7 +76,7 @@ export default async function OrderSlipPage({
   const draft = draftFromOrder(
     { ...order, order_lines: order.order_lines.filter((line) => line.is_active) },
     {
-      slotOf: (label) => slotByLabel.get(normalizeSearch(label)) ?? null,
+      slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
       categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
       defaultWindow: defaultWindow(
         order.event_date,

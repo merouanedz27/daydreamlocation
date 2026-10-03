@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
+import { COSTUME_ITEMS, SHOE_ITEMS } from "@/lib/item-catalog";
+import { normalizeSearch } from "@/lib/search";
 
 export type Settings = Tables<"settings">;
 
@@ -138,8 +140,8 @@ export type ItemSuggestion = {
 export type CustomerSuggestion = { name: string; phone: string | null };
 
 /**
- * Ce que la saisie rapide propose pendant la frappe : les vêtements déjà
- * nommés et les clients déjà venus. Chargé en une fois, comme le catalogue —
+ * Ce que la saisie rapide propose pendant la frappe : les listes FIXES de
+ * vêtements (`item-catalog`, ses listes AppSheet) et les clients déjà venus. Chargé en une fois, comme le catalogue —
  * quelques centaines de lignes, filtrées ensuite dans le navigateur sans
  * aller-retour réseau.
  *
@@ -151,19 +153,32 @@ export async function getQuickSuggestions(): Promise<{
   customers: CustomerSuggestion[];
 }> {
   const supabase = await createClient();
-  const [items, customers] = await Promise.all([
-    supabase.rpc("order_item_suggestions"),
-    supabase.rpc("customer_suggestions"),
-  ]);
+  const customers = await supabase.rpc("customer_suggestions");
 
   return {
-    items: (items.data ?? []).map((r) => ({
-      label: r.label,
-      uses: Number(r.uses),
-      slot: Number(r.slot),
-    })),
+    items: [
+      ...COSTUME_ITEMS.map((label) => ({ label, uses: 0, slot: 1 })),
+      ...SHOE_ITEMS.map((label) => ({ label, uses: 0, slot: 3 })),
+    ],
     customers: (customers.data ?? []).map((r) => ({ name: r.name, phone: r.phone })),
   };
+}
+
+/**
+ * La case HABITUELLE de chaque libellé déjà saisi (1 tenue … 4 accessoires),
+ * apprise des commandes — y compris les libellés d'avant les listes fixes.
+ * Ne sert qu'à REPLACER les pièces d'une commande existante dans leurs cases
+ * (modification, bon de location), jamais à proposer quoi que ce soit.
+ */
+export async function getLabelSlots(): Promise<Map<string, number>> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("order_item_suggestions");
+  const slots = new Map<string, number>();
+  for (const r of data ?? []) slots.set(normalizeSearch(r.label), Number(r.slot));
+  // Les listes fixes ont le dernier mot : un costume reste un costume.
+  for (const label of COSTUME_ITEMS) slots.set(normalizeSearch(label), 1);
+  for (const label of SHOE_ITEMS) slots.set(normalizeSearch(label), 3);
+  return slots;
 }
 
 export type Unavailability = {
