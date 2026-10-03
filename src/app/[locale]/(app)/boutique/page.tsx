@@ -48,6 +48,7 @@ export default async function ShopPage({
           shop_phone: settings.shop_phone ?? null,
           rental_terms_fr: settings.rental_terms_fr ?? null,
           rental_terms_ar: settings.rental_terms_ar ?? null,
+          customer_message: settings.customer_message ?? null,
         }}
       />
     </div>

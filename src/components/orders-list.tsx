@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { MessageButton } from "@/components/customer-message";
 import { loadMoreOrders } from "@/lib/actions/orders-list";
 import {
   DONE_NAME_CLASS,
@@ -42,6 +43,7 @@ const STATUS_KEYS: Record<string, string> = {
 const COLUMNS = [
   "customer_name",
   "customer_phone",
+  "message",
   "event_date",
   "picked_up",
   "returned",
@@ -55,6 +57,7 @@ const COLUMNS = [
   "return_due_date",
   "order_no",
   "status",
+  "created_by_name",
 ] as const;
 
 type Column = (typeof COLUMNS)[number];
@@ -62,6 +65,7 @@ type Column = (typeof COLUMNS)[number];
 const HEADERS: Record<Column, string> = {
   customer_name: "orders.short.customer",
   customer_phone: "orders.short.phone",
+  message: "orders.short.message",
   event_date: "orders.short.eventDate",
   picked_up: "orders.short.pickedUp",
   returned: "orders.short.returned",
@@ -75,7 +79,11 @@ const HEADERS: Record<Column, string> = {
   return_due_date: "orders.short.returnDue",
   order_no: "orders.short.orderNo",
   status: "orders.short.status",
+  created_by_name: "orders.short.createdBy",
 };
+
+/** Colonnes réservées au propriétaire : qui a saisi la commande. */
+const OWNER_ONLY: Column[] = ["created_by_name"];
 
 const MONEY: Column[] = ["amount_paid", "total_price", "balance", "caution_amount"];
 
@@ -100,11 +108,13 @@ export function OrdersList({
   total,
   sort,
   ascending,
+  isOwner,
 }: {
   initialRows: OrderTableRow[];
   total: number;
   sort: SortKey;
   ascending: boolean;
+  isOwner: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -119,6 +129,7 @@ export function OrdersList({
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const done = exhausted || rows.length >= total;
+  const columns = isOwner ? COLUMNS : COLUMNS.filter((c) => !OWNER_ONLY.includes(c));
 
   // Une tranche de plus quand le bas du tableau approche (200 px d'avance :
   // la suite est déjà là quand le doigt y arrive).
@@ -204,6 +215,12 @@ export function OrdersList({
         ) : (
           "—"
         );
+      case "message":
+        return order.customer_phone ? (
+          <MessageButton order={order} phone={order.customer_phone} className="mx-auto" />
+        ) : (
+          "—"
+        );
       case "event_date":
       case "pickup_date":
       case "return_due_date":
@@ -220,6 +237,8 @@ export function OrdersList({
         return order.pieces.length ? order.pieces.join(" · ") : "—";
       case "tailor":
         return order.tailor ?? "—";
+      case "created_by_name":
+        return order.created_by_name ?? "—";
       case "amount_paid":
       case "total_price":
       case "caution_amount":
@@ -262,7 +281,7 @@ export function OrdersList({
         <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              {COLUMNS.map((column, i) => {
+              {columns.map((column, i) => {
                 const sortable = column in SORTABLE;
                 const active = sortable && sort === column;
                 const money = MONEY.includes(column);
@@ -318,7 +337,7 @@ export function OrdersList({
                 }}
                 className="hover:[&>td]:bg-accent cursor-pointer"
               >
-                {COLUMNS.map((column, i) => (
+                {columns.map((column, i) => (
                   <td
                     key={column}
                     className={cn(
@@ -327,7 +346,9 @@ export function OrdersList({
                       i > 0 && "border-s",
                       i === 0 && "sticky start-0 z-1 max-w-44 truncate border-e",
                       MONEY.includes(column) && "tabular text-end",
-                      (column === "picked_up" || column === "returned") && "text-center",
+                      (column === "picked_up" || column === "returned" || column === "message") &&
+                        "text-center",
+                      column === "message" && "px-1",
                       column === "pieces" && "max-w-96 truncate",
                       column === "tailor" && "max-w-48 truncate",
                       column === "balance" &&

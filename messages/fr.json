@@ -110,8 +110,10 @@
       "orderNo": "N°",
       "customer": "Client",
       "phone": "Tél.",
+      "message": "Message",
       "eventDate": "Événement",
       "pickupDate": "Retrait",
+      "createdBy": "Saisie par",
       "status": "Statut",
       "total": "Total",
       "paid": "Versé",
@@ -211,7 +213,8 @@
       "stepUp": "Plus {step}"
     },
     "callNamed": "Appeler {name}",
-    "smsNamed": "Envoyer un SMS à {name}",
+    "messageNamed": "Écrire à {name} sur WhatsApp",
+    "messageCustomer": "Message WhatsApp",
     "checkedToast": "{label} — {name}",
     "countTotal": "{count, plural, =0 {Aucune commande} =1 {1 commande} other {{n} commandes}}",
     "endOfList": "Fin de la liste",
@@ -494,6 +497,9 @@
     "termsFr": "Conditions de location — français",
     "termsAr": "Conditions de location — arabe",
     "termsHint": "Caution, retard, dégâts, nettoyage… Le bon imprime le texte de sa langue.",
+    "message": "Message au client (WhatsApp)",
+    "messageHint": "Le bouton 💬 ouvre WhatsApp avec ce texte déjà rempli. Champs remplacés : {fields}. Vide : la conversation s'ouvre sans texte.",
+    "messagePlaceholder": "Bonjour '{nom}', votre tenue pour le '{date}' est prête. Retrait le '{retrait}', retour le '{retour}'. Reste à payer : '{reste}'. DayDream Location",
     "saved": "Informations de la boutique enregistrées."
   },
   "print": {

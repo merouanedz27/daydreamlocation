@@ -20,6 +20,7 @@ export const shopSettingsSchema = z.object({
   shop_phone: optional(40),
   rental_terms_fr: optional(3000),
   rental_terms_ar: optional(3000),
+  customer_message: optional(1000),
 });
 
 export type ShopSettingsInput = z.infer<typeof shopSettingsSchema>;

@@ -68,6 +68,12 @@ export type OrderTableRow = OrderRow & {
   pieces: string[];
   /** La colonne « Tailleur » : la note de la première pièce qui en porte une. */
   tailor: string | null;
+  /**
+   * Le membre qui a saisi la commande (`created_by`). Affiché au propriétaire
+   * SEUL — et la policy `profiles_read` ne laisse de toute façon un employé
+   * lire que son propre profil. `null` pour les commandes reprises du tableur.
+   */
+  created_by_name: string | null;
 };
 
 export type OrdersQuery = {

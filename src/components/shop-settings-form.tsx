@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { updateShopSettings } from "@/lib/actions/settings";
+import { MESSAGE_FIELDS } from "@/lib/customer-message";
 import type { Locale } from "@/i18n/routing";
 
 export type ShopSettings = {
@@ -25,10 +26,12 @@ export type ShopSettings = {
   shop_phone: string | null;
   rental_terms_fr: string | null;
   rental_terms_ar: string | null;
+  customer_message: string | null;
 };
 
 /**
- * Ce que le bon de location imprime en tête et en pied.
+ * Ce que le bon de location imprime en tête et en pied, et le message type
+ * que le bouton 💬 des listes envoie au client.
  *
  * Champs NON CONTRÔLÉS (`defaultValue`) : rien ne dépend de leur valeur avant
  * l'envoi.
@@ -134,6 +137,26 @@ export function ShopSettingsForm({ settings }: { settings: ShopSettings }) {
             className="text-base"
           />
           {fieldError("rental_terms_ar")}
+        </Field>
+
+        {/* Pas de `dir` imposé : le propriétaire écrit son message dans la
+            langue de ses clients, et `auto` suit la première lettre tapée. */}
+        <Field data-invalid={field === "customer_message" || undefined}>
+          <FieldLabel htmlFor="customer_message">{t("shop.message")}</FieldLabel>
+          <Textarea
+            id="customer_message"
+            name="customer_message"
+            dir="auto"
+            rows={5}
+            maxLength={1000}
+            defaultValue={settings.customer_message ?? ""}
+            placeholder={t("shop.messagePlaceholder")}
+            className="text-base"
+          />
+          <FieldDescription>
+            {t("shop.messageHint", { fields: MESSAGE_FIELDS.map((f) => `{${f}}`).join(" ") })}
+          </FieldDescription>
+          {fieldError("customer_message")}
         </Field>
       </FieldGroup>
 

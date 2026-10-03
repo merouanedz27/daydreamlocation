@@ -17,7 +17,8 @@ function resolveLocale(value: FormDataEntryValue | null): Locale {
 }
 
 /**
- * Coordonnées de la boutique et conditions de location, imprimées sur le bon.
+ * Coordonnées de la boutique et conditions de location, imprimées sur le bon,
+ * et message type envoyé au client par WhatsApp.
  *
  * Le contrôle de rôle est refait ici : une Server Action est un point d'entrée
  * réseau. La policy `settings_write` refuserait de toute façon — mais un refus
@@ -36,6 +37,7 @@ export async function updateShopSettings(formData: FormData): Promise<ActionResu
     shop_phone: formData.get("shop_phone"),
     rental_terms_fr: formData.get("rental_terms_fr"),
     rental_terms_ar: formData.get("rental_terms_ar"),
+    customer_message: formData.get("customer_message"),
   });
 
   if (!parsed.success) {
@@ -54,6 +56,7 @@ export async function updateShopSettings(formData: FormData): Promise<ActionResu
   // Zéro ligne sans erreur = refus silencieux de la policy. On le dit.
   if (error || !data?.length) return { ok: false, error: "errors.generic" };
 
-  revalidatePath(`/${locale}/boutique`);
+  // Tout le layout : le message type est lu par lui, pour toutes les listes.
+  revalidatePath(`/${locale}`, "layout");
   return { ok: true };
 }

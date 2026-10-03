@@ -38,7 +38,8 @@ export async function getOrdersTable(
     .from("orders")
     .select(
       `${ROW_COLUMNS},
-       order_lines ( id, model_name_snapshot, size_snapshot, external_label, line_note, is_active )`,
+       order_lines ( id, model_name_snapshot, size_snapshot, external_label, line_note, is_active ),
+       profiles ( full_name )`,
       { count: "exact" },
     );
 
@@ -57,6 +58,7 @@ export async function getOrdersTable(
     .range(offset, offset + limit - 1);
 
   type Raw = OrderRow & {
+    profiles: { full_name: string } | null;
     order_lines: {
       id: number;
       model_name_snapshot: string | null;
@@ -67,7 +69,7 @@ export async function getOrdersTable(
     }[];
   };
 
-  const rows = ((data ?? []) as unknown as Raw[]).map(({ order_lines, ...order }) => {
+  const rows = ((data ?? []) as unknown as Raw[]).map(({ order_lines, profiles, ...order }) => {
     const lines = (order_lines ?? []).filter((l) => l.is_active);
     return {
       ...order,
@@ -79,6 +81,7 @@ export async function getOrdersTable(
         })
         .filter((p): p is string => p !== null),
       tailor: lines.find((l) => l.line_note?.trim())?.line_note?.trim() ?? null,
+      created_by_name: profiles?.full_name ?? null,
     };
   });
 

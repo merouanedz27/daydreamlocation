@@ -6,6 +6,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
   Pencil,
   Phone,
   Printer,
@@ -23,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { Link } from "@/i18n/navigation";
 import { OrderCancelZone, OrderRestoreButton } from "@/components/order-cancel";
 import { OrderChecks } from "@/components/order-checks";
+import { MessageButton } from "@/components/customer-message";
 import { OrderDeleteZone } from "@/components/order-delete";
 import { CautionToggle, OrderPaymentDrawer } from "@/components/order-payment";
 import { isOwner, requireProfile } from "@/lib/auth";
@@ -504,9 +506,18 @@ export default async function OrderPage({
                   </a>
                 </Button>
               )}
+              {order.customer_phone && (
+                <Button asChild variant="outline" className="mt-2 h-11 w-full justify-start">
+                  <MessageButton order={order} phone={order.customer_phone}>
+                    <MessageCircle className="size-4" aria-hidden />
+                    {t("orders.messageCustomer")}
+                  </MessageButton>
+                </Button>
+              )}
 
               <p className="text-muted-foreground mt-3 text-xs">
-                {order.profiles?.full_name
+                {/* Qui a saisi la commande : au propriétaire seul. */}
+                {owner && order.profiles?.full_name
                   ? t("orders.createdBy", {
                       date: formatDate(order.created_at, l),
                       name: order.profiles.full_name,

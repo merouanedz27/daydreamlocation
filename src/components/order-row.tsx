@@ -4,7 +4,8 @@ import { useOptimistic, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { CircleCheck, MessageSquare, Phone, Plane } from "lucide-react";
+import { CircleCheck, Phone, Plane } from "lucide-react";
+import { MessageButton } from "@/components/customer-message";
 import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { setOrderChecks } from "@/lib/actions/orders";
@@ -23,8 +24,9 @@ import type { Locale } from "@/i18n/routing";
  * - ✓ : elle est revenue (« Retour validé »). Les DEUX cochées, la commande
  *   est terminée et son nom est BARRÉ (`isOrderDone`) — c'est ainsi que
  *   l'équipe repère d'un coup d'œil ce qui n'appelle plus rien ;
- * - 📞 et 💬 appellent ou écrivent au client sans ouvrir la fiche : c'est le
- *   geste le plus fréquent de « Demain » et de « Pas rentrés ».
+ * - 📞 et 💬 appellent le client ou lui ouvrent WhatsApp, le message type de
+ *   la boutique déjà rempli, sans ouvrir la fiche : c'est le geste le plus
+ *   fréquent de « Demain » et de « Pas rentrés ».
  *
  * `action` ajoute un bouton de validation en un toucher (✈ sur « Demain »,
  * ✓ sur « Pas rentrés ») : l'employé coche depuis la liste, sans passer par
@@ -87,13 +89,7 @@ export function OrderListRow({
           >
             <Phone className="size-5" aria-hidden />
           </a>
-          <a
-            href={`sms:${order.customer_phone}`}
-            aria-label={t("orders.smsNamed", { name: order.customer_name })}
-            className="text-muted-foreground hover:text-foreground hover:bg-muted flex size-11 shrink-0 items-center justify-center rounded-full"
-          >
-            <MessageSquare className="size-5" aria-hidden />
-          </a>
+          <MessageButton order={order} phone={order.customer_phone} />
         </>
       )}
 

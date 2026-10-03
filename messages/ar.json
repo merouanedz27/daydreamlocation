@@ -110,8 +110,10 @@
       "orderNo": "الرقم",
       "customer": "الزبون",
       "phone": "الهاتف",
+      "message": "رسالة",
       "eventDate": "المناسبة",
       "pickupDate": "الاستلام",
+      "createdBy": "أدخلها",
       "status": "الحالة",
       "total": "المجموع",
       "paid": "التسبيق",
@@ -211,7 +213,8 @@
       "stepUp": "زائد {step}"
     },
     "callNamed": "الاتصال بـ {name}",
-    "smsNamed": "إرسال رسالة إلى {name}",
+    "messageNamed": "مراسلة {name} عبر واتساب",
+    "messageCustomer": "رسالة واتساب",
     "checkedToast": "{label} — {name}",
     "countTotal": "{count, plural, =0 {لا توجد طلبيات} =1 {طلبية واحدة} other {{n} طلبيات}}",
     "endOfList": "نهاية القائمة",
@@ -494,6 +497,9 @@
     "termsFr": "شروط الكراء — بالفرنسية",
     "termsAr": "شروط الكراء — بالعربية",
     "termsHint": "الضمان، التأخير، الأضرار، التنظيف… يطبع الوصل النص الموافق للغته.",
+    "message": "رسالة إلى الزبون (واتساب)",
+    "messageHint": "يفتح زر 💬 واتساب بهذا النص جاهزًا. الحقول المعوَّضة: {fields}. إن كان فارغًا تُفتح المحادثة بلا نص.",
+    "messagePlaceholder": "مرحبا '{nom}'، لباسك ليوم '{date}' جاهز. الاستلام يوم '{retrait}' والإرجاع يوم '{retour}'. المبلغ المتبقي: '{reste}'. DayDream Location",
     "saved": "تم حفظ معلومات المحل."
   },
   "print": {

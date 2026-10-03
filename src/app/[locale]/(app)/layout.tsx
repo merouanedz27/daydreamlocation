@@ -3,7 +3,9 @@ import { AppHeader } from "@/components/app-header";
 import { BottomNav } from "@/components/bottom-nav";
 import { NewOrderFab } from "@/components/new-order-fab";
 import { AppFooter } from "@/components/app-footer";
+import { CustomerMessageProvider } from "@/components/customer-message";
 import { requireProfile, isOwner } from "@/lib/auth";
+import { getSettings } from "@/lib/queries/orders";
 import type { Locale } from "@/i18n/routing";
 
 /**
@@ -25,6 +27,8 @@ export default async function AppLayout({
 
   const profile = await requireProfile(locale as Locale);
   const t = await getTranslations("roles");
+  // Le message type de la boutique, pour chaque bouton 💬 des listes.
+  const settings = await getSettings();
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -35,7 +39,11 @@ export default async function AppLayout({
       />
 
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-        {children}
+        {/* `?? ""` : tant que la migration n'est pas appliquée, la colonne
+            n'existe pas et `select *` ne la renvoie pas. */}
+        <CustomerMessageProvider template={settings.customer_message ?? ""}>
+          {children}
+        </CustomerMessageProvider>
         <NewOrderFab />
       </div>
 

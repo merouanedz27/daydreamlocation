@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { OrdersFilters } from "@/components/orders-filters";
 import { OrdersList } from "@/components/orders-list";
 import { getOrdersTable } from "@/lib/queries/orders-list";
+import { getProfile, isOwner } from "@/lib/auth";
 import { parseOrdersQuery } from "@/lib/orders-query";
 
 export async function generateMetadata(props: {
@@ -46,7 +47,7 @@ export default async function OrdersPage({
   for (const key of ["q", "statut", "tri", "sens"] as const) {
     if (raw[key]) exportParams.set(key, raw[key]);
   }
-  const { rows, total } = await getOrdersTable(query);
+  const [{ rows, total }, profile] = await Promise.all([getOrdersTable(query), getProfile()]);
 
   // Toute la liste repart de zéro quand un filtre ou le tri change.
   const listKey = [raw.q, raw.statut, raw.tri, raw.sens].map((v) => v ?? "").join("|");
@@ -90,6 +91,7 @@ export default async function OrdersPage({
         total={total}
         sort={query.sort}
         ascending={query.ascending}
+        isOwner={isOwner(profile)}
       />
     </div>
   );

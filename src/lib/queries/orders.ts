@@ -22,6 +22,7 @@ export async function getSettings(): Promise<Settings> {
       shop_phone: null,
       rental_terms_fr: null,
       rental_terms_ar: null,
+      customer_message: null,
     }
   );
 }
