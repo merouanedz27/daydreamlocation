@@ -23,6 +23,7 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MessageButton } from "@/components/customer-message";
 import { Highlight } from "@/components/highlight";
+import { SelectBox } from "@/components/select-box";
 import { deleteOrders, setOrdersChecks, type BulkResult } from "@/lib/actions/orders";
 import { loadMoreOrders } from "@/lib/actions/orders-list";
 import {
@@ -760,36 +761,5 @@ export function OrdersList({
         </div>
       </div>
     </>
-  );
-}
-
-/**
- * Une case de sélection, avec une cible de 44 px autour d'une case de 20 :
- * on la touche au pouce sans ouvrir la commande par mégarde.
- */
-function SelectBox({
-  checked,
-  indeterminate = false,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
-      <input
-        type="checkbox"
-        checked={checked}
-        ref={(el) => {
-          if (el) el.indeterminate = indeterminate;
-        }}
-        onChange={onChange}
-        aria-label={label}
-        className="accent-primary size-5 cursor-pointer"
-      />
-    </label>
   );
 }

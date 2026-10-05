@@ -348,7 +348,15 @@
     "deletedToast": "« {name} » supprimé",
     "retiredInsteadToast": "« {name} » déjà loué : retiré du catalogue",
     "archivedToast": "« {name} » retiré du catalogue",
-    "restoredToast": "« {name} » remis au catalogue"
+    "restoredToast": "« {name} » remis au catalogue",
+    "selectedCount": "{count, plural, =1 {1 modèle sélectionné} other {{n} modèles sélectionnés}}",
+    "moreActions": "Autres actions",
+    "deleteManyTitle": "Supprimer {count, plural, =1 {1 modèle} other {{n} modèles}} ?",
+    "deleteManyBody": "{names}. Jamais loués : effacés définitivement avec leurs pièces. Déjà loués : retirés du catalogue à la place, leurs commandes passées ne changent pas.",
+    "deletedManyToast": "{count, plural, =1 {1 modèle supprimé} other {{n} modèles supprimés}}",
+    "retiredManyToast": "{count, plural, =1 {1 modèle déjà loué : retiré du catalogue} other {{n} modèles déjà loués : retirés du catalogue}}",
+    "archivedManyToast": "{count, plural, =1 {1 modèle retiré du catalogue} other {{n} modèles retirés du catalogue}}",
+    "restoredManyToast": "{count, plural, =1 {1 modèle remis au catalogue} other {{n} modèles remis au catalogue}}"
   },
   "dashboard": {
     "title": "Tableau de bord",

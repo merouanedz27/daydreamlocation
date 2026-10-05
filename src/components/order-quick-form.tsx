@@ -148,7 +148,7 @@ const EMPTY_BUSY = new Map<number, Unavailability>();
 const SLOT_CATEGORIES: Record<number, string[]> = {
   1: ["costume", "veste", "pantalon", "gilet"],
   2: ["chemise"],
-  3: ["chaussures"],
+  3: ["chaussures", "bligha"],
   4: ["noeud", "accessoire", "barnous"],
 };
 

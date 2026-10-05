@@ -117,6 +117,7 @@ const CATEGORY_SLOT: Record<string, number> = {
   gilet: 0,
   chemise: 1,
   chaussures: 2,
+  bligha: 2,
   noeud: 3,
   accessoire: 3,
   barnous: 3,

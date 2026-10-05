@@ -416,6 +416,84 @@ export async function removeModel(
   return { ok: true, retired: outcome === "inUse" };
 }
 
+/** Les identifiants d'une sélection (« 4,7,12 »), sans doublon ni valeur folle. */
+function parseIds(value: FormDataEntryValue | null): number[] {
+  const ids = String(value ?? "")
+    .split(",")
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0);
+  return [...new Set(ids)];
+}
+
+/** Plafond d'une sélection : un catalogue entier, pas davantage. */
+const MAX_BULK = 200;
+
+/**
+ * « Supprimer » sur une SÉLECTION du catalogue. Même règle que l'appui long
+ * d'autrefois, modèle par modèle : jamais loué → effacé, déjà loué → retiré.
+ * Un modèle qui échoue n'arrête pas les autres ; le compte rendu dit ce qui a
+ * eu lieu.
+ */
+export async function removeModels(
+  formData: FormData,
+): Promise<{ ok: true; deleted: number; retired: number } | { ok: false; error: string }> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const ids = parseIds(formData.get("ids"));
+  if (!ids.length || ids.length > MAX_BULK) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  let deleted = 0;
+  const inUse: number[] = [];
+  for (const id of ids) {
+    const outcome = await eraseModel(supabase, id);
+    if (outcome === "deleted") deleted++;
+    else if (outcome === "inUse") inUse.push(id);
+  }
+
+  let retired = 0;
+  if (inUse.length) {
+    const { data } = await supabase
+      .from("article_models")
+      .update({ is_active: false })
+      .in("id", inUse)
+      .select("id");
+    retired = data?.length ?? 0;
+  }
+
+  revalidatePath(`/${locale}/stock`);
+  if (!deleted && !retired) return { ok: false, error: "errors.generic" };
+  return { ok: true, deleted, retired };
+}
+
+/** Retire du catalogue une SÉLECTION de modèles, ou l'y remet. */
+export async function setModelsActive(
+  formData: FormData,
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const ids = parseIds(formData.get("ids"));
+  if (!ids.length || ids.length > MAX_BULK) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("article_models")
+    .update({ is_active: formData.get("active") === "1" })
+    .in("id", ids)
+    .select("id");
+
+  if (error || !data?.length) return { ok: false, error: "errors.generic" };
+
+  revalidatePath(`/${locale}/stock`);
+  return { ok: true, count: data.length };
+}
+
 /**
  * Retire un modèle du catalogue, ou l'y remet.
  *

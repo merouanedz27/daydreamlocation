@@ -348,7 +348,15 @@
     "deletedToast": "تم حذف « {name} »",
     "retiredInsteadToast": "« {name} » سبق تأجيره: سُحب من الكتالوج",
     "archivedToast": "سُحب « {name} » من الكتالوج",
-    "restoredToast": "أُعيد « {name} » إلى الكتالوج"
+    "restoredToast": "أُعيد « {name} » إلى الكتالوج",
+    "selectedCount": "{count, plural, =1 {موديل واحد محدد} other {{n} موديلات محددة}}",
+    "moreActions": "إجراءات أخرى",
+    "deleteManyTitle": "حذف {count, plural, =1 {موديل واحد} other {{n} موديلات}}؟",
+    "deleteManyBody": "{names}. لم تُؤجَّر قط: تُحذف نهائيًا مع قطعها. سبق تأجيرها: تُسحب من الكتالوج بدلًا من ذلك، ولا تتغير الطلبيات السابقة.",
+    "deletedManyToast": "{count, plural, =1 {حُذف موديل واحد} other {حُذفت {n} موديلات}}",
+    "retiredManyToast": "{count, plural, =1 {موديل واحد سبق تأجيره: سُحب من الكتالوج} other {{n} موديلات سبق تأجيرها: سُحبت من الكتالوج}}",
+    "archivedManyToast": "{count, plural, =1 {سُحب موديل واحد من الكتالوج} other {سُحبت {n} موديلات من الكتالوج}}",
+    "restoredManyToast": "{count, plural, =1 {أُعيد موديل واحد إلى الكتالوج} other {أُعيدت {n} موديلات إلى الكتالوج}}"
   },
   "dashboard": {
     "title": "لوحة القيادة",
