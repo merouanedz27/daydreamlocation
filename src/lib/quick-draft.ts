@@ -111,6 +111,7 @@ export function splitCostumeSize(size: string | null): {
 
 /** Catégories du stock → case de la saisie (0 costume … 3 accessoires). */
 const CATEGORY_SLOT: Record<string, number> = {
+  costume: 0,
   veste: 0,
   pantalon: 0,
   gilet: 0,
@@ -118,6 +119,7 @@ const CATEGORY_SLOT: Record<string, number> = {
   chaussures: 2,
   noeud: 3,
   accessoire: 3,
+  barnous: 3,
 };
 
 export type EditableOrder = {

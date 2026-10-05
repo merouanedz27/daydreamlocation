@@ -1,0 +1,146 @@
+-- Import du stock du 2026-10-05 : Invités, Tuxedos, Costume à rayures, Burnous.
+-- Données, pas schéma. Rejouable sans doublon (on conflict do nothing).
+-- Prérequis : migration 20261005175843_categories_costume_barnous.
+--   node scripts/run-sql.mjs supabase/data/import_stock_20261005.sql
+
+begin;
+
+insert into public.article_models (ref_code, name_fr, category_id, color, base_price)
+select v.ref_code, v.name_fr, c.id, v.color, 0
+from (values
+  ('INV-BEIGE-S', 'Invite Beige Simple', 'costume', 'Beige'),
+  ('INV-NOIR-C', 'Invite Noir Croisé', 'costume', 'Noir'),
+  ('INV-BLEU-C', 'Invite Bleu Nuit Croisé', 'costume', 'Bleu nuit'),
+  ('INV-VERT-C', 'Invite Vert Croisé', 'costume', 'Vert'),
+  ('INV-NOIR-S', 'Invite Noir Simple', 'costume', 'Noir'),
+  ('INV-GRIS', 'Invite Gris', 'costume', 'Gris'),
+  ('INV-GREUNA', 'Invite Greuna', 'costume', null),
+  ('CST-BLEU-RAY', 'Costume Bleu à Rayures', 'costume', 'Bleu'),
+  ('BRN-DORE', 'Barnous Doré', 'barnous', 'Doré'),
+  ('BRN-DORE-MAX', 'Barnous Doré Max', 'barnous', 'Doré'),
+  ('BRN-BEIGE-WAFA', 'Barnous Beige Wafa', 'barnous', 'Beige'),
+  ('TUX-A', 'Tuxedo A', 'costume', null),
+  ('TUX-B', 'Tuxedo B', 'costume', null),
+  ('TUX-C', 'Tuxedo C', 'costume', null),
+  ('TUX-D', 'Tuxedo D', 'costume', null),
+  ('TUX-E', 'Tuxedo E', 'costume', null),
+  ('TUX-F', 'Tuxedo F', 'costume', null),
+  ('TUX-G', 'Tuxedo G', 'costume', null)
+) as v(ref_code, name_fr, slug, color)
+join public.categories c on c.slug = v.slug
+on conflict (ref_code) do nothing;
+
+insert into public.article_units (model_id, ref_code, size)
+select m.id, v.ref_code, v.size
+from (values
+  ('INV-BEIGE-S', 'INV-BEIGE-S-01', '48'),
+  ('INV-BEIGE-S', 'INV-BEIGE-S-02', '50'),
+  ('INV-BEIGE-S', 'INV-BEIGE-S-03', '52'),
+  ('INV-BEIGE-S', 'INV-BEIGE-S-04', '54'),
+  ('INV-BEIGE-S', 'INV-BEIGE-S-05', '56'),
+  ('INV-BEIGE-S', 'INV-BEIGE-S-06', '58'),
+  ('INV-NOIR-C', 'INV-NOIR-C-01', '46'),
+  ('INV-NOIR-C', 'INV-NOIR-C-02', '48'),
+  ('INV-NOIR-C', 'INV-NOIR-C-03', '50'),
+  ('INV-NOIR-C', 'INV-NOIR-C-04', '52'),
+  ('INV-NOIR-C', 'INV-NOIR-C-05', '54'),
+  ('INV-NOIR-C', 'INV-NOIR-C-06', '56'),
+  ('INV-NOIR-C', 'INV-NOIR-C-07', '58'),
+  ('INV-BLEU-C', 'INV-BLEU-C-01', '46'),
+  ('INV-BLEU-C', 'INV-BLEU-C-02', '48'),
+  ('INV-BLEU-C', 'INV-BLEU-C-03', '50'),
+  ('INV-BLEU-C', 'INV-BLEU-C-04', '52'),
+  ('INV-BLEU-C', 'INV-BLEU-C-05', '54'),
+  ('INV-BLEU-C', 'INV-BLEU-C-06', '56'),
+  ('INV-BLEU-C', 'INV-BLEU-C-07', '58'),
+  ('INV-VERT-C', 'INV-VERT-C-01', '46'),
+  ('INV-VERT-C', 'INV-VERT-C-02', '48'),
+  ('INV-VERT-C', 'INV-VERT-C-03', '52'),
+  ('INV-VERT-C', 'INV-VERT-C-04', '54'),
+  ('INV-VERT-C', 'INV-VERT-C-05', '56'),
+  ('INV-VERT-C', 'INV-VERT-C-06', '58'),
+  ('INV-NOIR-S', 'INV-NOIR-S-01', '48'),
+  ('INV-NOIR-S', 'INV-NOIR-S-02', '50'),
+  ('INV-NOIR-S', 'INV-NOIR-S-03', '52'),
+  ('INV-NOIR-S', 'INV-NOIR-S-04', '54'),
+  ('INV-NOIR-S', 'INV-NOIR-S-05', '56'),
+  ('INV-NOIR-S', 'INV-NOIR-S-06', '58'),
+  ('INV-GRIS', 'INV-GRIS-01', '48'),
+  ('INV-GRIS', 'INV-GRIS-02', '50'),
+  ('INV-GRIS', 'INV-GRIS-03', '52'),
+  ('INV-GREUNA', 'INV-GREUNA-01', '48'),
+  ('INV-GREUNA', 'INV-GREUNA-02', '50'),
+  ('INV-GREUNA', 'INV-GREUNA-03', '52'),
+  ('INV-GREUNA', 'INV-GREUNA-04', '54'),
+  ('INV-GREUNA', 'INV-GREUNA-05', '56'),
+  ('INV-GREUNA', 'INV-GREUNA-06', '58'),
+  ('INV-GREUNA', 'INV-GREUNA-07', '60'),
+  ('CST-BLEU-RAY', 'CST-BLEU-RAY-01', '46'),
+  ('CST-BLEU-RAY', 'CST-BLEU-RAY-02', '46'),
+  ('CST-BLEU-RAY', 'CST-BLEU-RAY-03', '50'),
+  ('CST-BLEU-RAY', 'CST-BLEU-RAY-04', '52'),
+  ('CST-BLEU-RAY', 'CST-BLEU-RAY-05', '54'),
+  ('CST-BLEU-RAY', 'CST-BLEU-RAY-06', '56'),
+  ('BRN-DORE', 'BRN-DORE-01', 'Standard'),
+  ('BRN-DORE-MAX', 'BRN-DORE-MAX-01', 'Standard'),
+  ('BRN-BEIGE-WAFA', 'BRN-BEIGE-WAFA-01', 'Standard'),
+  ('TUX-A', 'TUX-A-01', '46'),
+  ('TUX-A', 'TUX-A-02', '48'),
+  ('TUX-A', 'TUX-A-03', '50'),
+  ('TUX-A', 'TUX-A-04', '52'),
+  ('TUX-A', 'TUX-A-05', '54'),
+  ('TUX-A', 'TUX-A-06', '56'),
+  ('TUX-A', 'TUX-A-07', '58'),
+  ('TUX-B', 'TUX-B-01', '44'),
+  ('TUX-B', 'TUX-B-02', '46'),
+  ('TUX-B', 'TUX-B-03', '50'),
+  ('TUX-B', 'TUX-B-04', '52'),
+  ('TUX-B', 'TUX-B-05', '54'),
+  ('TUX-B', 'TUX-B-06', '56'),
+  ('TUX-B', 'TUX-B-07', '58'),
+  ('TUX-C', 'TUX-C-01', '44'),
+  ('TUX-C', 'TUX-C-02', '46'),
+  ('TUX-C', 'TUX-C-03', '50'),
+  ('TUX-C', 'TUX-C-04', '52'),
+  ('TUX-C', 'TUX-C-05', '54'),
+  ('TUX-C', 'TUX-C-06', '56'),
+  ('TUX-D', 'TUX-D-01', '44'),
+  ('TUX-D', 'TUX-D-02', '46'),
+  ('TUX-D', 'TUX-D-03', '48'),
+  ('TUX-D', 'TUX-D-04', '50'),
+  ('TUX-D', 'TUX-D-05', '52'),
+  ('TUX-D', 'TUX-D-06', '56'),
+  ('TUX-D', 'TUX-D-07', '58'),
+  ('TUX-E', 'TUX-E-01', '44'),
+  ('TUX-E', 'TUX-E-02', '46'),
+  ('TUX-E', 'TUX-E-03', '48'),
+  ('TUX-E', 'TUX-E-04', '50'),
+  ('TUX-E', 'TUX-E-05', '52'),
+  ('TUX-E', 'TUX-E-06', '54'),
+  ('TUX-E', 'TUX-E-07', '56'),
+  ('TUX-E', 'TUX-E-08', '58'),
+  ('TUX-F', 'TUX-F-01', '44'),
+  ('TUX-F', 'TUX-F-02', '46'),
+  ('TUX-F', 'TUX-F-03', '48'),
+  ('TUX-F', 'TUX-F-04', '50'),
+  ('TUX-F', 'TUX-F-05', '52'),
+  ('TUX-F', 'TUX-F-06', '54'),
+  ('TUX-F', 'TUX-F-07', '56'),
+  ('TUX-F', 'TUX-F-08', '58'),
+  ('TUX-G', 'TUX-G-01', '44'),
+  ('TUX-G', 'TUX-G-02', '46'),
+  ('TUX-G', 'TUX-G-03', '48'),
+  ('TUX-G', 'TUX-G-04', '50'),
+  ('TUX-G', 'TUX-G-05', '52'),
+  ('TUX-G', 'TUX-G-06', '54'),
+  ('TUX-G', 'TUX-G-07', '56')
+) as v(model_ref, ref_code, size)
+join public.article_models m on m.ref_code = v.model_ref
+on conflict (ref_code) do nothing;
+
+select count(*) filter (where m.ref_code = any (array['INV-BEIGE-S', 'INV-NOIR-C', 'INV-BLEU-C', 'INV-VERT-C', 'INV-NOIR-S', 'INV-GRIS', 'INV-GREUNA', 'CST-BLEU-RAY', 'BRN-DORE', 'BRN-DORE-MAX', 'BRN-BEIGE-WAFA', 'TUX-A', 'TUX-B', 'TUX-C', 'TUX-D', 'TUX-E', 'TUX-F', 'TUX-G'])) as nouveaux_modeles,
+       (select count(*) from public.article_units u join public.article_models m2 on m2.id = u.model_id
+         where m2.ref_code = any (array['INV-BEIGE-S', 'INV-NOIR-C', 'INV-BLEU-C', 'INV-VERT-C', 'INV-NOIR-S', 'INV-GRIS', 'INV-GREUNA', 'CST-BLEU-RAY', 'BRN-DORE', 'BRN-DORE-MAX', 'BRN-BEIGE-WAFA', 'TUX-A', 'TUX-B', 'TUX-C', 'TUX-D', 'TUX-E', 'TUX-F', 'TUX-G'])) as nouvelles_pieces
+from public.article_models m;
+
+commit;

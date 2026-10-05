@@ -146,10 +146,10 @@ const EMPTY_BUSY = new Map<number, Unavailability>();
  * `slot` des suggestions : 1 tenue, 2 chemise, 3 chaussures, 4 accessoires).
  */
 const SLOT_CATEGORIES: Record<number, string[]> = {
-  1: ["veste", "pantalon", "gilet"],
+  1: ["costume", "veste", "pantalon", "gilet"],
   2: ["chemise"],
   3: ["chaussures"],
-  4: ["noeud", "accessoire"],
+  4: ["noeud", "accessoire", "barnous"],
 };
 
 /** Pas des boutons − / + des montants : les prix se comptent en 500 DA. */
