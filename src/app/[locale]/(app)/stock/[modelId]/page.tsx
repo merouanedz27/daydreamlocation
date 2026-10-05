@@ -123,9 +123,18 @@ export default async function ModelPage({
             {category && ` · ${category}`}
             {model.color && ` · ${model.color}`}
           </p>
-          <p className="tabular mt-2 text-lg font-medium">
-            {formatMoney(model.base_price, l)}
-          </p>
+          <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+            <div>
+              <dt className="text-muted-foreground text-xs">{t("stock.rentalPrice")}</dt>
+              <dd className="tabular text-lg font-medium">{formatMoney(model.base_price, l)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-xs">{t("stock.purchasePriceModel")}</dt>
+              <dd className="tabular text-lg font-medium">
+                {formatMoney(model.purchase_price, l)}
+              </dd>
+            </div>
+          </dl>
         </div>
       </div>
 

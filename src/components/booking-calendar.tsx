@@ -10,28 +10,11 @@ import {
   formatWeekdayShort,
 } from "@/lib/format";
 import { DONE_NAME_CLASS, isOrderDone, type OrderRow } from "@/lib/orders-query";
-import { addDays, daysBetween, type IsoDate } from "@/lib/rental-range";
+import { addDays, daysBetween, startOfWeek, type IsoDate } from "@/lib/rental-range";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
 export type CalendarView = "mois" | "semaine" | "jour";
-
-/**
- * Premier jour de la semaine : lundi en français, SAMEDI en arabe — l'usage
- * algérien, où le week-end tombe le vendredi. Sur un calendrier en arabe qui
- * commencerait un lundi, le vendredi des mariages se retrouverait en avant-
- * dernière colonne au lieu de la dernière.
- */
-const WEEK_STARTS: Record<Locale, number> = { fr: 1, ar: 6 };
-
-/** Jour de la semaine d'une date ISO (0 = dimanche), sans piège de fuseau. */
-function weekday(date: IsoDate): number {
-  return new Date(`${date}T00:00:00Z`).getUTCDay();
-}
-
-export function startOfWeek(date: IsoDate, locale: Locale): IsoDate {
-  return addDays(date, -((weekday(date) - WEEK_STARTS[locale] + 7) % 7));
-}
 
 /** Les bornes affichées d'une vue — ce que la page doit charger. */
 export function calendarRange(

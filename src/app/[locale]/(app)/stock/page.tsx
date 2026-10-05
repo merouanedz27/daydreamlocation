@@ -72,6 +72,7 @@ export default async function StockPage({
           : model.categories.name_fr
         : null,
       price: model.base_price,
+      purchasePrice: model.purchase_price,
       photo: model.photo_path ? photoUrl(model.photo_path) : null,
       available: stock.available,
       total: stock.total,

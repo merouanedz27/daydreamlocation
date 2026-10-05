@@ -28,6 +28,7 @@ import { deleteOrders, setOrdersChecks, type BulkResult } from "@/lib/actions/or
 import { loadMoreOrders } from "@/lib/actions/orders-list";
 import {
   DONE_NAME_CLASS,
+  ORDERS_PARAM_KEYS,
   ROW_TONE_CLASS,
   SORTABLE,
   STATUS_BADGE_CLASS,
@@ -176,12 +177,9 @@ export function OrdersList({
   // la suite est déjà là quand le doigt y arrive).
   useEffect(() => {
     if (done || !sentinel.current) return;
-    const filters = {
-      q: params.get("q") ?? undefined,
-      statut: params.get("statut") ?? undefined,
-      tri: params.get("tri") ?? undefined,
-      sens: params.get("sens") ?? undefined,
-    };
+    const filters = Object.fromEntries(
+      ORDERS_PARAM_KEYS.map((key) => [key, params.get(key) ?? undefined]),
+    );
     let busy = false;
     const observer = new IntersectionObserver(
       async (entries) => {

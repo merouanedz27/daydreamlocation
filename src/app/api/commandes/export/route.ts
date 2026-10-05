@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import writeXlsxFile, { type Row } from "write-excel-file/node";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/auth";
-import { ordersFilters, parseOrdersQuery, SORTABLE } from "@/lib/orders-query";
+import { ORDERS_PARAM_KEYS, ordersFilters, parseOrdersQuery, SORTABLE } from "@/lib/orders-query";
 import { pieceOrderIds } from "@/lib/queries/orders-list";
 import { todayIso } from "@/lib/rental-range";
 import { routing, type Locale } from "@/i18n/routing";
@@ -55,7 +55,7 @@ type ExportOrder = {
  * évaluée comme formule — pas d'injection « =… » par un nom de client.
  *
  * MÊMES COMMANDES QU'À L'ÉCRAN — les paramètres sont ceux de la liste
- * (`q`, `statut`, `tri`, `sens`), lus par `parseOrdersQuery` et filtrés par
+ * (`q`, `statut`, `tri`, `sens`, `du`, `au`), lus par `parseOrdersQuery` et filtrés par
  * `ordersFilters`, les deux fonctions qu'utilise l'écran. Seule la pagination
  * est ignorée : on exporte TOUT le résultat.
  *
@@ -74,13 +74,13 @@ export async function GET(request: NextRequest) {
   const profile = await getProfile();
   if (!profile) return new Response(null, { status: 401 });
 
-  const query = parseOrdersQuery({
-    q: params.get("q") ?? undefined,
-    statut: params.get("statut") ?? undefined,
-    tri: params.get("tri") ?? undefined,
-    sens: params.get("sens") ?? undefined,
-  });
-  const { search, status } = ordersFilters(query, await pieceOrderIds(query.q));
+  const query = parseOrdersQuery(
+    Object.fromEntries(ORDERS_PARAM_KEYS.map((key) => [key, params.get(key) ?? undefined])),
+  );
+  const { search, status, from: eventFrom, to: eventTo } = ordersFilters(
+    query,
+    await pieceOrderIds(query.q),
+  );
 
   const supabase = await createClient();
   const orders: ExportOrder[] = [];
@@ -96,6 +96,8 @@ export async function GET(request: NextRequest) {
       );
     if (search) chunk = chunk.or(search);
     if (status) chunk = chunk.eq("status", status);
+    if (eventFrom) chunk = chunk.gte("event_date", eventFrom);
+    if (eventTo) chunk = chunk.lte("event_date", eventTo);
 
     const { data, error } = await chunk
       .order(SORTABLE[query.sort], { ascending: query.ascending })

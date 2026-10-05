@@ -6,6 +6,7 @@ import {
   Download,
   KeyRound,
   LayoutGrid,
+  WashingMachine,
   LogOut,
   Plane,
   Receipt,
@@ -14,7 +15,6 @@ import {
   Undo2,
   User,
   Users,
-  Wallet,
 } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -79,10 +79,10 @@ export function AppHeader({
   /** Pages hors onglets, rangées dans le menu du compte. */
   const moreLinks = [
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
+    { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
     ...(showDashboard
       ? [
           { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },
-          { href: "/depenses", icon: Wallet, label: t("nav.expenses") },
         ]
       : []),
   ];

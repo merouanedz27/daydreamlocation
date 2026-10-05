@@ -55,7 +55,6 @@ export async function createExpense(formData: FormData): Promise<ActionResult> {
   if (error) return { ok: false, error: "errors.generic" };
 
   revalidatePath(`/${locale}/frais`);
-  revalidatePath(`/${locale}/depenses`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };
 }
@@ -81,7 +80,6 @@ export async function deleteExpense(formData: FormData): Promise<ActionResult> {
   if (error) return { ok: false, error: "errors.generic" };
 
   revalidatePath(`/${locale}/frais`);
-  revalidatePath(`/${locale}/depenses`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };
 }

@@ -9,11 +9,12 @@ import type { PeriodTotals, Upcoming } from "@/lib/queries/dashboard";
 import type { Locale } from "@/i18n/routing";
 
 /**
- * Recettes − dépenses = bénéfice, sur le mois ou sur l'année.
+ * Locations − frais = bénéfice, sur le mois ou sur l'année.
  *
- * Le chiffre que le client a demandé en propres mots. Il n'a de sens que
- * parce que l'écran Dépenses existe : sans dépenses saisies, le « bénéfice »
- * vaudrait exactement le chiffre d'affaires et mentirait.
+ * « Locations » est la somme des prix des commandes, remplis à partir des prix
+ * de LOCATION du stock. Les frais sont ceux que l'équipe note dans l'onglet
+ * « Frais » (tailleur, pressing…). Le chiffre d'affaires, lui, est ailleurs :
+ * c'est la valeur d'ACHAT du stock, sans période.
  */
 export function DashboardResult({
   revenue,

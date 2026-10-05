@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronRight, Receipt } from "lucide-react";
-import { Link } from "@/i18n/navigation";
+import { Receipt } from "lucide-react";
 import { FraisQuickForm } from "@/components/frais-quick-form";
+import { ExpensesList } from "@/components/expenses-list";
 import { isOwner, requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayMonth, formatMoney } from "@/lib/format";
 import type { Locale } from "@/i18n/routing";
 import { Highlight } from "@/components/highlight";
+import type { ExpenseRow } from "@/lib/queries/expenses";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -26,9 +27,10 @@ const RECENT = 30;
  *
  * OUVERT À TOUTE L'ÉQUIPE pour l'ajout. La liste dessous passe par la RLS :
  * un employé ne relit que SES frais (pour repérer une faute de frappe), le
- * propriétaire les voit tous. AUCUN total ici : les totaux, le bénéfice et le
- * registre complet restent sur `/depenses` et le bilan, réservés au
- * propriétaire.
+ * propriétaire les voit tous — avec la corbeille, lui seul pouvant effacer
+ * un frais. AUCUN total ici : le total et le bénéfice sont sur le tableau de
+ * bord, réservé au propriétaire. (L'ancienne page « Dépenses » faisait
+ * doublon avec celle-ci et a disparu : tous les frais vivent ici.)
  */
 export default async function FraisPage({
   params,
@@ -51,13 +53,13 @@ export default async function FraisPage({
   const supabase = await createClient();
   let request = supabase
     .from("expenses")
-    .select("id, spent_on, category, amount, description");
+    .select("*, orders ( order_no, customer_name )");
   if (term) request = request.ilike("description", `%${term}%`);
   const { data } = await request
     .order("spent_on", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(RECENT);
-  const recent = data ?? [];
+  const recent = (data ?? []) as unknown as ExpenseRow[];
 
   return (
     <div className="space-y-6">
@@ -73,18 +75,11 @@ export default async function FraisPage({
           <h2 id="frais-recent" className="text-base font-medium">
             {owner ? t("frais.recentAll") : t("frais.recentMine")}
           </h2>
-          {owner && (
-            <Link
-              href="/depenses"
-              className="text-gold-strong flex min-h-11 items-center gap-1 text-sm font-medium"
-            >
-              {t("frais.seeExpenses")}
-              <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden />
-            </Link>
-          )}
         </div>
 
-        {recent.length ? (
+        {recent.length && owner ? (
+          <ExpensesList expenses={recent} />
+        ) : recent.length ? (
           <ul className="border-border bg-card overflow-hidden rounded-lg border">
             {recent.map((row) => (
               <li

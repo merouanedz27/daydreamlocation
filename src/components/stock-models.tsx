@@ -29,6 +29,8 @@ export type StockModelRow = {
   ref: string;
   category: string | null;
   price: number;
+  /** Prix d'achat d'une pièce : fait le chiffre d'affaires. */
+  purchasePrice: number;
   /** URL publique de la photo, ou `null`. */
   photo: string | null;
   available: number;
@@ -322,7 +324,15 @@ export function StockModels({
                   )}
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                    <span className="tabular font-medium">{formatMoney(model.price, locale)}</span>
+                    {/* Un prix à 0 fausse le tableau de bord — location (bénéfice)
+                        ou achat (chiffre d'affaires) : il doit se voir. */}
+                    {model.price > 0 && model.purchasePrice > 0 ? (
+                      <span className="tabular font-medium">{formatMoney(model.price, locale)}</span>
+                    ) : (
+                      <span className="bg-gold-soft text-foreground rounded px-1.5 py-0.5 text-xs font-medium">
+                        {t("stock.priceMissing")}
+                      </span>
+                    )}
                     <span
                       className={cn(
                         "tabular",
@@ -433,7 +443,13 @@ export function StockModels({
                     {model.category ?? "—"}
                   </td>
                   <td className={cn(sheet.td, "tabular text-end whitespace-nowrap")}>
-                    {formatNumber(model.price, locale)}
+                    {model.price > 0 && model.purchasePrice > 0 ? (
+                      formatNumber(model.price, locale)
+                    ) : (
+                      <span className="bg-gold-soft text-foreground rounded px-1.5 py-0.5 text-xs font-medium">
+                        {t("stock.priceMissing")}
+                      </span>
+                    )}
                   </td>
                   <td
                     className={cn(

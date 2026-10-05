@@ -160,3 +160,20 @@ export function rangesOverlap(a: string | null, b: string | null): boolean {
   if (startA >= endA || startB >= endB) return false; // plage vide
   return startA < endB && startB < endA;
 }
+
+/**
+ * Premier jour de la semaine : lundi en français, SAMEDI en arabe — l'usage
+ * algérien, où le week-end tombe le vendredi. Sur un calendrier en arabe qui
+ * commencerait un lundi, le vendredi des mariages se retrouverait en avant-
+ * dernière colonne au lieu de la dernière.
+ */
+const WEEK_STARTS: Record<"fr" | "ar", number> = { fr: 1, ar: 6 };
+
+/** Jour de la semaine d'une date ISO (0 = dimanche), sans piège de fuseau. */
+function weekday(date: IsoDate): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
+export function startOfWeek(date: IsoDate, locale: "fr" | "ar"): IsoDate {
+  return addDays(date, -((weekday(date) - WEEK_STARTS[locale] + 7) % 7));
+}

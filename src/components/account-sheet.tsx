@@ -7,8 +7,8 @@ import {
   Download,
   KeyRound,
   LayoutGrid,
+  WashingMachine,
   LogOut,
-  Receipt,
   Store,
   TrendingUp,
   User,
@@ -72,14 +72,14 @@ export function AccountSheet({
   const openingSignOut = useRef(false);
 
   // Ce qui n'a pas trouvé place dans les cinq onglets de la barre basse (ceux
-  // de son AppSheet) : le stock pour tous, et pour le propriétaire le bilan,
-  // le registre des dépenses et l'administration.
+  // de son AppSheet) : le stock pour tous, et pour le propriétaire le bilan
+  // et l'administration.
   const links = [
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
+    { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
     ...(showAdmin
       ? [
           { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },
-          { href: "/depenses", icon: Receipt, label: t("nav.expenses") },
           { href: "/equipe", icon: Users, label: t("nav.team") },
           { href: "/boutique", icon: Store, label: t("nav.shop") },
         ]

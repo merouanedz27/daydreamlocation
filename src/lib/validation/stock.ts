@@ -24,6 +24,19 @@ const money = z.coerce
   .min(0, { message: "errors.numberNegative" })
   .max(99_999_999);
 
+/** Un montant saisi, obligatoire : « 0 » est accepté, le vide non. */
+const requiredMoney = z
+  .string({ message: "errors.required" })
+  .trim()
+  .min(1, { message: "errors.required" })
+  .transform(Number)
+  .pipe(
+    z
+      .number({ message: "errors.numberInvalid" })
+      .min(0, { message: "errors.numberNegative" })
+      .max(99_999_999),
+  );
+
 export const modelSchema = z.object({
   ref_code: z
     .string()
@@ -39,11 +52,46 @@ export const modelSchema = z.object({
   color: optionalText,
   brand: optionalText,
   description: optionalText,
-  base_price: money,
+  // Les deux prix sont OBLIGATOIRES — un champ vide n'est pas un « 0 »
+  // implicite. Location : remplit le prix des commandes, donc le bénéfice.
+  // Achat (d'UNE pièce) : fait le chiffre d'affaires du tableau de bord.
+  base_price: requiredMoney,
+  purchase_price: requiredMoney,
   photo_path: z.string().trim().max(300).optional().nullable(),
 });
 
 export type ModelInput = z.infer<typeof modelSchema>;
+
+/** Plafonds de la création en série : un arrivage, pas un entrepôt. */
+export const MAX_PIECE_ROWS = 30;
+export const MAX_PIECES = 200;
+
+/**
+ * Les pièces saisies AVEC le modèle : une ligne « taille × nombre » par taille
+ * reçue (« 50:4 » = quatre vestes en 50). Le séparateur est le DERNIER « : »,
+ * une taille libre pouvant en contenir un.
+ */
+export const piecesSchema = z
+  .array(z.string())
+  .max(MAX_PIECE_ROWS, { message: "errors.tooManyPieces" })
+  .transform((rows) =>
+    rows.map((row) => {
+      const at = row.lastIndexOf(":");
+      return { size: row.slice(0, at).trim(), qty: Number(row.slice(at + 1)) };
+    }),
+  )
+  .pipe(
+    z
+      .array(
+        z.object({
+          size: z.string().min(1, { message: "errors.required" }).max(20),
+          qty: z.number().int().min(1).max(50, { message: "errors.tooManyPieces" }),
+        }),
+      )
+      .refine((rows) => rows.reduce((n, r) => n + r.qty, 0) <= MAX_PIECES, {
+        message: "errors.tooManyPieces",
+      }),
+  );
 
 export const unitSchema = z.object({
   model_id: z.coerce.number().int().positive(),

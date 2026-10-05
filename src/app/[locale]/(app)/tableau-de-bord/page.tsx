@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { CalendarClock, Receipt, TrendingUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CalendarClock, TrendingUp } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "@/i18n/navigation";
 import { RevenueChart, StockChart } from "@/components/dashboard-charts";
@@ -47,20 +46,26 @@ export default async function DashboardPage({
       {/* Titre reporté en `sr-only` : la barre de navigation dit déjà où l'on
           est. On le garde dans le DOM — un écran sans `h1` casse la navigation
           par titres des lecteurs d'écran. */}
-      <div className="flex items-center justify-end gap-4">
-        <h1 className="sr-only">{t("dashboard.title")}</h1>
-        <Button asChild variant="outline" className="h-11">
-          <Link href="/depenses">
-            <Receipt className="size-4" aria-hidden />
-            {t("nav.expenses")}
-          </Link>
-        </Button>
-      </div>
+      <h1 className="sr-only">{t("dashboard.title")}</h1>
 
-      {/* 1. Recettes sur quatre périodes calendaires complètes. */}
-      <section className="mt-6">
-        <h2 className="sr-only">{t("dashboard.revenue")}</h2>
-        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* 0. Le chiffre d'affaires TEL QUE LE PROPRIÉTAIRE LE COMPTE : ce que
+          le stock lui a coûté. Un total, sans période — il l'a voulu ainsi. */}
+      <section className="border-gold-strong/40 bg-gold-soft/40 rounded-lg border p-4">
+        <h2 className="text-muted-foreground text-sm">{t("dashboard.turnover")}</h2>
+        <p className="tabular mt-1 text-2xl font-medium">
+          {formatMoney(stats.stockValue.total, l)}
+        </p>
+        <p className="text-muted-foreground mt-1 text-xs">
+          {t("dashboard.turnoverHint", {
+            count: formatNumber(stats.stockValue.pieces, l),
+          })}
+        </p>
+      </section>
+
+      {/* 1. Locations sur quatre périodes calendaires complètes. */}
+      <section className="mt-8">
+        <h2 className="text-lg">{t("dashboard.revenue")}</h2>
+        <dl className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {kpis.map((k) => (
             <div key={k.label} className="border-border rounded-lg border p-4">
               <dt className="text-muted-foreground truncate text-sm">{k.label}</dt>
@@ -101,7 +106,7 @@ export default async function DashboardPage({
         )}
       </section>
 
-      {/* 2. Le chiffre qu'il a demandé : recettes moins dépenses. */}
+      {/* 2. Le bénéfice : locations moins frais. */}
       <section className="mt-8">
         <h2 className="text-lg">{t("dashboard.result")}</h2>
         <div className="mt-3">

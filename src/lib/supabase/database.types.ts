@@ -29,6 +29,7 @@ export type Database = {
           photo_path: string | null;
           is_active: boolean;
           created_at: string;
+          purchase_price: number;
         };
         Insert: {
           ref_code: string;
@@ -42,6 +43,7 @@ export type Database = {
           photo_path?: string | null;
           is_active?: boolean;
           created_at?: string;
+          purchase_price?: number;
         };
         Update: {
           ref_code?: string;
@@ -55,6 +57,7 @@ export type Database = {
           photo_path?: string | null;
           is_active?: boolean;
           created_at?: string;
+          purchase_price?: number;
         };
         Relationships: [
           {
@@ -80,6 +83,7 @@ export type Database = {
           status: string;
           notes: string | null;
           created_at: string;
+          status_since: string | null;
         };
         Insert: {
           model_id: number;
@@ -93,6 +97,7 @@ export type Database = {
           status?: string;
           notes?: string | null;
           created_at?: string;
+          status_since?: string | null;
         };
         Update: {
           model_id?: number;
@@ -106,6 +111,7 @@ export type Database = {
           status?: string;
           notes?: string | null;
           created_at?: string;
+          status_since?: string | null;
         };
         Relationships: [
           {
@@ -466,6 +472,14 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      set_pressing: {
+        Args: {
+          p_unit_ids: number[];
+          p_in: boolean;
+          p_cost?: number | null;
+        };
+        Returns: number;
+      };
       add_order_payment: {
         Args: {
           p_order_id: number;

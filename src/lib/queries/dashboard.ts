@@ -47,8 +47,16 @@ export type Upcoming = {
   nextDate: string | null;
 };
 
+/**
+ * Le CHIFFRE D'AFFAIRES au sens du propriétaire : le prix d'achat de toutes
+ * les pièces du stock (retirées comprises), sans date. Ce n'est PAS ce que
+ * rapportent les locations — celles-ci font le bénéfice.
+ */
+export type StockValue = { pieces: number; total: number };
+
 export type DashboardStats = {
   today: string;
+  stockValue: StockValue;
   revenue: PeriodTotals;
   expenses: PeriodTotals;
   monthly: MonthlyPoint[];
@@ -72,6 +80,7 @@ const periods = (raw: Record<string, unknown> | undefined): PeriodTotals => ({
 
 const EMPTY: DashboardStats = {
   today: new Date().toISOString().slice(0, 10),
+  stockValue: { pieces: 0, total: 0 },
   revenue: { day: 0, week: 0, month: 0, year: 0 },
   expenses: { day: 0, week: 0, month: 0, year: 0 },
   monthly: [],
@@ -92,9 +101,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const stock = (raw.stock ?? {}) as Record<string, unknown>;
   const unpaid = (raw.unpaid ?? {}) as Record<string, unknown>;
   const upcoming = (raw.upcoming ?? {}) as Record<string, unknown>;
+  const stockValue = (raw.stockValue ?? {}) as Record<string, unknown>;
 
   return {
     today: String(raw.today ?? EMPTY.today),
+    stockValue: { pieces: num(stockValue.pieces), total: num(stockValue.total) },
     revenue: periods(raw.revenue as Record<string, unknown>),
     expenses: periods(raw.expenses as Record<string, unknown>),
     monthly: ((raw.monthly ?? []) as Record<string, unknown>[]).map((m) => ({

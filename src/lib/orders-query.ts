@@ -85,16 +85,39 @@ export type OrdersQuery = {
   status: OrderStatus | null;
   sort: SortKey;
   ascending: boolean;
+  /** Bornes INCLUSES sur la date de l'ÉVÉNEMENT (`du` / `au` dans l'URL). */
+  from: string | null;
+  to: string | null;
 };
 
-/** Normalise les paramètres d'URL : tout ce qui est inconnu est ignoré. */
-export function parseOrdersQuery(params: {
+/** Les paramètres d'URL de la liste — partagés par l'écran, la suite et l'export. */
+export type OrdersParams = {
   q?: string;
   statut?: string;
   tri?: string;
   sens?: string;
-}): OrdersQuery {
+  du?: string;
+  au?: string;
+};
+
+export const ORDERS_PARAM_KEYS = ["q", "statut", "tri", "sens", "du", "au"] as const;
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Une date `YYYY-MM-DD` réelle, ou `null` : un lien trafiqué n'atteint pas la base. */
+function isoDay(value: string | undefined): string | null {
+  if (!value || !ISO_DAY.test(value)) return null;
+  const d = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value ? null : value;
+}
+
+/** Normalise les paramètres d'URL : tout ce qui est inconnu est ignoré. */
+export function parseOrdersQuery(params: OrdersParams): OrdersQuery {
   const sort = (params.tri && params.tri in SORTABLE ? params.tri : "event_date") as SortKey;
+  let from = isoDay(params.du);
+  let to = isoDay(params.au);
+  // Bornes inversées : on comprend ce que l'employé voulait dire.
+  if (from && to && from > to) [from, to] = [to, from];
 
   return {
     q: (params.q ?? "").trim().slice(0, 80),
@@ -107,6 +130,8 @@ export function parseOrdersQuery(params: {
     ascending: params.sens
       ? params.sens === "asc"
       : sort === "customer_name" || sort === "order_no",
+    from,
+    to,
   };
 }
 
@@ -130,10 +155,15 @@ export function ordersFilters(
   /** Argument de `.or(...)`, ou `null` sans recherche. */
   search: string | null;
   status: OrderStatus | null;
+  /** Date de l'événement, bornes incluses. */
+  from: string | null;
+  to: string | null;
 } {
   return {
     search: orderSearchFilter(query.q, pieceOrderIds),
     status: query.status,
+    from: query.from,
+    to: query.to,
   };
 }
 

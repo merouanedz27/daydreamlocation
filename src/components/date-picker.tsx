@@ -17,7 +17,7 @@ import type { Locale } from "@/i18n/routing";
  * `ar-DZ` et non `ar` : la variante algérienne. Les jours restent en chiffres
  * latins dans les deux langues, comme `formatDate`.
  */
-const CALENDAR_LOCALE = { fr, ar: arDZ } as const;
+export const CALENDAR_LOCALE = { fr, ar: arDZ } as const;
 
 /**
  * `YYYY-MM-DD` → `Date` à minuit LOCAL, et retour par les accesseurs locaux.
@@ -31,7 +31,7 @@ export function toCalendarDate(iso: IsoDate): Date {
   return new Date(y, m - 1, d);
 }
 
-function toIso(date: Date): IsoDate {
+export function toIso(date: Date): IsoDate {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${m}-${d}`;

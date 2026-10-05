@@ -83,9 +83,11 @@ export async function getOrdersTable(
     );
 
   // Mêmes filtres que l'export Excel : voir `ordersFilters`.
-  const { search, status } = ordersFilters(query, pieceIds);
+  const { search, status, from, to } = ordersFilters(query, pieceIds);
   if (search) request = request.or(search);
   if (status) request = request.eq("status", status);
+  if (from) request = request.gte("event_date", from);
+  if (to) request = request.lte("event_date", to);
 
   const { data, count } = await request
     .order(SORTABLE[query.sort], { ascending: query.ascending })

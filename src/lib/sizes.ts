@@ -18,6 +18,7 @@ const SERIES: Record<string, string[]> = {
   costume: SUIT_SIZES,
   chemise: SHIRT_SIZES,
   chaussures: SHOE_SIZES,
+  bligha: SHOE_SIZES,
 };
 
 /** La série d'une catégorie ; vide = taille libre seulement. */

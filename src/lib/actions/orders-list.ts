@@ -1,7 +1,7 @@
 "use server";
 
 import { getProfile } from "@/lib/auth";
-import { parseOrdersQuery, type OrderTableRow } from "@/lib/orders-query";
+import { parseOrdersQuery, type OrderTableRow, type OrdersParams } from "@/lib/orders-query";
 import { getOrdersTable } from "@/lib/queries/orders-list";
 
 /**
@@ -12,7 +12,7 @@ import { getOrdersTable } from "@/lib/queries/orders-list";
  * façon, et un paramètre trafiqué retombe sur la valeur par défaut.
  */
 export async function loadMoreOrders(
-  params: { q?: string; statut?: string; tri?: string; sens?: string },
+  params: OrdersParams,
   offset: number,
 ): Promise<OrderTableRow[]> {
   const profile = await getProfile();

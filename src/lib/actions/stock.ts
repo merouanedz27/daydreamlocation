@@ -7,10 +7,12 @@ import type { ZodError } from "zod";
 import {
   modelSchema,
   modelUpdateSchema,
+  piecesSchema,
   unitSchema,
   unitUpdateSchema,
 } from "@/lib/validation/stock";
 import { nextUnitRefs } from "@/lib/stock-refs";
+import { sortSizes } from "@/lib/sizes";
 import { PHOTO_BUCKET } from "@/lib/storage";
 import { redirectTo } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
@@ -59,7 +61,14 @@ function firstIssue(
 }
 
 /** Champs réellement rendus par `ModelForm` — voir `firstIssue`. */
-const MODEL_FIELDS = ["ref_code", "name_fr", "category_id", "base_price"] as const;
+const MODEL_FIELDS = [
+  "ref_code",
+  "name_fr",
+  "category_id",
+  "base_price",
+  "purchase_price",
+  "pieces",
+] as const;
 
 /**
  * Crée un modèle.
@@ -84,10 +93,21 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
     brand: formData.get("brand"),
     description: formData.get("description"),
     base_price: formData.get("base_price"),
+    purchase_price: formData.get("purchase_price"),
     photo_path: formData.get("photo_path") || null,
   });
 
   if (!parsed.success) return firstIssue(parsed.error, MODEL_FIELDS);
+
+  const pieces = piecesSchema.safeParse(formData.getAll("pieces").map(String));
+  if (!pieces.success) {
+    const issue = pieces.error.issues.at(-1)!;
+    return {
+      ok: false,
+      error: issue.message.startsWith("errors.") ? issue.message : "errors.generic",
+      field: "pieces",
+    };
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -103,11 +123,36 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "errors.generic" };
   }
 
+  // Les pièces saisies sur la même page : « 50 × 4 » donne quatre pièces en
+  // 50, numérotées dans l'ordre des tailles (TUX-H-01… en 46, puis 48…).
+  const quantities = new Map<string, number>();
+  for (const { size, qty } of pieces.data) {
+    quantities.set(size, (quantities.get(size) ?? 0) + qty);
+  }
+  const sizes = sortSizes([...quantities.keys()]).flatMap((size) =>
+    Array.from({ length: quantities.get(size) ?? 0 }, () => size),
+  );
+
+  if (sizes.length) {
+    const refs = nextUnitRefs(parsed.data.ref_code, [], sizes.length);
+    const { error: unitsError } = await supabase.from("article_units").insert(
+      sizes.map((size, i) => ({ model_id: data.id, ref_code: refs[i], size })),
+    );
+    if (unitsError) {
+      // Pas de modèle à moitié créé : sans ses pièces, on le retire. Il n'a
+      // encore ni pièce ni commande, l'effacement ne peut pas être refusé.
+      await supabase.from("article_models").delete().eq("id", data.id);
+      return { ok: false, error: "errors.generic", field: "pieces" };
+    }
+  }
+
   // La liste est rafraîchie AVANT la redirection, sinon l'employé arrive sur
   // un catalogue où son modèle ne figure pas encore.
   revalidatePath(`/${locale}/stock`);
   revalidatePath(`/${locale}/stock/${data.id}`);
-  redirectTo("/stock", locale);
+  // Avec des pièces, on montre la fiche : c'est là qu'on vérifie leurs
+  // références et leurs tailles.
+  redirectTo(sizes.length ? `/stock/${data.id}` : "/stock", locale);
 }
 
 /** Champs réellement rendus par `UnitForm` — voir `firstIssue`. */
@@ -253,13 +298,58 @@ export async function setUnitStatus(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("article_units")
-    .update({ status })
+    .update({ status, status_since: new Date().toISOString() })
     .eq("id", unitId);
 
   if (error) return { ok: false, error: "errors.generic" };
 
   revalidatePath(`/${locale}/stock/${modelId}`);
   return { ok: true };
+}
+
+/**
+ * Supprime une pièce saisie par erreur.
+ *
+ * Même règle que pour un modèle : une pièce jamais louée est EFFACÉE ; une
+ * pièce déjà louée ne peut pas l'être (`order_lines.unit_id` est en
+ * `on delete restrict`, ses commandes passées la désignent). Elle passe alors
+ * en « retirée » : hors du stock louable, l'historique intact. C'est la base
+ * qui tranche, pas un contrôle JavaScript préalable.
+ */
+export async function deleteUnit(
+  formData: FormData,
+): Promise<{ ok: true; retired: boolean } | { ok: false; error: string }> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const { data: unit } = await supabase
+    .from("article_units")
+    .select("model_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!unit) return { ok: false, error: "errors.generic" };
+
+  let retired = false;
+  const { error } = await supabase.from("article_units").delete().eq("id", id);
+  if (error) {
+    if (error.code !== FOREIGN_KEY_VIOLATION) return { ok: false, error: "errors.generic" };
+    const { error: retireError } = await supabase
+      .from("article_units")
+      .update({ status: "retire" })
+      .eq("id", id);
+    if (retireError) return { ok: false, error: "errors.generic" };
+    retired = true;
+  }
+
+  revalidatePath(`/${locale}/stock/${unit.model_id}`);
+  revalidatePath(`/${locale}/stock`);
+  return { ok: true, retired };
 }
 
 /**
@@ -288,6 +378,7 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
     brand: formData.get("brand"),
     description: formData.get("description"),
     base_price: formData.get("base_price"),
+    purchase_price: formData.get("purchase_price"),
     photo_path: formData.get("photo_path") || null,
   });
 

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PhotoUpload } from "@/components/photo-upload";
+import { ModelPieces } from "@/components/model-pieces";
 import { createModel, updateModel } from "@/lib/actions/stock";
 import type { ArticleModel, Category } from "@/lib/queries/stock";
 import type { Locale } from "@/i18n/routing";
@@ -54,6 +55,11 @@ export function ModelForm({
   const [field, setField] = useState<string | null>(null);
 
   const editing = Boolean(model);
+  // Suivis en direct pour la création des pièces : la catégorie choisit la
+  // série de tailles, la référence annonce celles des pièces.
+  const [refCode, setRefCode] = useState(model?.ref_code ?? "");
+  const [categoryId, setCategoryId] = useState(model ? String(model.category_id) : "");
+  const categorySlug = categories.find((c) => String(c.id) === categoryId)?.slug ?? null;
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -86,7 +92,8 @@ export function ModelForm({
             name="ref_code"
             required
             disabled={isPending}
-            defaultValue={model?.ref_code ?? ""}
+            value={refCode}
+            onChange={(e) => setRefCode(e.target.value)}
             placeholder="Gio-079"
             autoCapitalize="characters"
             autoCorrect="off"
@@ -133,7 +140,8 @@ export function ModelForm({
             name="category_id"
             required
             disabled={isPending}
-            defaultValue={model ? String(model.category_id) : undefined}
+            value={categoryId}
+            onValueChange={setCategoryId}
           >
             <SelectTrigger id="category_id" className="h-12 w-full text-base">
               <SelectValue placeholder={t("stock.category")} />
@@ -150,7 +158,7 @@ export function ModelForm({
         </Field>
 
         <Field data-invalid={field === "base_price" || undefined}>
-          <FieldLabel htmlFor="base_price">{t("stock.price")}</FieldLabel>
+          <FieldLabel htmlFor="base_price">{t("stock.rentalPrice")}</FieldLabel>
           <Input
             id="base_price"
             name="base_price"
@@ -158,13 +166,31 @@ export function ModelForm({
             inputMode="numeric"
             min={0}
             step={100}
-            defaultValue={model?.base_price ?? 0}
+            defaultValue={model?.base_price ?? ""}
             required
             disabled={isPending}
             className="h-12 text-base"
           />
-          <FieldDescription>{t("stock.priceHint")}</FieldDescription>
+          <FieldDescription>{t("stock.priceRequiredHint")}</FieldDescription>
           {field === "base_price" && error && <FieldError>{t(error)}</FieldError>}
+        </Field>
+
+        <Field data-invalid={field === "purchase_price" || undefined}>
+          <FieldLabel htmlFor="purchase_price">{t("stock.purchasePriceModel")}</FieldLabel>
+          <Input
+            id="purchase_price"
+            name="purchase_price"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={100}
+            defaultValue={model?.purchase_price ?? ""}
+            required
+            disabled={isPending}
+            className="h-12 text-base"
+          />
+          <FieldDescription>{t("stock.purchasePriceModelHint")}</FieldDescription>
+          {field === "purchase_price" && error && <FieldError>{t(error)}</FieldError>}
         </Field>
 
         <Field>
@@ -188,6 +214,16 @@ export function ModelForm({
             className="h-12 text-base"
           />
         </Field>
+
+        {/* Les pièces se saisissent avec le modèle, à la création seulement :
+            ensuite, « Ajouter une pièce » sur la fiche prend le relais. */}
+        {!editing && (
+          <Field data-invalid={field === "pieces" || undefined}>
+            <FieldLabel>{t("stock.piecesSection")}</FieldLabel>
+            <ModelPieces categorySlug={categorySlug} refCode={refCode} disabled={isPending} />
+            {field === "pieces" && error && <FieldError>{t(error)}</FieldError>}
+          </Field>
+        )}
 
         {/* Encart de repli. Il n'est juste que parce que l'action ne renvoie
             QUE des champs réellement rendus ci-dessus (voir `firstIssue`) :

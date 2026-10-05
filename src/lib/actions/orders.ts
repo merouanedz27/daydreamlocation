@@ -561,7 +561,6 @@ export async function deleteOrder(formData: FormData): Promise<ActionResult> {
   // tableau de bord ; et ses frais perdent leur lien dans les dépenses.
   revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/tableau-de-bord`);
-  revalidatePath(`/${locale}/depenses`);
   redirectTo("/commandes", locale);
 }
 
@@ -653,6 +652,5 @@ export async function deleteOrders(formData: FormData): Promise<BulkResult> {
 
   revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/tableau-de-bord`);
-  revalidatePath(`/${locale}/depenses`);
   return { ok: true, rows: data };
 }

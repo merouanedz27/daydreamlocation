@@ -37,7 +37,7 @@ export async function getModels(options?: {
     .from("article_models")
     .select(
       `id, ref_code, name_fr, name_ar, category_id, color, brand, description,
-       base_price, photo_path, is_active, created_at,
+       base_price, purchase_price, photo_path, is_active, created_at,
        categories ( id, slug, name_fr, name_ar ),
        article_units ( id, size, status )`,
     )
@@ -192,3 +192,55 @@ export function countStock(
  * `generateMetadata`, le layout et la page d'une même requête.
  */
 export const getModel = cache(fetchModel);
+
+/** Une pièce telle que l'écran Pressing la montre. */
+export type PressingUnit = {
+  id: number;
+  ref: string;
+  size: string | null;
+  status: "disponible" | "nettoyage";
+  /** Depuis quand elle est au pressing (ISO), si connu. */
+  since: string | null;
+  modelName: string;
+  modelNameAr: string | null;
+  modelRef: string;
+};
+
+/**
+ * Les pièces que l'écran Pressing peut déplacer : celles au pressing, et
+ * celles disponibles qu'on pourrait y envoyer. Modèles du catalogue seulement
+ * — un modèle retiré ne part plus au pressing.
+ */
+export async function getPressingUnits(): Promise<PressingUnit[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("article_units")
+    .select(
+      `id, ref_code, size, status, status_since,
+       article_models!inner ( ref_code, name_fr, name_ar, is_active )`,
+    )
+    .in("status", ["disponible", "nettoyage"])
+    .eq("article_models.is_active", true)
+    .order("ref_code");
+
+  if (error) throw error;
+
+  type Raw = {
+    id: number;
+    ref_code: string;
+    size: string | null;
+    status: "disponible" | "nettoyage";
+    status_since: string | null;
+    article_models: { ref_code: string; name_fr: string; name_ar: string | null };
+  };
+  return ((data ?? []) as unknown as Raw[]).map((u) => ({
+    id: u.id,
+    ref: u.ref_code,
+    size: u.size,
+    status: u.status,
+    since: u.status_since,
+    modelName: u.article_models.name_fr,
+    modelNameAr: u.article_models.name_ar,
+    modelRef: u.article_models.ref_code,
+  }));
+}

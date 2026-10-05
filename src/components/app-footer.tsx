@@ -40,11 +40,11 @@ export async function AppFooter({
     { href: "/commandes", label: t("nav.orders") },
     { href: "/commandes/nouvelle", label: t("orders.new") },
     { href: "/stock", label: t("nav.stock") },
+    { href: "/pressing", label: t("nav.pressing") },
     ...(showStockLinks ? [{ href: "/stock/nouveau", label: t("stock.newModel") }] : []),
     ...(showOwnerLinks
       ? [
           { href: "/tableau-de-bord", label: t("nav.dashboard") },
-          { href: "/depenses", label: t("nav.expenses") },
           { href: "/equipe", label: t("nav.team") },
           { href: "/boutique", label: t("nav.shop") },
         ]
