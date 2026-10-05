@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { UnitForm } from "@/components/unit-form";
 import { getModel } from "@/lib/queries/stock";
-import { requireOwner } from "@/lib/auth";
-import { nextUnitRefs } from "@/lib/stock-refs";
+import { requireStockManager } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -25,18 +24,13 @@ export default async function NewUnitPage({
 }) {
   const { locale, modelId } = await params;
   setRequestLocale(locale);
-  await requireOwner(locale as Locale);
+  await requireStockManager(locale as Locale);
 
   const id = Number(modelId);
   if (!Number.isFinite(id)) notFound();
 
   const [model, t] = await Promise.all([getModel(id), getTranslations()]);
   if (!model) notFound();
-
-  const [nextRef] = nextUnitRefs(
-    model.ref_code,
-    (model.article_units ?? []).map((u) => u.ref_code),
-  );
 
   return (
     <div className="mx-auto max-w-lg">
@@ -56,7 +50,12 @@ export default async function NewUnitPage({
         <span className="ornament-diamond" />
       </div>
 
-      <UnitForm modelId={model.id} refCode={model.ref_code} nextRef={nextRef} />
+      <UnitForm
+        modelId={model.id}
+        refCode={model.ref_code}
+        existingRefs={(model.article_units ?? []).map((u) => u.ref_code)}
+        categorySlug={model.categories?.slug ?? null}
+      />
     </div>
   );
 }

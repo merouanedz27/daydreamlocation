@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { signOut } from "@/lib/actions/auth";
+import { ThemeChoice } from "@/components/theme-choice";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 import wordmark from "../../public/logo-wordmark.png";
@@ -257,6 +258,11 @@ export function AppHeader({
                   {t("account.changePassword")}
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-muted-foreground text-xs font-medium">
+                {t("theme.title")}
+              </DropdownMenuLabel>
+              <ThemeChoice compact className="mx-1 mb-1" />
               <DropdownMenuSeparator />
 
               {/* Visible pour TOUS les rôles : chaque employé installe

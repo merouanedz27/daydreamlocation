@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Plus, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,24 +23,54 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createUnits } from "@/lib/actions/stock";
+import { sizeSeries, sortSizes } from "@/lib/sizes";
+import { nextUnitRefs } from "@/lib/stock-refs";
+import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
 const CONDITIONS = ["neuf", "bon", "use", "retire"] as const;
 
+/**
+ * Ajout de pièces EN SÉRIE : on touche chaque taille reçue (46, 48, 50…), une
+ * pièce est créée par taille, avec sa référence. Sans taille cochée, le
+ * nombre d'exemplaires reprend la main (pièces sans taille).
+ */
 export function UnitForm({
   modelId,
   refCode,
-  nextRef,
+  existingRefs,
+  categorySlug,
 }: {
   modelId: number;
   refCode: string;
-  nextRef: string;
+  /** Références déjà prises : la prévisualisation annonce les suivantes. */
+  existingRefs: string[];
+  categorySlug: string | null;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [field, setField] = useState<string | null>(null);
+  const [sizes, setSizes] = useState<string[]>([]);
+  const [other, setOther] = useState("");
+  const series = sizeSeries(categorySlug);
+  // Les tailles libres ajoutées s'affichent comme les autres, à la suite.
+  const chips = sortSizes([...series, ...sizes]);
+  const chosen = sortSizes(sizes);
+  const refs = nextUnitRefs(refCode, existingRefs, Math.max(chosen.length, 1));
+
+  function toggle(size: string) {
+    setSizes((current) =>
+      current.includes(size) ? current.filter((s) => s !== size) : [...current, size],
+    );
+  }
+
+  function addOther() {
+    const size = other.trim().slice(0, 20);
+    if (size && !sizes.includes(size)) setSizes((current) => [...current, size]);
+    setOther("");
+  }
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -61,15 +91,71 @@ export function UnitForm({
 
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="size">{t("stock.size")}</FieldLabel>
-          <Input
-            id="size"
-            name="size"
-            disabled={isPending}
-            placeholder="50"
-            className="h-12 text-base"
-          />
-          <FieldDescription>{t("stock.sizeHint")}</FieldDescription>
+          <FieldLabel>{t("stock.sizeSeries")}</FieldLabel>
+          {chosen.map((size) => (
+            <input key={size} type="hidden" name="sizes" value={size} />
+          ))}
+          {chips.length > 0 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t("stock.sizeSeries")}>
+              {chips.map((size) => {
+                const on = sizes.includes(size);
+                return (
+                  <button
+                    key={size}
+                    type="button"
+                    aria-pressed={on}
+                    disabled={isPending}
+                    onClick={() => toggle(size)}
+                    className={cn(
+                      "press tabular flex h-11 min-w-12 items-center justify-center gap-1 rounded-full border px-3 text-base font-medium",
+                      on
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-muted",
+                    )}
+                  >
+                    <bdi>{size}</bdi>
+                    {on && !series.includes(size) && <X className="size-3.5" aria-hidden />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Input
+              value={other}
+              onChange={(e) => setOther(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addOther();
+                }
+              }}
+              disabled={isPending}
+              placeholder={t("stock.otherSize")}
+              aria-label={t("stock.otherSize")}
+              className="h-12 flex-1 text-base"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={addOther}
+              disabled={isPending || !other.trim()}
+              className="h-12"
+            >
+              <Plus className="size-4" aria-hidden />
+              {t("stock.addSize")}
+            </Button>
+          </div>
+          <FieldDescription>
+            {chosen.length
+              ? t("stock.seriesCount", {
+                  count: chosen.length,
+                  first: refs[0],
+                  last: refs[refs.length - 1],
+                })
+              : t("stock.sizeSeriesHint")}
+          </FieldDescription>
+          {field === "sizes" && error && <FieldError>{t(error)}</FieldError>}
         </Field>
 
         <Field>
@@ -87,7 +173,7 @@ export function UnitForm({
           />
         </Field>
 
-        <Field data-invalid={field === "quantity" || undefined}>
+        <Field data-invalid={field === "quantity" || undefined} hidden={chosen.length > 0}>
           <FieldLabel htmlFor="quantity">{t("stock.quantity")}</FieldLabel>
           <Input
             id="quantity"
@@ -103,7 +189,7 @@ export function UnitForm({
           {/* Les références sont dérivées du code fournisseur : on montre
               celle qui sera attribuée, pour qu'il n'y ait pas de surprise. */}
           <FieldDescription>
-            {t("stock.nextRefHint", { ref: nextRef })}
+            {t("stock.nextRefHint", { ref: refs[0] })}
           </FieldDescription>
           {field === "quantity" && error && <FieldError>{t(error)}</FieldError>}
         </Field>

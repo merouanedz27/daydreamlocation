@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Shirt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link, useRouter } from "@/i18n/navigation";
+import { Highlight } from "@/components/highlight";
 import { sheet } from "@/components/sheet-table";
 import { StockModelMenu, type MenuModel } from "@/components/stock-model-menu";
 import { ViewToggle, type ListView } from "@/components/view-toggle";
@@ -26,6 +27,8 @@ export type StockModelRow = {
   photo: string | null;
   available: number;
   total: number;
+  /** Tailles distinctes des pièces en stock, triées. */
+  sizes: string[];
 };
 
 /*
@@ -146,11 +149,21 @@ export function StockModels({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{model.name}</p>
+                  <p className="truncate font-medium">
+                    <Highlight text={model.name} />
+                  </p>
                   <p className="text-muted-foreground mt-0.5 truncate text-sm">
-                    <bdi>{model.ref}</bdi>
+                    <bdi>
+                      <Highlight text={model.ref} />
+                    </bdi>
                     {model.category && ` · ${model.category}`}
                   </p>
+
+                  {model.sizes.length > 0 && (
+                    <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                      {t("stock.size")} <bdi className="text-foreground font-medium">{model.sizes.join(" · ")}</bdi>
+                    </p>
+                  )}
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <span className="tabular font-medium">{formatMoney(model.price, locale)}</span>
@@ -223,11 +236,20 @@ export function StockModels({
                 >
                   <td className={cn(sheet.td, "text-start md:whitespace-nowrap")}>
                     <Link href={`/stock/${model.id}`} className={sheet.rowLink}>
-                      <bdi className="block min-w-14 wrap-anywhere">{model.ref}</bdi>
+                      <bdi className="block min-w-14 wrap-anywhere">
+                        <Highlight text={model.ref} />
+                      </bdi>
                     </Link>
                   </td>
                   <td className={cn(sheet.td, "text-start")}>
-                    <span className="block min-w-14 wrap-anywhere">{model.name}</span>
+                    <span className="block min-w-14 wrap-anywhere">
+                      <Highlight text={model.name} />
+                    </span>
+                    {model.sizes.length > 0 && (
+                      <bdi className="text-muted-foreground block text-xs">
+                        {model.sizes.join(" · ")}
+                      </bdi>
+                    )}
                   </td>
                   <td className={cn(sheet.td, "text-muted-foreground hidden text-start sm:table-cell")}>
                     {model.category ?? "—"}

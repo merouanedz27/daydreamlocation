@@ -47,7 +47,11 @@ export type ModelInput = z.infer<typeof modelSchema>;
 
 export const unitSchema = z.object({
   model_id: z.coerce.number().int().positive(),
-  size: optionalText,
+  /**
+   * La SÉRIE de tailles cochées : une pièce par taille (46, 48, 50 → trois
+   * pièces). Vide = `quantity` pièces sans taille.
+   */
+  sizes: z.array(z.string().trim().min(1).max(20)).max(20).default([]),
   length_cm: z
     .union([z.literal(""), z.coerce.number().min(0).max(999)])
     .optional()
@@ -72,6 +76,20 @@ export const unitSchema = z.object({
 });
 
 export type UnitInput = z.infer<typeof unitSchema>;
+
+/** Modification d'une pièce existante : sa taille, sa longueur, son prix. */
+export const unitUpdateSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  size: optionalText,
+  length_cm: z
+    .union([z.literal(""), z.coerce.number().min(0).max(999)])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? null : Number(v))),
+  price_override: z
+    .union([z.literal(""), money])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? null : Number(v))),
+});
 
 /**
  * Modification d'un modèle : les mêmes règles que la création, plus l'`id`.

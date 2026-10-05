@@ -25,6 +25,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { ThemeChoice } from "@/components/theme-choice";
 import { cn } from "@/lib/utils";
 
 /**
@@ -198,6 +199,12 @@ export function AccountSheet({
               />
             </Link>
           </SheetClose>
+
+          {/* Clair / sombre / auto : réglé sur CE téléphone. */}
+          <p className="text-muted-foreground px-3 pt-3 pb-1 text-xs font-medium">
+            {t("theme.title")}
+          </p>
+          <ThemeChoice className="mx-1" />
 
           {onInstall && (
             <>

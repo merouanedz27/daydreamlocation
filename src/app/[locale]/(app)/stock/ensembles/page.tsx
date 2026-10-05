@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { StockTabs } from "@/components/stock-tabs";
 import { getEnsembles } from "@/lib/queries/ensembles";
-import { getProfile, isOwner } from "@/lib/auth";
+import { getProfile, canManageStock } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
 import { matchesSearch } from "@/lib/search";
+import { Highlight } from "@/components/highlight";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -48,7 +49,7 @@ export default async function EnsemblesPage({
   const ensembles = all.filter((e) =>
     matchesSearch(q, e.name, ...e.pieces.flatMap((p) => [p.ref_code, p.model_name_fr, p.model_name_ar])),
   );
-  const canEdit = isOwner(profile);
+  const canEdit = canManageStock(profile);
 
   return (
     <div>
@@ -86,7 +87,9 @@ export default async function EnsemblesPage({
               <>
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{e.name}</p>
+                    <p className="truncate font-medium">
+                      <Highlight text={e.name} />
+                    </p>
                     <p className="text-muted-foreground mt-0.5 text-sm">
                       {t("orders.ensemblePieces", { count: e.pieces.length })}
                       {" · "}
@@ -112,7 +115,9 @@ export default async function EnsemblesPage({
                         variant="outline"
                         className={p.status === "retire" ? "text-muted-foreground line-through" : undefined}
                       >
-                        <bdi>{p.ref_code}</bdi>
+                        <bdi>
+                          <Highlight text={p.ref_code} />
+                        </bdi>
                         {p.size && ` · ${p.size}`}
                       </Badge>
                     </li>

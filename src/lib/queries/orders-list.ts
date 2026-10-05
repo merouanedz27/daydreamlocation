@@ -10,6 +10,9 @@ import {
   type OrderTableRow,
   type OrdersQuery,
 } from "@/lib/orders-query";
+import { getLabelSlots } from "@/lib/queries/orders";
+import { normalizeSearch } from "@/lib/search";
+import { ticketFields, type TicketFields } from "@/lib/ticket-fields";
 
 /** Colonnes d'une ligne de liste — partagées par tous les écrans de liste. */
 const ROW_COLUMNS = `id, order_no, customer_name, customer_phone, event_date,
@@ -51,22 +54,30 @@ export async function pieceOrderIds(q: string | null | undefined): Promise<numbe
  * chargées dans le navigateur donnerait des résultats faux — on ne verrait
  * que ce qui est déjà arrivé.
  *
- * Les pièces viennent avec chaque commande (jointure `order_lines`) : c'est
- * la colonne « ce que le client emporte » du tableau, celle que l'équipe
- * lisait dans son AppSheet.
+ * Les pièces viennent avec chaque commande (jointure `order_lines`) et sont
+ * remises dans les colonnes de son AppSheet — costume, taille, chemise,
+ * chaussures, accessoires — par le même calcul que le bon de location
+ * (`ticketFields`) : le tableau dit ce que dit le ticket.
  */
 export async function getOrdersTable(
   query: OrdersQuery,
   offset = 0,
   limit = ORDERS_BATCH,
 ): Promise<{ rows: OrderTableRow[]; total: number }> {
-  const [supabase, pieceIds] = await Promise.all([createClient(), pieceOrderIds(query.q)]);
+  // Tout part EN MÊME TEMPS : les libellés habituels ne retardent pas la liste.
+  const [supabase, pieceIds, labelSlots] = await Promise.all([
+    createClient(),
+    pieceOrderIds(query.q),
+    getLabelSlots(),
+  ]);
 
   let request = supabase
     .from("orders")
     .select(
       `${ROW_COLUMNS},
-       order_lines ( id, model_name_snapshot, size_snapshot, external_label, line_note, is_active ),
+       order_lines ( id, unit_id, model_name_snapshot, size_snapshot, external_label,
+         external_source, external_cost, line_note, is_active,
+         article_units ( ref_code, article_models ( categories ( slug ) ) ) ),
        profiles ( full_name )`,
       { count: "exact" },
     );
@@ -89,31 +100,57 @@ export async function getOrdersTable(
     profiles: { full_name: string } | null;
     order_lines: {
       id: number;
+      unit_id: number | null;
       model_name_snapshot: string | null;
       size_snapshot: string | null;
       external_label: string | null;
+      external_source: string | null;
+      external_cost: number | null;
       line_note: string | null;
       is_active: boolean;
+      article_units: {
+        ref_code: string;
+        article_models: { categories: { slug: string } | null } | null;
+      } | null;
     }[];
   };
 
+  const slotOf = (label: string) => labelSlots.get(normalizeSearch(label)) ?? null;
+
   const rows = ((data ?? []) as unknown as Raw[]).map(({ order_lines, profiles, ...order }) => {
     const lines = (order_lines ?? []).filter((l) => l.is_active);
+    const categoryByUnit = new Map<number, string | null>();
+    for (const l of lines) {
+      if (l.unit_id) {
+        categoryByUnit.set(l.unit_id, l.article_units?.article_models?.categories?.slug ?? null);
+      }
+    }
+    const fields = ticketFields(
+      { ...order, notes: null, order_lines: lines },
+      { slotOf, categoryOfUnit: (id) => categoryByUnit.get(id) ?? null },
+    );
     return {
       ...order,
-      pieces: lines
-        .map((l) => {
-          const name = (l.model_name_snapshot ?? l.external_label ?? "").trim();
-          if (!name) return null;
-          return l.size_snapshot ? `${name} (${l.size_snapshot})` : name;
-        })
-        .filter((p): p is string => p !== null),
-      tailor: lines.find((l) => l.line_note?.trim())?.line_note?.trim() ?? null,
+      costume: fields.costume,
+      sizes: costumeSizes(fields),
+      tailor: fields.tailor,
+      shirt: fields.shirt,
+      shoes: fields.shoes,
+      accessories: fields.accessories,
       created_by_name: profiles?.full_name ?? null,
     };
   });
 
   return { rows, total: count ?? 0 };
+}
+
+/** « 50 · G 48 · P 52 » — le pantalon n'est écrit que s'il diffère de la veste. */
+function costumeSizes(fields: TicketFields): string | null {
+  if (!fields.jacketSize) return null;
+  const parts = [fields.jacketSize];
+  if (fields.vestSize) parts.push(`G ${fields.vestSize}`);
+  if (fields.pantsSize && fields.pantsSize !== fields.jacketSize) parts.push(`P ${fields.pantsSize}`);
+  return parts.join(" · ");
 }
 
 /**

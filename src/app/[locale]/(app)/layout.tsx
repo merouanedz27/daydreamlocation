@@ -3,8 +3,9 @@ import { AppHeader } from "@/components/app-header";
 import { BottomNav } from "@/components/bottom-nav";
 import { NewOrderFab } from "@/components/new-order-fab";
 import { AppFooter } from "@/components/app-footer";
+import { UpdateNotifier } from "@/components/update-notifier";
 import { CustomerMessageProvider } from "@/components/customer-message";
-import { requireProfile, isOwner } from "@/lib/auth";
+import { canManageStock, requireProfile, isOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/queries/orders";
 import type { Locale } from "@/i18n/routing";
 
@@ -38,7 +39,9 @@ export default async function AppLayout({
     <div className="flex min-h-dvh flex-col">
       <AppHeader
         fullName={profile.full_name}
-        roleLabel={t(profile.role === "owner" ? "owner" : "staff")}
+        roleLabel={t(
+          profile.role === "owner" || profile.role === "moderator" ? profile.role : "staff",
+        )}
         showDashboard={isOwner(profile)}
       />
 
@@ -51,9 +54,12 @@ export default async function AppLayout({
         <NewOrderFab />
       </div>
 
-      <AppFooter showOwnerLinks={isOwner(profile)} />
+      <AppFooter showOwnerLinks={isOwner(profile)} showStockLinks={canManageStock(profile)} />
 
       <BottomNav />
+
+      {/* Pas en développement : chaque rechargement à chaud changerait la version. */}
+      {process.env.NODE_ENV !== "development" && <UpdateNotifier />}
     </div>
   );
 }

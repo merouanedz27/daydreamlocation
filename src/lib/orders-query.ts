@@ -60,14 +60,18 @@ export type OrderRow = {
 
 /**
  * Une ligne du TABLEAU des commandes : la commande, plus ce que le client
- * emporte — les colonnes « Costume, Chemise, Chaussures… » de son AppSheet,
- * réunies en une seule.
+ * emporte — les colonnes « Costume, Taille, Chemise, Chaussures,
+ * Accessoires » de son AppSheet, calculées comme sur le bon de location.
  */
 export type OrderTableRow = OrderRow & {
-  /** « Invite Noir Simple (50 · P 52) », dans l'ordre de saisie. */
-  pieces: string[];
-  /** La colonne « Tailleur » : la note de la première pièce qui en porte une. */
+  costume: string | null;
+  /** « 50 · G 48 · P 52 » : veste, gilet, pantalon. */
+  sizes: string | null;
+  /** La colonne « Tailleur » : la note portée par les pièces. */
   tailor: string | null;
+  shirt: string | null;
+  shoes: string | null;
+  accessories: string | null;
   /**
    * Le membre qui a saisi la commande (`created_by`). Affiché au propriétaire
    * SEUL — et la policy `profiles_read` ne laisse de toute façon un employé
@@ -176,3 +180,56 @@ export function isOrderDone(order: { picked_up: boolean; returned: boolean }): b
  */
 export const DONE_NAME_CLASS =
   "text-muted-foreground line-through decoration-foreground/70 decoration-2";
+
+/**
+ * La COULEUR d'une commande, celle de toute sa ligne dans le tableau :
+ * jaune réservée, rouge sortie (plus soutenu en retard), vert revenue, gris
+ * annulée. Une seule source pour la liste et la fiche.
+ */
+export type OrderTone = "reserved" | "out" | "late" | "returned" | "cancelled";
+
+/** La couleur de chaque statut, hors retard (qui se déduit de la date). */
+export const STATUS_TONE: Record<OrderStatus, OrderTone> = {
+  reservee: "reserved",
+  en_cours: "out",
+  retournee: "returned",
+  annulee: "cancelled",
+};
+
+export function orderTone(
+  order: { status: string; return_due_date: string },
+  today: string,
+): OrderTone {
+  const tone = STATUS_TONE[order.status as OrderStatus] ?? "reserved";
+  return tone === "out" && order.return_due_date < today ? "late" : tone;
+}
+
+/**
+ * Les puces de filtre aux couleurs des LIGNES qu'elles filtrent : teinte
+ * transparente au repos, pleine une fois choisie.
+ */
+export const FILTER_CHIP_CLASS: Record<OrderTone, { idle: string; active: string }> = {
+  reserved: { idle: "bg-row-reserved/50 border-row-reserved", active: "bg-row-reserved" },
+  out: { idle: "bg-row-out/50 border-row-out", active: "bg-row-out" },
+  late: { idle: "bg-row-late/50 border-row-late", active: "bg-row-late" },
+  returned: { idle: "bg-row-returned/50 border-row-returned", active: "bg-row-returned" },
+  cancelled: { idle: "bg-row-cancelled/50 border-row-cancelled", active: "bg-row-cancelled" },
+};
+
+/** Fond de chaque cellule d'une ligne, selon sa couleur. */
+export const ROW_TONE_CLASS: Record<OrderTone, string> = {
+  reserved: "[&>td]:bg-row-reserved",
+  out: "[&>td]:bg-row-out",
+  late: "[&>td]:bg-row-late",
+  returned: "[&>td]:bg-row-returned",
+  cancelled: "[&>td]:bg-row-cancelled [&>td]:text-muted-foreground",
+};
+
+/** La pastille de statut, aux mêmes couleurs que la ligne mais plus franches. */
+export const STATUS_BADGE_CLASS: Record<OrderTone, string> = {
+  reserved: "bg-gold-soft text-foreground border-gold-strong/40",
+  out: "bg-destructive/15 text-destructive border-destructive/30",
+  late: "bg-destructive text-white border-transparent",
+  returned: "bg-success-soft text-success-foreground border-success/30",
+  cancelled: "bg-muted text-muted-foreground border-transparent",
+};

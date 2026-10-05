@@ -7,13 +7,13 @@ import type { Tables } from "@/lib/supabase/database.types";
 export type Profile = Tables<"profiles">;
 
 /**
- * Les deux seules valeurs admises par la contrainte `profiles_role_valid`.
+ * Les trois seules valeurs admises par la contrainte `profiles_role_valid`.
  *
  * Le generateur de types ne lit pas les contraintes `check` : `database.types`
  * decrit `role` comme un `string` nu, et `profile.role === "ownr"` compilerait
  * sans broncher. Ce type ferme la porte.
  */
-export type Role = "owner" | "staff";
+export type Role = "owner" | "moderator" | "staff";
 
 /**
  * Profil de l'utilisateur connecté, ou `null`.
@@ -72,4 +72,20 @@ export async function requireOwner(locale: Locale): Promise<Profile> {
 
 export function isOwner(profile: Profile | null): boolean {
   return profile?.role === "owner";
+}
+
+/**
+ * Gère le STOCK : propriétaire ou modérateur. Le modérateur fait tout ce que
+ * fait un employé, plus les modèles, pièces et ensembles — jamais l'argent.
+ * Même règle que `private.can_manage_stock()` côté Postgres.
+ */
+export function canManageStock(profile: Profile | null): boolean {
+  return profile?.role === "owner" || profile?.role === "moderator";
+}
+
+/** Exige le droit de gérer le stock (création, modification de modèles…). */
+export async function requireStockManager(locale: Locale): Promise<Profile> {
+  const profile = await requireProfile(locale);
+  if (!canManageStock(profile)) redirectTo("/stock", locale);
+  return profile;
 }

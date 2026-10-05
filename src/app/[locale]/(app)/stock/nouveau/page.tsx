@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ModelForm } from "@/components/model-form";
 import { getCategories } from "@/lib/queries/stock";
-import { requireOwner } from "@/lib/auth";
+import { requireStockManager } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -26,7 +26,7 @@ export default async function NewModelPage({
 
   // Réservé au propriétaire. La Server Action le revérifie de son côté :
   // elle est appelable directement, sans passer par cette page.
-  await requireOwner(locale as Locale);
+  await requireStockManager(locale as Locale);
 
   const [categories, t] = await Promise.all([getCategories(), getTranslations()]);
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { EnsembleForm } from "@/components/ensemble-form";
 import { getOrderCatalogue } from "@/lib/queries/orders";
-import { requireOwner } from "@/lib/auth";
+import { requireStockManager } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -25,7 +25,7 @@ export default async function NewEnsemblePage({
   setRequestLocale(locale);
 
   // Réservé au propriétaire ; `saveEnsemble` le revérifie de son côté.
-  await requireOwner(locale as Locale);
+  await requireStockManager(locale as Locale);
 
   // Le catalogue de la saisie de commande : modèles actifs, pièces non retirées.
   const [{ models }, t] = await Promise.all([getOrderCatalogue(), getTranslations()]);

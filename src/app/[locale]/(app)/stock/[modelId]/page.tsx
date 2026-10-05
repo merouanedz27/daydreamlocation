@@ -9,7 +9,9 @@ import { Link } from "@/i18n/navigation";
 import { ModelRestoreButton } from "@/components/model-danger-zone";
 import { getBlockedUnitIds, getModel, isUnitFree } from "@/lib/queries/stock";
 import { todayIso } from "@/lib/rental-range";
-import { getProfile, isOwner } from "@/lib/auth";
+import { getProfile, canManageStock } from "@/lib/auth";
+import { UnitEdit } from "@/components/unit-edit";
+import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { photoUrl } from "@/lib/storage";
 import type { Locale } from "@/i18n/routing";
@@ -49,7 +51,7 @@ export default async function ModelPage({
 
   const l = locale as Locale;
   const t = await getTranslations();
-  const canEdit = isOwner(profile);
+  const canEdit = canManageStock(profile);
 
   const name = l === "ar" && model.name_ar ? model.name_ar : model.name_fr;
   const category = model.categories
@@ -158,7 +160,10 @@ export default async function ModelPage({
           return (
             <li
               key={unit.id}
-              className="border-border bg-card flex items-center gap-3 rounded-lg border p-3"
+              className={cn(
+                "border-border bg-card flex items-center gap-3 rounded-lg border p-3",
+                canEdit && "py-1.5 pe-1",
+              )}
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">
@@ -198,6 +203,19 @@ export default async function ModelPage({
                     ? t("stock.reserved")
                     : t(`stock.${UNIT_STATUS_KEY[unit.status]}`)}
               </Badge>
+
+              {canEdit && (
+                <UnitEdit
+                  unit={{
+                    id: unit.id,
+                    ref_code: unit.ref_code,
+                    size: unit.size,
+                    length_cm: unit.length_cm,
+                    price_override: unit.price_override,
+                  }}
+                  categorySlug={model.categories?.slug ?? null}
+                />
+              )}
             </li>
           );
         })}

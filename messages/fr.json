@@ -122,7 +122,12 @@
       "pickedUp": "Allez",
       "returned": "Retour",
       "pieces": "Tenue",
+      "costume": "Costume",
+      "sizes": "Taille",
       "tailor": "Tailleur",
+      "shirt": "Chemise",
+      "shoes": "Chaussures",
+      "accessories": "Accessoires",
       "returnDue": "Retour prévu"
     },
     "allStatuses": "Toutes",
@@ -187,7 +192,7 @@
       "other": "Autre pièce",
       "size": "Taille",
       "tailor": "Tailleur",
-      "tailorPlaceholder": "Tailleur : ex. TK-525 (14 cm)",
+      "tailorPlaceholder": "ex. COME 14 CM + SLIMI",
       "addOther": "Ajouter une pièce",
       "payment": "Paiement",
       "price": "Prix de la tenue",
@@ -276,6 +281,14 @@
     "sizeHint": "Comme vous l'écrivez d'habitude : 50, M, 42…",
     "quantity": "Nombre d'exemplaires",
     "nextRefHint": "Première référence attribuée : {ref}",
+    "sizeSeries": "Tailles reçues",
+    "sizeSeriesHint": "Touchez chaque taille reçue : une pièce sera créée par taille. Sans taille, indiquez le nombre d'exemplaires ci-dessous.",
+    "otherSize": "Autre taille (M, 42…)",
+    "addSize": "Ajouter",
+    "seriesCount": "{count} pièce(s), une par taille : {first} → {last}",
+    "editPiece": "Modifier la pièce",
+    "editPieceNamed": "Modifier la pièce {ref}",
+    "pieceSavedToast": "Pièce {ref} modifiée",
     "newModelHint": "Un modèle est un type de vêtement. Vous y ajouterez ensuite les pièces réelles.",
     "conditions": {
       "neuf": "Neuf",
@@ -427,8 +440,21 @@
     "noRecipients": "Aucun destinataire avec une adresse e-mail.",
     "emailFailed": "L'e-mail n'a pas pu partir. Réessayez."
   },
+  "update": {
+    "available": "Nouvelle version de l'application disponible",
+    "reload": "Actualiser",
+    "later": "Plus tard",
+    "reloading": "Mise à jour…"
+  },
+  "theme": {
+    "title": "Apparence",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Auto"
+  },
   "roles": {
     "owner": "Administrateur",
+    "moderator": "Modérateur",
     "staff": "Membre"
   },
   "team": {
@@ -448,12 +474,9 @@
     "inactive": "Désactivé",
     "empty": "Aucun compte pour l'instant.",
     "actionsFor": "Actions pour {name}",
-    "promote": "Passer administrateur",
-    "demote": "Repasser membre",
-    "promoteTitle": "Passer {name} administrateur ?",
-    "promoteBody": "Il verra le bilan et les dépenses, et pourra gérer l'équipe.",
-    "demoteTitle": "Repasser {name} en membre ?",
-    "demoteBody": "Il garde les commandes et le stock, mais perd le bilan, les dépenses et l'équipe.",
+    "roleTo": {"owner": "Passer administrateur", "moderator": "Passer modérateur", "staff": "Passer membre"},
+    "roleToTitle": {"owner": "Passer {name} administrateur ?", "moderator": "Passer {name} modérateur ?", "staff": "Passer {name} membre ?"},
+    "roleToBody": {"owner": "Il verra le bilan et les dépenses, et pourra gérer l'équipe.", "moderator": "Il garde les commandes et gère le stock : modèles, pièces, ensembles. Pas de bilan, ni de dépenses, ni d'équipe.", "staff": "Il garde les commandes et consulte le stock sans le modifier. Pas de bilan, ni de dépenses, ni d'équipe."},
     "deactivate": "Désactiver l'accès",
     "activate": "Réactiver l'accès",
     "deactivateTitle": "Désactiver l'accès de {name} ?",

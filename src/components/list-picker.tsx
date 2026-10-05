@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { HighlightText } from "@/components/highlight";
 import { normalizeSearch } from "@/lib/search";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +66,10 @@ export function ListPicker({
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<string[]>(selected);
 
-  const q = normalizeSearch(query);
+  // La saisie reste instantanée ; la liste (filtre + surlignage) suit juste
+  // après, sans bloquer le clavier sur un téléphone modeste.
+  const deferredQuery = useDeferredValue(query);
+  const q = normalizeSearch(deferredQuery);
 
   const visible = useMemo(() => {
     if (!q) return options.filter((o) => o.featured || picked.includes(o.key));
@@ -157,7 +161,7 @@ export function ListPicker({
               checked={picked.includes(option.key)}
               disabled={option.disabled && !picked.includes(option.key)}
               onToggle={() => toggle(option.key)}
-              label={option.label}
+              label={<HighlightText text={option.label} q={deferredQuery} />}
               secondary={option.secondary}
               trailing={option.trailing}
             />

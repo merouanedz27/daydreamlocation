@@ -7,7 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { ModelForm } from "@/components/model-form";
 import { ModelDangerZone } from "@/components/model-danger-zone";
 import { getCategories, getModel } from "@/lib/queries/stock";
-import { requireOwner } from "@/lib/auth";
+import { requireStockManager } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -28,7 +28,7 @@ export default async function EditModelPage({
 
   // Réservé au propriétaire. Les Server Actions le revérifient de leur côté :
   // elles sont appelables directement, sans passer par cette page.
-  await requireOwner(locale as Locale);
+  await requireStockManager(locale as Locale);
 
   const id = Number(modelId);
   if (!Number.isFinite(id)) notFound();

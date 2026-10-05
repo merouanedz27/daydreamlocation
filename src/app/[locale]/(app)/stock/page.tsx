@@ -13,8 +13,9 @@ import {
   getCategories,
   getModels,
 } from "@/lib/queries/stock";
-import { getProfile, isOwner } from "@/lib/auth";
+import { getProfile, canManageStock } from "@/lib/auth";
 import { todayIso } from "@/lib/rental-range";
+import { sortSizes } from "@/lib/sizes";
 import { photoUrl } from "@/lib/storage";
 import type { Locale } from "@/i18n/routing";
 
@@ -55,7 +56,7 @@ export default async function StockPage({
     getBlockedUnitIds(todayIso()),
   ]);
 
-  const canEdit = isOwner(profile);
+  const canEdit = canManageStock(profile);
 
   // Données prêtes à afficher : le client choisit seulement la présentation
   // (cartes ou tableau), jamais ce qui est compté comme disponible.
@@ -74,6 +75,10 @@ export default async function StockPage({
       photo: model.photo_path ? photoUrl(model.photo_path) : null,
       available: stock.available,
       total: stock.total,
+      // Les tailles en stock, pièces retirées exclues : « 46 · 48 · 50 ».
+      sizes: sortSizes(
+        (model.article_units ?? []).filter((u) => u.status !== "retire").map((u) => u.size),
+      ),
     };
   });
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, isOwner } from "@/lib/auth";
+import { getProfile, canManageStock } from "@/lib/auth";
 import { ensembleSchema } from "@/lib/validation/ensembles";
 import { redirectTo } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
@@ -44,7 +44,7 @@ export async function saveEnsemble(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const parsed = ensembleSchema.safeParse({
     id: formData.get("id"),
@@ -95,7 +95,7 @@ export async function deleteEnsemble(formData: FormData): Promise<ActionResult> 
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };

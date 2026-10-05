@@ -4,7 +4,8 @@ import { useTransition } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
-import { STATUSES } from "@/lib/orders-query";
+import { Check } from "lucide-react";
+import { FILTER_CHIP_CLASS, STATUSES, STATUS_TONE } from "@/lib/orders-query";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
@@ -63,6 +64,7 @@ export function OrdersFilters() {
             key={s}
             label={t(`orders.status.${STATUS_KEYS[s]}`)}
             active={currentStatus === s}
+            colors={FILTER_CHIP_CLASS[STATUS_TONE[s]]}
             onClick={() => push({ statut: currentStatus === s ? null : s })}
           />
         ))}
@@ -71,13 +73,20 @@ export function OrdersFilters() {
   );
 }
 
+/**
+ * Une puce de filtre. Celles des statuts portent la couleur de leurs lignes
+ * (jaune réservée, rouge en cours…) : on sait ce qu'on va voir avant de
+ * toucher. Choisie, elle se remplit et prend un ✓ — jamais la couleur seule.
+ */
 function Chip({
   label,
   active,
+  colors,
   onClick,
 }: {
   label: string;
   active: boolean;
+  colors?: { idle: string; active: string };
   onClick: () => void;
 }) {
   return (
@@ -86,12 +95,17 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "min-h-9 shrink-0 rounded-full border px-3 text-sm transition-colors",
-        active
-          ? "border-primary bg-primary text-primary-foreground font-medium"
-          : "border-border text-muted-foreground hover:bg-muted",
+        "flex min-h-10 shrink-0 items-center gap-1 rounded-full border px-3 text-sm transition-colors",
+        colors
+          ? active
+            ? cn(colors.active, "border-foreground/40 text-foreground border-2 font-semibold")
+            : cn(colors.idle, "text-foreground hover:brightness-95")
+          : active
+            ? "border-primary bg-primary text-primary-foreground font-medium"
+            : "border-border text-muted-foreground hover:bg-muted",
       )}
     >
+      {active && colors && <Check className="size-3.5" aria-hidden />}
       {label}
     </button>
   );

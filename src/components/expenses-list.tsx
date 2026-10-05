@@ -17,6 +17,7 @@ import {
   formatNumber,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Highlight } from "@/components/highlight";
 import type { ExpenseRow } from "@/lib/queries/expenses";
 import type { Locale } from "@/i18n/routing";
 
@@ -113,8 +114,12 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
                   href={`/commandes/${e.order_id}`}
                   className="text-gold-strong underline-offset-4 hover:underline"
                 >
-                  <bdi className="whitespace-nowrap">{e.orders.order_no}</bdi>{" "}
-                  <span className="wrap-anywhere">{e.orders.customer_name}</span>
+                  <bdi className="whitespace-nowrap">
+                    <Highlight text={e.orders.order_no} />
+                  </bdi>{" "}
+                  <span className="wrap-anywhere">
+                    <Highlight text={e.orders.customer_name} />
+                  </span>
                 </Link>
               );
 
@@ -133,7 +138,7 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
                       catégorie prend sa place — jamais de ligne sans titre. */}
                   <td className={cn(sheet.td, "text-start")}>
                     <span className="block min-w-14 wrap-anywhere">
-                      {e.description || category}
+                      <Highlight text={e.description || category} />
                     </span>
 
                     {/* Téléphone : catégorie et commande en seconde ligne. La

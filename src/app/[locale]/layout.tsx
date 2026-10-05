@@ -6,6 +6,7 @@ import { Cairo, Inter } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import { localeDirection, routing, type Locale } from "@/i18n/routing";
 import "../globals.css";
 
@@ -53,8 +54,11 @@ export const viewport: Viewport = {
   // Teinte la barre d'adresse du navigateur mobile et la barre d'état une fois
   // l'application installée. Elle doit suivre l'EN-TÊTE, pas le fond de page :
   // sinon un bandeau blanc se colle au-dessus d'un en-tête brun. Même valeur
-  // que `--nav` (#6B4F3A) — à changer en même temps que lui.
-  themeColor: "#6B4F3A",
+  // que `--nav` — à changer en même temps que lui, dans les DEUX thèmes.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#6B4F3A" },
+    { media: "(prefers-color-scheme: dark)", color: "#261B13" },
+  ],
   width: "device-width",
   initialScale: 1,
   // L'équipe travaille au téléphone : le zoom reste autorisé (accessibilité).
@@ -102,6 +106,7 @@ export default async function LocaleLayout({
       <body className="flex min-h-full flex-col">
         {/* DirectionProvider informe les primitives Radix du sens d'écriture
             (menus, sliders, carrousels ouvrent du bon côté). */}
+        <ThemeProvider>
         <DirectionProvider dir={dir}>
           {/* Service worker de l'application installée (`src/app/sw.ts`).
               Coupé en développement : un worker actif servirait d'anciens
@@ -118,12 +123,10 @@ export default async function LocaleLayout({
           >
             <NextIntlClientProvider>{children}</NextIntlClientProvider>
           </SerwistProvider>
-          {/* `theme="light"` : `ui/sonner.tsx` lit le thème via next-themes, mais
-              aucun ThemeProvider n'est monté — il vaudrait donc « system », et un
-              téléphone réglé en sombre afficherait des toasts noirs sur une
-              application blanche. Le mode sombre n'est pas exposé en v1. */}
-          <Toaster position="top-center" dir={dir} theme="light" />
+          {/* Les toasts suivent le thème de l'application (`ui/sonner.tsx`). */}
+          <Toaster position="top-center" dir={dir} />
         </DirectionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

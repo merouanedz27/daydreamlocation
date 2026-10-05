@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { CalendarClock, Check, Search } from "lucide-react";
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { HighlightText } from "@/components/highlight";
+import { normalizeSearch } from "@/lib/search";
 import { photoUrl } from "@/lib/storage";
 import { formatDate, formatMoney } from "@/lib/format";
 import { resolveUnitPrice } from "@/lib/order-draft";
@@ -59,25 +61,25 @@ export function OrderPiecePicker({
     return [...seen.entries()];
   }, [models, locale]);
 
+  // Saisie instantanée, liste un temps derrière : voir `ListPicker`.
+  const deferredTerm = useDeferredValue(term);
+
   const filtered = useMemo(() => {
-    const q = term.trim().toLowerCase();
+    const q = normalizeSearch(deferredTerm);
+    const has = (value: string | null | undefined) => Boolean(value) && normalizeSearch(value!).includes(q);
     return models.filter((m) => {
       if (category && m.category_slug !== category) return false;
       if (!q) return true;
       // On cherche sur ce que l'équipe a sous les yeux : la référence
       // fournisseur d'abord, puis le nom, puis la taille.
       return (
-        m.ref_code.toLowerCase().includes(q) ||
-        m.name_fr.toLowerCase().includes(q) ||
-        (m.name_ar ?? "").toLowerCase().includes(q) ||
-        m.units.some(
-          (u) =>
-            u.ref_code.toLowerCase().includes(q) ||
-            (u.size ?? "").toLowerCase().includes(q),
-        )
+        has(m.ref_code) ||
+        has(m.name_fr) ||
+        has(m.name_ar) ||
+        m.units.some((u) => has(u.ref_code) || has(u.size))
       );
     });
-  }, [models, term, category]);
+  }, [models, deferredTerm, category]);
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -136,6 +138,7 @@ export function OrderPiecePicker({
                     unavailable={unavailable}
                     alreadyPicked={alreadyPicked}
                     onPick={onPick}
+                    q={deferredTerm}
                   />
                 </li>
               ))}
@@ -179,12 +182,15 @@ function ModelBlock({
   unavailable,
   alreadyPicked,
   onPick,
+  q,
 }: {
   model: PickerModel;
   locale: Locale;
   unavailable: Map<number, Unavailability>;
   alreadyPicked: Set<number>;
   onPick: (unit: PickedUnit) => void;
+  /** Le terme cherché, surligné dans le nom, la référence et la taille. */
+  q: string;
 }) {
   const t = useTranslations();
   const name = (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
@@ -205,9 +211,13 @@ function ModelBlock({
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{name}</p>
+          <p className="truncate font-medium">
+            <HighlightText text={name} q={q} />
+          </p>
           <p className="text-muted-foreground truncate text-sm">
-            <bdi>{model.ref_code}</bdi>
+            <bdi>
+              <HighlightText text={model.ref_code} q={q} />
+            </bdi>
             {" · "}
             <span className="tabular">{formatMoney(model.base_price, locale)}</span>
           </p>
@@ -229,6 +239,7 @@ function ModelBlock({
                 blocked={unavailable.get(unit.id)}
                 picked={alreadyPicked.has(unit.id)}
                 onPick={onPick}
+                q={q}
               />
             </li>
           ))}
@@ -250,6 +261,7 @@ function UnitRow({
   blocked,
   picked,
   onPick,
+  q,
 }: {
   model: PickerModel;
   unit: PickerUnit;
@@ -257,6 +269,7 @@ function UnitRow({
   blocked?: Unavailability;
   picked: boolean;
   onPick: (unit: PickedUnit) => void;
+  q: string;
 }) {
   const t = useTranslations();
   const price = resolveUnitPrice(model, unit);
@@ -297,11 +310,13 @@ function UnitRow({
     >
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">
-          <bdi>{unit.ref_code}</bdi>
+          <bdi>
+            <HighlightText text={unit.ref_code} q={q} />
+          </bdi>
           {unit.size && (
             <span className="text-muted-foreground font-normal">
               {" · "}
-              {t("stock.size")} {unit.size}
+              {t("stock.size")} <HighlightText text={unit.size} q={q} />
             </span>
           )}
         </span>

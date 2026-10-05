@@ -30,16 +30,10 @@ import { CautionToggle, OrderPaymentDrawer } from "@/components/order-payment";
 import { isOwner, requireProfile } from "@/lib/auth";
 import { countOrderExpenses, getOrder, type OrderDetailLine } from "@/lib/queries/orders";
 import { daysBetween, todayIso } from "@/lib/rental-range";
+import { STATUS_BADGE_CLASS, orderTone } from "@/lib/orders-query";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
-
-const STATUS_STYLES: Record<string, string> = {
-  reservee: "bg-gold-soft text-foreground border-transparent",
-  en_cours: "bg-gold-soft text-foreground border-transparent",
-  retournee: "bg-success-soft text-success-foreground border-transparent",
-  annulee: "bg-muted text-muted-foreground border-transparent",
-};
 
 const STATUS_KEYS: Record<string, string> = {
   reservee: "reserved",
@@ -187,12 +181,7 @@ export default async function OrderPage({
             disputeraient la même largeur sur un écran de 390 px. Le mot porte
             l'information, jamais la seule couleur. */}
         <Badge
-          className={cn(
-            "shrink-0",
-            late
-              ? "bg-warning-soft text-warning-foreground border-transparent"
-              : STATUS_STYLES[order.status],
-          )}
+          className={cn("shrink-0", STATUS_BADGE_CLASS[orderTone(order, today)])}
         >
           {late
             ? t("orders.lateBy", { count: formatNumber(daysLate, l) })

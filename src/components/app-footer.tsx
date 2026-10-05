@@ -25,7 +25,13 @@ import wordmark from "../../public/logo-wordmark.png";
  * haut de page. Une alerte qu'il faut faire défiler jusqu'en bas est une
  * alerte manquée — et elle coûterait une requête à CHAQUE page rendue.
  */
-export async function AppFooter({ showOwnerLinks }: { showOwnerLinks: boolean }) {
+export async function AppFooter({
+  showOwnerLinks,
+  showStockLinks,
+}: {
+  showOwnerLinks: boolean;
+  showStockLinks: boolean;
+}) {
   const t = await getTranslations();
 
   // Les mêmes destinations que la barre d'en-tête, PLUS les deux écrans de
@@ -34,7 +40,7 @@ export async function AppFooter({ showOwnerLinks }: { showOwnerLinks: boolean })
     { href: "/commandes", label: t("nav.orders") },
     { href: "/commandes/nouvelle", label: t("orders.new") },
     { href: "/stock", label: t("nav.stock") },
-    { href: "/stock/nouveau", label: t("stock.newModel") },
+    ...(showStockLinks ? [{ href: "/stock/nouveau", label: t("stock.newModel") }] : []),
     ...(showOwnerLinks
       ? [
           { href: "/tableau-de-bord", label: t("nav.dashboard") },
@@ -65,8 +71,15 @@ export async function AppFooter({ showOwnerLinks }: { showOwnerLinks: boolean })
               flottaison, il se charge en différé — contrairement à celui de la
               barre.
               Le `alt` porte le nom : c'est la seule chose qui identifie encore
-              cette colonne pour un lecteur d'écran. */}
-          <Image src={wordmark} alt={t("app.name")} sizes="125px" className="h-6 w-auto" />
+              cette colonne pour un lecteur d'écran.
+              En mode sombre, le fond devient brun foncé : le logo passe en
+              BLANC, comme celui de la barre d'en-tête. */}
+          <Image
+            src={wordmark}
+            alt={t("app.name")}
+            sizes="125px"
+            className="h-6 w-auto dark:brightness-0 dark:invert"
+          />
           <p className="text-muted-foreground mt-1.5">{t("app.tagline")}</p>
           <p className="text-muted-foreground mt-2">
             {/* L'année est calculée au rendu : le serveur rend cette page à la

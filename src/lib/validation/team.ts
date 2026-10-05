@@ -3,7 +3,7 @@ import { z } from "zod";
 /** Messages = CLÉS i18n, jamais des phrases. Voir `daydream-i18n`. */
 
 /** Doit rester aligné sur la contrainte `profiles_role_valid` en base. */
-export const MEMBER_ROLES = ["owner", "staff"] as const;
+export const MEMBER_ROLES = ["owner", "moderator", "staff"] as const;
 
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 

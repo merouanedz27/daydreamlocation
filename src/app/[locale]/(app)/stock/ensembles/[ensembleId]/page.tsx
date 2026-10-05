@@ -8,7 +8,7 @@ import { EnsembleForm } from "@/components/ensemble-form";
 import { EnsembleDelete } from "@/components/ensemble-delete";
 import { getEnsemble } from "@/lib/queries/ensembles";
 import { getOrderCatalogue } from "@/lib/queries/orders";
-import { requireOwner } from "@/lib/auth";
+import { requireStockManager } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -27,7 +27,7 @@ export default async function EditEnsemblePage({
   const { locale, ensembleId } = await params;
   setRequestLocale(locale);
 
-  await requireOwner(locale as Locale);
+  await requireStockManager(locale as Locale);
 
   const id = Number(ensembleId);
   if (!Number.isInteger(id) || id <= 0) notFound();

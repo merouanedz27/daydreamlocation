@@ -2,9 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, isOwner } from "@/lib/auth";
+import { getProfile, canManageStock } from "@/lib/auth";
 import type { ZodError } from "zod";
-import { modelSchema, modelUpdateSchema, unitSchema } from "@/lib/validation/stock";
+import {
+  modelSchema,
+  modelUpdateSchema,
+  unitSchema,
+  unitUpdateSchema,
+} from "@/lib/validation/stock";
 import { nextUnitRefs } from "@/lib/stock-refs";
 import { PHOTO_BUCKET } from "@/lib/storage";
 import { redirectTo } from "@/i18n/navigation";
@@ -68,7 +73,7 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const parsed = modelSchema.safeParse({
     ref_code: formData.get("ref_code"),
@@ -107,7 +112,7 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
 
 /** Champs réellement rendus par `UnitForm` — voir `firstIssue`. */
 const UNIT_FIELDS = [
-  "size",
+  "sizes",
   "length_cm",
   "quantity",
   "price_override",
@@ -126,11 +131,11 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const parsed = unitSchema.safeParse({
     model_id: formData.get("model_id"),
-    size: formData.get("size"),
+    sizes: formData.getAll("sizes").map(String),
     length_cm: formData.get("length_cm"),
     price_override: formData.get("price_override"),
     purchase_price: formData.get("purchase_price"),
@@ -140,7 +145,10 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
 
   if (!parsed.success) return firstIssue(parsed.error, UNIT_FIELDS);
 
-  const { model_id, quantity, ...unit } = parsed.data;
+  const { model_id, quantity, sizes, ...unit } = parsed.data;
+  // Une série cochée décide du nombre : une pièce par taille, sans doublon.
+  const series = [...new Set(sizes)];
+  const count = series.length || quantity;
   const supabase = await createClient();
 
   const { data: model } = await supabase
@@ -161,10 +169,15 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
   const refs = nextUnitRefs(
     model.ref_code,
     (existing ?? []).map((r) => r.ref_code),
-    quantity,
+    count,
   );
 
-  const rows = refs.map((ref_code) => ({ ...unit, model_id, ref_code }));
+  const rows = refs.map((ref_code, i) => ({
+    ...unit,
+    model_id,
+    ref_code,
+    size: series[i] ?? null,
+  }));
 
   const { error } = await supabase.from("article_units").insert(rows);
 
@@ -182,6 +195,42 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
 }
 
 /**
+ * Corrige une pièce DÉJÀ créée : sa taille, sa longueur, son prix.
+ *
+ * La référence ne change jamais (elle est sur l'étiquette du cintre), et les
+ * commandes passées gardent la taille de leur instantané (`size_snapshot`).
+ */
+export async function updateUnit(formData: FormData): Promise<ActionResult> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const parsed = unitUpdateSchema.safeParse({
+    id: formData.get("id"),
+    size: formData.get("size"),
+    length_cm: formData.get("length_cm"),
+    price_override: formData.get("price_override"),
+  });
+  if (!parsed.success) return firstIssue(parsed.error, ["size", "length_cm", "price_override"]);
+
+  const { id, ...changes } = parsed.data;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("article_units")
+    .update(changes)
+    .eq("id", id)
+    .select("model_id")
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, error: "errors.generic" };
+
+  revalidatePath(`/${locale}/stock/${data.model_id}`);
+  revalidatePath(`/${locale}/stock`);
+  return { ok: true };
+}
+
+/**
  * Change l'état matériel d'une pièce (nettoyage, réparation, retrait).
  *
  * Ne touche PAS à la disponibilité sur des dates : celle-ci se déduit des
@@ -191,7 +240,7 @@ export async function setUnitStatus(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const unitId = Number(formData.get("unit_id"));
   const status = String(formData.get("status"));
@@ -227,7 +276,7 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const parsed = modelUpdateSchema.safeParse({
     id: formData.get("id"),
@@ -283,7 +332,7 @@ export async function deleteModel(formData: FormData): Promise<ActionResult> {
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
@@ -346,7 +395,7 @@ export async function removeModel(
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
@@ -379,7 +428,7 @@ export async function setModelActive(formData: FormData): Promise<ActionResult> 
   const locale = resolveLocale(formData.get("locale"));
 
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };

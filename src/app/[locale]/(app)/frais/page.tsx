@@ -7,6 +7,7 @@ import { isOwner, requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDayMonth, formatMoney } from "@/lib/format";
 import type { Locale } from "@/i18n/routing";
+import { Highlight } from "@/components/highlight";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -94,7 +95,7 @@ export default async function FraisPage({
                   {formatDayMonth(row.spent_on, l)}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">
-                  {row.description || t(`expenses.categories.${row.category}`)}
+                  <Highlight text={row.description || t(`expenses.categories.${row.category}`)} />
                 </span>
                 <span className="tabular shrink-0 text-sm font-medium">
                   {formatMoney(Number(row.amount), l)}

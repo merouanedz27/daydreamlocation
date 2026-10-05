@@ -56,6 +56,8 @@ import {
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { SUIT_SIZES } from "@/lib/sizes";
+import { HighlightText } from "@/components/highlight";
 import type {
   CustomerSuggestion,
   ItemSuggestion,
@@ -138,7 +140,6 @@ const FIELD_TARGETS = [
 const EMPTY_BUSY = new Map<number, Unavailability>();
 
 /** La liste « Taille » de son AppSheet : 44 à 66, de deux en deux. */
-const SUIT_SIZES = Array.from({ length: 12 }, (_, i) => String(44 + i * 2));
 
 /**
  * Catégories du stock montrées d'office dans chaque case (numérotée comme
@@ -552,7 +553,7 @@ export function OrderQuickForm({
       .slice(0, MAX_SUGGESTIONS)
       .map((c) => ({
         key: `${c.name}|${c.phone ?? ""}`,
-        primary: c.name,
+        primary: <HighlightText text={c.name} q={draft.customerName} />,
         secondary: c.phone ? <bdi dir="ltr">{c.phone}</bdi> : undefined,
         onPick: () => updateDraft({ customerName: c.name, customerPhone: c.phone ?? "" }),
       }));

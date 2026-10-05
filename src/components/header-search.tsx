@@ -78,7 +78,7 @@ export function HeaderSearch() {
   // pas une requête par lettre sur un réseau mobile.
   useEffect(() => {
     if (!scope || term.trim() === applied) return;
-    const timer = setTimeout(() => apply(term), 350);
+    const timer = setTimeout(() => apply(term), 250);
     return () => clearTimeout(timer);
     // `apply` change à chaque rendu ; seul le terme doit relancer le délai.
     // eslint-disable-next-line react-hooks/exhaustive-deps

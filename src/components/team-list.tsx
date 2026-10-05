@@ -38,11 +38,14 @@ import {
   setMemberRole,
 } from "@/lib/actions/team";
 import { cn } from "@/lib/utils";
+import { Highlight } from "@/components/highlight";
+import { MEMBER_ROLES, type MemberRole } from "@/lib/validation/team";
 import type { Member } from "@/lib/queries/profiles";
 import type { Locale } from "@/i18n/routing";
 
 type Pending =
-  | { kind: "role" | "active" | "password"; member: Member }
+  | { kind: "role"; member: Member; role: MemberRole }
+  | { kind: "active" | "password"; member: Member }
   | null;
 
 /**
@@ -78,9 +81,14 @@ export function TeamList({
    */
   const openingDrawer = useRef(false);
 
-  function open(kind: NonNullable<Pending>["kind"], member: Member) {
+  function open(kind: "active" | "password", member: Member) {
     openingDrawer.current = true;
     setPending({ kind, member });
+  }
+
+  function openRole(member: Member, role: MemberRole) {
+    openingDrawer.current = true;
+    setPending({ kind: "role", member, role });
   }
 
   if (members.length === 0) {
@@ -88,6 +96,7 @@ export function TeamList({
   }
 
   const target = pending?.member;
+  const nextRole = pending?.kind === "role" ? pending.role : null;
 
   function payload(member: Member, extra: Record<string, string>) {
     const data = new FormData();
@@ -115,7 +124,7 @@ export function TeamList({
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="min-w-0 truncate text-sm font-medium">
-                    {member.full_name}
+                    <Highlight text={member.full_name} />
                   </span>
                   {self && (
                     <span className="text-muted-foreground shrink-0 text-xs">
@@ -125,7 +134,11 @@ export function TeamList({
                   <span
                     className={cn(
                       "shrink-0 rounded-full px-1.5 text-[11px] leading-5",
-                      admin ? "bg-gold-soft text-foreground" : "bg-muted text-muted-foreground",
+                      admin
+                        ? "bg-gold-soft text-foreground"
+                        : member.role === "moderator"
+                          ? "bg-success-soft text-success-foreground"
+                          : "bg-muted text-muted-foreground",
                     )}
                   >
                     {t(`roles.${member.role}`)}
@@ -141,7 +154,7 @@ export function TeamList({
                 {/* Une adresse latine au milieu d'une phrase arabe se
                     réordonne à l'affichage : `<bdi>` l'isole. */}
                 <p className="text-muted-foreground truncate text-xs">
-                  <bdi>{member.email ?? "—"}</bdi>
+                  <bdi>{member.email ? <Highlight text={member.email} /> : "—"}</bdi>
                 </p>
               </div>
 
@@ -171,17 +184,21 @@ export function TeamList({
                       e.preventDefault();
                     }}
                   >
-                    <DropdownMenuItem
-                      className="min-h-11"
-                      onSelect={() => open("role", member)}
-                    >
-                      {admin ? (
-                        <ShieldOff className="size-4" aria-hidden />
-                      ) : (
-                        <ShieldCheck className="size-4" aria-hidden />
-                      )}
-                      {admin ? t("team.demote") : t("team.promote")}
-                    </DropdownMenuItem>
+                    {/* Un élément par AUTRE rôle : administrateur, modérateur, membre. */}
+                    {MEMBER_ROLES.filter((role) => role !== member.role).map((role) => (
+                      <DropdownMenuItem
+                        key={role}
+                        className="min-h-11"
+                        onSelect={() => openRole(member, role)}
+                      >
+                        {role === "staff" ? (
+                          <ShieldOff className="size-4" aria-hidden />
+                        ) : (
+                          <ShieldCheck className="size-4" aria-hidden />
+                        )}
+                        {t(`team.roleTo.${role}`)}
+                      </DropdownMenuItem>
+                    ))}
 
                     <DropdownMenuItem
                       className="min-h-11"
@@ -222,23 +239,13 @@ export function TeamList({
         tone="default"
         icon={<ShieldCheck className="size-4" />}
         title={
-          target
-            ? t(target.role === "owner" ? "team.demoteTitle" : "team.promoteTitle", {
-                name: target.full_name,
-              })
-            : ""
+          target && nextRole ? t(`team.roleToTitle.${nextRole}`, { name: target.full_name }) : ""
         }
-        description={
-          target
-            ? t(target.role === "owner" ? "team.demoteBody" : "team.promoteBody")
-            : undefined
-        }
-        confirmLabel={target?.role === "owner" ? t("team.demote") : t("team.promote")}
+        description={nextRole ? t(`team.roleToBody.${nextRole}`) : undefined}
+        confirmLabel={nextRole ? t(`team.roleTo.${nextRole}`) : ""}
         onConfirm={async () => {
-          if (!target) return;
-          const result = await setMemberRole(
-            payload(target, { role: target.role === "owner" ? "staff" : "owner" }),
-          );
+          if (!target || !nextRole) return;
+          const result = await setMemberRole(payload(target, { role: nextRole }));
           if (result.ok) {
             toast.success(t("team.roleChangedToast", { name: target.full_name }));
           } else {

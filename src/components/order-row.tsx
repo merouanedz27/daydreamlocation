@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { CircleCheck, Phone, Plane } from "lucide-react";
 import { MessageButton } from "@/components/customer-message";
+import { Highlight } from "@/components/highlight";
 import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { setOrderChecks } from "@/lib/actions/orders";
@@ -63,7 +64,7 @@ export function OrderListRow({
               isOrderDone(order) && DONE_NAME_CLASS,
             )}
           >
-            {order.customer_name}
+            <Highlight text={order.customer_name} />
           </span>
           <span
             className={cn(

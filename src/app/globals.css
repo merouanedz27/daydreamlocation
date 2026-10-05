@@ -54,6 +54,15 @@
   --color-cream-foreground: var(--cream-foreground);
   --color-brown-soft: var(--brown-soft);
 
+  /* Fond de LIGNE du tableau des commandes, selon son statut. */
+  --color-row-reserved: var(--row-reserved);
+  --color-row-out: var(--row-out);
+  --color-row-late: var(--row-late);
+  --color-row-returned: var(--row-returned);
+  --color-row-cancelled: var(--row-cancelled);
+  /* Terme cherché, surligné dans les listes. */
+  --color-highlight: var(--highlight);
+
   /* Surface des BARRES (en-tête, barre basse, pied de page). Un seul jeu de
      quatre variables : changer d'avis sur la couleur des barres ne doit
      toucher qu'un endroit, pas trois composants. */
@@ -197,6 +206,17 @@
   --gold-strong: oklch(0.5538 0.1207 66.44);
   --brown-soft: oklch(0.9381 0.0138 67.66); /* #F1E9E1 */
 
+  /* Lignes du tableau des commandes — toute la ligne prend la couleur de son
+     statut, comme dans son AppSheet. Teintes CLAIRES : le texte noir reste
+     lisible dessus (≥ 10:1), même en plein soleil. */
+  --row-reserved: oklch(0.9450 0.0950 100); /* jaune — réservée */
+  --row-out: oklch(0.9000 0.0550 22); /* rouge — sortie */
+  --row-late: oklch(0.8450 0.0900 30); /* rouge plus soutenu — en retard */
+  --row-returned: oklch(0.9200 0.0550 145); /* vert — revenue */
+  --row-cancelled: oklch(0.9200 0.0040 70); /* gris — annulée */
+  /* Ambre FRANC : doit ressortir sur TOUTES les lignes, jaune comprise. */
+  --highlight: oklch(0.8200 0.1600 70);
+
   --chart-1: oklch(0.7952 0.1617 86.05); /* jaune */
   --chart-2: oklch(0.4518 0.0497 57.96); /* brun */
   --chart-3: oklch(0.4646 0.0573 137.11); /* vert */
@@ -215,57 +235,70 @@
   --radius: 0.5rem;
 }
 
-/* Mode sombre non exposé en v1 (pas de bascule dans l'UI) : la variante est
-   liée à la classe `.dark`, donc le mode sombre du système ne le déclenche pas.
-   Défini pour pouvoir l'activer plus tard sans refonte. */
+/* MODE SOMBRE — « Espresso & Or ».
+   Activé par la classe `.dark` que pose next-themes (`theme-provider.tsx`) :
+   « Auto » suit le téléphone, sinon le choix Clair / Sombre de l'employé.
+   Les mêmes couleurs de la maison que le thème clair : bruns espresso pour
+   les surfaces, crème pour le texte, or pour les accents — pas un gris froid.
+   Les documents imprimés restent toujours en clair. */
 .dark {
-  --background: oklch(0.1997 0.0140 71.96);
-  --foreground: oklch(0.9483 0.0136 78.26);
-  --card: oklch(0.2363 0.0182 70.50);
+  --background: oklch(0.18 0.014 65); /* #17110C espresso */
+  --foreground: oklch(0.94 0.018 80); /* #F3EADB crème — ~15:1 sur le fond */
+  --card: oklch(0.22 0.016 65); /* #211912 */
   --card-foreground: var(--foreground);
-  --popover: oklch(0.2363 0.0182 70.50);
+  --popover: oklch(0.22 0.016 65);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.8606 0.1731 91.94); /* #FACC15 — 10,30:1 sur le fond */
-  --primary-foreground: oklch(0.1997 0.0140 71.96);
-  --secondary: oklch(0.6418 0.0687 67.62);
-  --secondary-foreground: oklch(0.1997 0.0140 71.96);
-  --muted: oklch(0.2716 0.0222 69.63);
-  --muted-foreground: oklch(0.7250 0.0243 71.69);
-  --accent: oklch(0.2716 0.0222 69.63);
+  --primary: oklch(0.86 0.17 92); /* #FACC15 or — texte espresso dessus ~11:1 */
+  --primary-foreground: oklch(0.18 0.014 65);
+  --secondary: oklch(0.64 0.07 62); /* #A47A55 caramel */
+  --secondary-foreground: oklch(0.18 0.014 65);
+  --muted: oklch(0.27 0.02 65); /* #2E241B */
+  --muted-foreground: oklch(0.74 0.03 72); /* #B9A88F sable — ~7:1 sur le fond */
+  --accent: oklch(0.27 0.02 65);
   --accent-foreground: var(--foreground);
-  --destructive: oklch(0.6204 0.1501 25);
-  --destructive-foreground: oklch(0.1997 0.0140 71.96);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
-  --ring: oklch(0.8606 0.1731 91.94);
-  --success: oklch(0.7204 0.0702 139);
-  --success-foreground: oklch(0.7204 0.0702 139);
-  --success-soft: oklch(0.3098 0.0401 138);
-  --warning: oklch(0.7576 0.1590 55.93); /* #FB923C — 6,97:1 sur le fond */
-  --warning-foreground: oklch(0.7576 0.1590 55.93);
-  --warning-soft: oklch(0.2840 0.0420 54.49); /* texte dessus 6,43:1 */
-  --cream: oklch(0.2363 0.0182 70.50);
+  --destructive: oklch(0.66 0.16 25); /* #E06A5A — ~5,5:1 sur le fond */
+  --destructive-foreground: oklch(0.18 0.014 65);
+  --border: oklch(1 0 0 / 11%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.86 0.17 92);
+  --success: oklch(0.74 0.09 145); /* #7FB98A — ~8:1 */
+  --success-foreground: oklch(0.74 0.09 145);
+  --success-soft: oklch(0.30 0.045 145);
+  --warning: oklch(0.77 0.15 58); /* #F29A4A — ~7:1 */
+  --warning-foreground: oklch(0.77 0.15 58);
+  --warning-soft: oklch(0.29 0.045 55);
+  --cream: oklch(0.22 0.016 65);
   --cream-foreground: var(--foreground);
-  --nav: oklch(0.2363 0.0182 70.50);
+  --nav: oklch(0.24 0.025 60); /* #261B13 — même valeur que le themeColor sombre */
   --nav-foreground: var(--foreground);
-  --nav-muted: oklch(0.7250 0.0243 71.69);
-  --nav-border: oklch(1 0 0 / 12%);
-  --gold-soft: oklch(0.3077 0.0461 86.25); /* gold-strong dessus 8,68:1 */
-  --gold-strong: oklch(0.8606 0.1731 91.94);
-  --brown-soft: oklch(0.3016 0.0301 67);
-  --chart-1: oklch(0.8606 0.1731 91.94);
-  --chart-2: oklch(0.6418 0.0687 67.62);
-  --chart-3: oklch(0.7204 0.0702 139);
-  --chart-4: oklch(0.7576 0.1590 55.93);
-  --chart-5: oklch(0.7774 0.0504 77.12);
-  --sidebar: oklch(0.2363 0.0182 70.50);
+  --nav-muted: oklch(0.74 0.03 72);
+  --nav-border: oklch(1 0 0 / 11%);
+  --gold-soft: oklch(0.31 0.05 86); /* or sur ce voile ~8:1 */
+  --gold-strong: oklch(0.86 0.17 92);
+  --brown-soft: oklch(0.25 0.025 62);
+
+  /* Lignes du tableau des commandes : teintes PROFONDES, même sens qu'en
+     clair ; le texte crème reste au-dessus de 10:1. */
+  --row-reserved: oklch(0.33 0.06 95); /* #3D3714 or-olive — réservée */
+  --row-out: oklch(0.32 0.07 25); /* #44211C brique — sortie */
+  --row-late: oklch(0.38 0.10 30); /* #5C2A21 — en retard */
+  --row-returned: oklch(0.32 0.05 145); /* #213A28 forêt — revenue */
+  --row-cancelled: oklch(0.27 0.008 70); /* #2D2824 — annulée */
+  --highlight: oklch(0.62 0.15 65); /* #C2780F ambre, texte crème dessus */
+
+  --chart-1: oklch(0.86 0.17 92);
+  --chart-2: oklch(0.64 0.07 62);
+  --chart-3: oklch(0.74 0.09 145);
+  --chart-4: oklch(0.77 0.15 58);
+  --chart-5: oklch(0.78 0.05 77);
+  --sidebar: oklch(0.22 0.016 65);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.8606 0.1731 91.94);
-  --sidebar-primary-foreground: oklch(0.1997 0.0140 71.96);
-  --sidebar-accent: oklch(0.2716 0.0222 69.63);
+  --sidebar-primary: oklch(0.86 0.17 92);
+  --sidebar-primary-foreground: oklch(0.18 0.014 65);
+  --sidebar-accent: oklch(0.27 0.02 65);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.8606 0.1731 91.94);
+  --sidebar-border: oklch(1 0 0 / 11%);
+  --sidebar-ring: oklch(0.86 0.17 92);
 }
 
 @layer base {

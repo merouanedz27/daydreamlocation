@@ -22,12 +22,16 @@ import { Spinner } from "@/components/ui/spinner";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MessageButton } from "@/components/customer-message";
+import { Highlight } from "@/components/highlight";
 import { deleteOrders, setOrdersChecks, type BulkResult } from "@/lib/actions/orders";
 import { loadMoreOrders } from "@/lib/actions/orders-list";
 import {
   DONE_NAME_CLASS,
+  ROW_TONE_CLASS,
   SORTABLE,
+  STATUS_BADGE_CLASS,
   isOrderDone,
+  orderTone,
   type OrderTableRow,
   type SortKey,
 } from "@/lib/orders-query";
@@ -35,13 +39,6 @@ import { formatDate, formatNumber } from "@/lib/format";
 import { daysBetween, todayIso } from "@/lib/rental-range";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
-
-const STATUS_STYLES: Record<string, string> = {
-  reservee: "bg-gold-soft text-foreground border-transparent",
-  en_cours: "bg-gold-soft text-foreground border-transparent",
-  retournee: "bg-success-soft text-success-foreground border-transparent",
-  annulee: "bg-muted text-muted-foreground border-transparent",
-};
 
 const STATUS_KEYS: Record<string, string> = {
   reservee: "reserved",
@@ -61,8 +58,12 @@ const COLUMNS = [
   "event_date",
   "picked_up",
   "returned",
-  "pieces",
+  "costume",
+  "sizes",
   "tailor",
+  "shirt",
+  "shoes",
+  "accessories",
   "amount_paid",
   "total_price",
   "balance",
@@ -83,8 +84,12 @@ const HEADERS: Record<Column, string> = {
   event_date: "orders.short.eventDate",
   picked_up: "orders.short.pickedUp",
   returned: "orders.short.returned",
-  pieces: "orders.short.pieces",
+  costume: "orders.short.costume",
+  sizes: "orders.short.sizes",
   tailor: "orders.short.tailor",
+  shirt: "orders.short.shirt",
+  shoes: "orders.short.shoes",
+  accessories: "orders.short.accessories",
   amount_paid: "orders.short.paid",
   total_price: "orders.short.total",
   balance: "orders.short.balance",
@@ -101,6 +106,9 @@ const OWNER_ONLY: Column[] = ["created_by_name"];
 
 const MONEY: Column[] = ["amount_paid", "total_price", "balance", "caution_amount"];
 
+/** Colonnes de texte libre : bornées, le reste se lit au survol (`title`). */
+const TEXT: Column[] = ["costume", "sizes", "tailor", "shirt", "shoes", "accessories"];
+
 /** Durée d'un appui long, en millisecondes — celle des menus d'Android. */
 const LONG_PRESS_MS = 500;
 
@@ -115,18 +123,16 @@ function keepsOwnTap(target: EventTarget): boolean {
   return Boolean(link && !link.hasAttribute("data-row-link"));
 }
 
-/** Rayure des lignes impaires, OPAQUE : la colonne collée doit cacher ce qui glisse dessous. */
-const STRIPE = "bg-[color-mix(in_oklab,var(--muted)_45%,var(--background))]";
-
 /**
  * Le tableau des commandes, COMME SON APPSHEET : toutes les colonnes, et on
  * fait défiler — vers la droite pour les colonnes, vers le bas pour les
  * commandes, qui arrivent d'elles-mêmes par tranches quand on approche du bas.
  * Plus de pages, plus de choix de colonnes, plus de bascule liste / tableau.
  *
- * Le tableau défile DANS son cadre (hauteur de l'écran) : c'est ce qui permet
- * de garder à la fois l'en-tête collé en haut et le nom du client collé au
- * bord pendant qu'on fait glisser les colonnes.
+ * Le tableau défile DANS son cadre (hauteur de l'écran), l'en-tête collé en
+ * haut. Le nom du client défile avec les autres colonnes, comme sur son
+ * AppSheet : tout l'écran sert aux colonnes. Chaque ligne prend la couleur de
+ * son statut (`orderTone`).
  *
  * Le parent remonte le composant à chaque changement de filtre (`key`) : la
  * liste repart de la première tranche.
@@ -195,6 +201,32 @@ export function OrdersList({
     observer.observe(sentinel.current);
     return () => observer.disconnect();
   }, [done, rows.length, params]);
+
+  const searched = params.get("q")?.trim() ?? "";
+
+  // Une recherche qui trouve sa réponse dans une colonne lointaine (Costume,
+  // N°…) : sur téléphone, le tableau GLISSE de lui-même jusqu'à la première
+  // cellule surlignée. Le parent remonte la liste à chaque recherche (`key`),
+  // donc ceci ne joue qu'une fois par recherche — jamais au chargement de la
+  // suite. `scrollBy` en pixels d'écran : même geste en français et en arabe.
+  useEffect(() => {
+    if (searched.length < 2) return;
+    const frame = requestAnimationFrame(() => {
+      const box = scroller.current;
+      // L'utilisateur a déjà fait glisser le tableau : on ne le contrarie pas.
+      if (!box || box.scrollLeft !== 0) return;
+      const cell = box.querySelector("tbody mark")?.closest("td");
+      if (!cell) return;
+      const c = cell.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      if (c.left >= b.left && c.right <= b.right) return;
+      box.scrollBy({
+        left: c.left + c.width / 2 - (b.left + b.width / 2),
+        behavior: "smooth",
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [searched]);
 
   const hasFilters = Boolean(params.get("q") || params.get("statut"));
 
@@ -376,11 +408,11 @@ export function OrdersList({
               href={`/commandes/${order.id}`}
               data-row-link
               className={cn(
-                "hover:text-gold-strong text-foreground min-w-0 truncate text-base font-semibold underline-offset-4 hover:underline",
+                "hover:text-gold-strong text-foreground text-[13px] font-bold underline-offset-4 hover:underline",
                 isOrderDone(order) && DONE_NAME_CLASS,
               )}
             >
-              {order.customer_name}
+              <Highlight text={order.customer_name} />
             </Link>
             {/* Le bon de location en un toucher, sans passer par la fiche. */}
             <Link
@@ -395,7 +427,7 @@ export function OrdersList({
       case "customer_phone":
         return order.customer_phone ? (
           <a href={`tel:${order.customer_phone}`} className="hover:underline" dir="ltr">
-            {order.customer_phone}
+            <Highlight text={order.customer_phone} />
           </a>
         ) : (
           "—"
@@ -435,10 +467,13 @@ export function OrdersList({
           </button>
         );
       }
-      case "pieces":
-        return order.pieces.length ? order.pieces.join(" · ") : "—";
+      case "costume":
+      case "sizes":
       case "tailor":
-        return order.tailor ?? "—";
+      case "shirt":
+      case "shoes":
+      case "accessories":
+        return order[column] ? <Highlight text={order[column]} /> : "—";
       case "created_by_name":
         return order.created_by_name ?? "—";
       case "amount_paid":
@@ -448,17 +483,16 @@ export function OrdersList({
       case "balance":
         return formatNumber(order.balance ?? 0, locale);
       case "order_no":
-        return <bdi>{order.order_no}</bdi>;
-      case "status": {
-        const late = order.status === "en_cours" && daysBetween(today, order.return_due_date) < 0;
         return (
-          <Badge
-            className={
-              late
-                ? "bg-warning-soft text-warning-foreground border-transparent"
-                : STATUS_STYLES[order.status]
-            }
-          >
+          <bdi>
+            <Highlight text={order.order_no} />
+          </bdi>
+        );
+      case "status": {
+        const tone = orderTone(order, today);
+        const late = tone === "late";
+        return (
+          <Badge className={STATUS_BADGE_CLASS[tone]}>
             {late
               ? t("orders.lateBy", {
                   count: formatNumber(-daysBetween(today, order.return_due_date), locale),
@@ -598,9 +632,6 @@ export function OrdersList({
                     className={cn(
                       "bg-muted text-muted-foreground border-border sticky top-0 z-10 border-b px-3 py-0 font-medium whitespace-nowrap",
                       i > 0 && "border-s",
-                      // Le nom du client reste collé au bord pendant qu'on
-                      // fait glisser les colonnes — et passe au-dessus d'elles.
-                      i === 0 && "start-0 z-20 border-e",
                       i === 0 && selecting && "ps-0",
                       money ? "text-end" : "text-start",
                     )}
@@ -641,7 +672,7 @@ export function OrdersList({
             </tr>
           </thead>
           <tbody>
-            {rows.map((order, r) => (
+            {rows.map((order) => (
               <tr
                 key={order.id}
                 // Appui long = sélection, comme dans la galerie du téléphone.
@@ -683,40 +714,33 @@ export function OrdersList({
                 }}
                 aria-selected={selected.has(order.id)}
                 className={cn(
-                  "hover:[&>td]:bg-accent cursor-pointer select-none [-webkit-touch-callout:none]",
-                  // Le toucher assombrit la ligne tout de suite ; si l'appui
-                  // dure, la sélection (or) prend le relais.
-                  selected.has(order.id)
-                    ? "[&>td]:bg-gold-soft"
-                    : "active:[&>td]:bg-muted [&>td]:transition-colors",
+                  "cursor-pointer select-none [-webkit-touch-callout:none] [&>td]:transition-[filter]",
+                  // TOUTE la ligne à la couleur de son statut ; le survol et
+                  // le toucher l'assombrissent sans la changer.
+                  ROW_TONE_CLASS[orderTone(order, today)],
+                  "hover:[&>td]:brightness-95 active:[&>td]:brightness-90",
+                  // La sélection se voit par-dessus la couleur : un liseré épais.
+                  selected.has(order.id) &&
+                    "[&>td]:shadow-[inset_0_2px_0_var(--gold-strong),inset_0_-2px_0_var(--gold-strong)] [&>td]:brightness-90",
                 )}
               >
                 {columns.map((column, i) => (
                   <td
                     key={column}
                     className={cn(
-                      "border-border h-12 border-b px-3 align-middle whitespace-nowrap",
-                      r % 2 ? STRIPE : "bg-background",
+                      "border-border h-11 border-b px-3 align-middle whitespace-nowrap",
                       i > 0 && "border-s",
-                      i === 0 && "sticky start-0 z-1 max-w-56 border-e",
                       i === 0 && selecting && "ps-0",
                       MONEY.includes(column) && "tabular text-end",
                       (column === "picked_up" || column === "returned" || column === "message") &&
                         "text-center",
                       column === "message" && "px-1",
-                      column === "pieces" && "max-w-96 truncate",
-                      column === "tailor" && "max-w-48 truncate",
+                      TEXT.includes(column) && "max-w-64 truncate",
                       column === "balance" &&
                         (order.balance ?? 0) > 0 &&
                         "text-warning-foreground font-medium",
                     )}
-                    title={
-                      column === "pieces"
-                        ? order.pieces.join(" · ")
-                        : column === "customer_name"
-                          ? order.customer_name
-                          : undefined
-                    }
+                    title={TEXT.includes(column) ? (order[column as "costume"] ?? undefined) : undefined}
                   >
                     {cell(order, column)}
                   </td>
