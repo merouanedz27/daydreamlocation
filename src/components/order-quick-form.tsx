@@ -403,14 +403,16 @@ export function OrderQuickForm({
     const slotNo = Math.min(index + 1, 4);
     // Une pièce EN PLUS peut être n'importe quoi : tout est proposé.
     const extra = index >= FIXED_SLOTS;
-    const own = draft.slots[index];
+    // La case peut avoir disparu : « + Autre pièce » refermé sans choix la
+    // retire, et la liste se rend encore pendant qu'elle se referme.
+    const own = draft.slots[index] as Slot | undefined;
     const options: PickerOption[] = [];
 
     // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
     for (const [id, { model, unit, name, price }] of unitIndex) {
       const blocked = busy.get(id);
       const material = unit.status !== "disponible";
-      const elsewhere = pickedUnits.has(id) && own.unitId !== id;
+      const elsewhere = pickedUnits.has(id) && own?.unitId !== id;
 
       let reason: string | null = null;
       if (!windowValid) reason = t("orders.quick.dateFirst");
@@ -446,7 +448,8 @@ export function OrderQuickForm({
 
   /** La valeur actuelle d'une case, sous forme de clé de la liste. */
   function selectedKeys(index: number): string[] {
-    const slot = draft.slots[index];
+    const slot = draft.slots[index] as Slot | undefined;
+    if (!slot) return [];
     if (slot.unitId) return [`u:${slot.unitId}`];
     const name = slot.name.trim();
     if (!name) return [];
