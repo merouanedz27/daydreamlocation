@@ -1,3 +1,4 @@
+import { sortParts } from "@/lib/stock-refs";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
@@ -38,6 +39,9 @@ export type PickerUnit = {
   length_cm: number | null;
   status: string;
   price_override: number | null;
+  /** Costume divisible : le costume (« TUX-A-03 ») et la partie de la pièce. */
+  set_ref: string | null;
+  part: string | null;
 };
 
 export type PickerModel = {
@@ -51,6 +55,8 @@ export type PickerModel = {
   category_fr: string | null;
   category_ar: string | null;
   units: PickerUnit[];
+  /** Prix de location de chaque partie louée SEULE ; vide = modèle simple. */
+  parts: { part: string; rent_price: number }[];
 };
 
 export type PickerEnsemble = {
@@ -80,7 +86,8 @@ export async function getOrderCatalogue(): Promise<{
       .select(
         `id, ref_code, name_fr, name_ar, photo_path, base_price,
          categories ( slug, name_fr, name_ar ),
-         article_units ( id, ref_code, size, length_cm, status, price_override )`,
+         article_units ( id, ref_code, size, length_cm, status, price_override, set_ref, part ),
+         article_model_parts ( part, rent_price )`,
       )
       .eq("is_active", true)
       .order("ref_code"),
@@ -100,6 +107,7 @@ export async function getOrderCatalogue(): Promise<{
     base_price: number;
     categories: { slug: string; name_fr: string; name_ar: string } | null;
     article_units: PickerUnit[];
+    article_model_parts: { part: string; rent_price: number }[];
   };
 
   type RawEnsemble = {
@@ -122,6 +130,7 @@ export async function getOrderCatalogue(): Promise<{
       category_ar: m.categories?.name_ar ?? null,
       // Une pièce retirée du stock n'a plus à apparaître nulle part.
       units: (m.article_units ?? []).filter((u) => u.status !== "retire"),
+      parts: sortParts(m.article_model_parts ?? []),
     })),
     ensembles: ((ensembles ?? []) as unknown as RawEnsemble[]).map((e) => ({
       id: e.id,

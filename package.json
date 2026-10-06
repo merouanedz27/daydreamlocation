@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.sw.json",
     "db:push": "supabase db push --db-url $SUPABASE_DB_URL --yes",
-    "db:test": "node scripts/run-sql.mjs supabase/tests/availability.sql && node scripts/run-sql.mjs supabase/tests/rls.sql && node scripts/run-sql.mjs supabase/tests/dashboard.sql && node scripts/run-sql.mjs supabase/tests/payments.sql && node scripts/run-sql.mjs supabase/tests/team.sql && node scripts/run-sql.mjs supabase/tests/ensembles.sql && node scripts/run-sql.mjs supabase/tests/moderator.sql",
+    "db:test": "node scripts/run-sql.mjs supabase/tests/availability.sql && node scripts/run-sql.mjs supabase/tests/rls.sql && node scripts/run-sql.mjs supabase/tests/dashboard.sql && node scripts/run-sql.mjs supabase/tests/payments.sql && node scripts/run-sql.mjs supabase/tests/team.sql && node scripts/run-sql.mjs supabase/tests/ensembles.sql && node scripts/run-sql.mjs supabase/tests/moderator.sql && node scripts/run-sql.mjs supabase/tests/costumes.sql",
     "db:advisors": "supabase db advisors --db-url $SUPABASE_DB_URL",
     "db:types": "node scripts/gen-types.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",

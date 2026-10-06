@@ -16,6 +16,16 @@ import { ThemeProvider as NextThemes } from "next-themes";
  * l'imprimante thermique et le PDF partagé veulent du noir sur blanc, quel que
  * soit le réglage du téléphone.
  */
+/**
+ * Le script anti-éclair ne sert qu'au PREMIER chargement, rendu par le
+ * serveur. Côté client (changement de langue : la mise en page `[locale]` se
+ * refait), React 19 refuse un <script> exécutable et le signale en console.
+ * Un type non exécutable le fait taire ; next-themes pose déjà
+ * `suppressHydrationWarning` sur la balise, l'écart de type est donc admis.
+ */
+const scriptProps =
+  typeof window === "undefined" ? undefined : ({ type: "application/json" } as const);
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const printing = pathname.includes("/imprimer");
@@ -27,6 +37,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       enableSystem
       disableTransitionOnChange
       forcedTheme={printing ? "light" : undefined}
+      scriptProps={scriptProps}
     >
       {children}
     </NextThemes>

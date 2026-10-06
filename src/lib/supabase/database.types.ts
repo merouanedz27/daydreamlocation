@@ -69,6 +69,35 @@ export type Database = {
           },
         ];
       };
+      article_model_parts: {
+        Row: {
+          model_id: number;
+          part: string;
+          rent_price: number;
+          position: number;
+        };
+        Insert: {
+          model_id: number;
+          part: string;
+          rent_price?: number;
+          position?: number;
+        };
+        Update: {
+          model_id?: number;
+          part?: string;
+          rent_price?: number;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "article_model_parts_model_id_fkey";
+            columns: ["model_id"];
+            isOneToOne: false;
+            referencedRelation: "article_models";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       article_units: {
         Row: {
           id: number;
@@ -84,6 +113,8 @@ export type Database = {
           notes: string | null;
           created_at: string;
           status_since: string | null;
+          set_ref: string | null;
+          part: string | null;
         };
         Insert: {
           model_id: number;
@@ -98,6 +129,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           status_since?: string | null;
+          set_ref?: string | null;
+          part?: string | null;
         };
         Update: {
           model_id?: number;
@@ -112,6 +145,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           status_since?: string | null;
+          set_ref?: string | null;
+          part?: string | null;
         };
         Relationships: [
           {

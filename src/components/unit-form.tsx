@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { createUnits } from "@/lib/actions/stock";
 import { sizeSeries, sortSizes } from "@/lib/sizes";
-import { nextUnitRefs } from "@/lib/stock-refs";
+import { nextUnitRefs, partRef, type Part } from "@/lib/stock-refs";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
@@ -40,12 +40,15 @@ export function UnitForm({
   refCode,
   existingRefs,
   categorySlug,
+  parts = [],
 }: {
   modelId: number;
   refCode: string;
   /** Références déjà prises : la prévisualisation annonce les suivantes. */
   existingRefs: string[];
   categorySlug: string | null;
+  /** Costume divisible : chaque pièce ajoutée est un costume de ces parties. */
+  parts?: readonly Part[];
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
@@ -190,24 +193,37 @@ export function UnitForm({
               celle qui sera attribuée, pour qu'il n'y ait pas de surprise. */}
           <FieldDescription>
             {t("stock.nextRefHint", { ref: refs[0] })}
+            {parts.length > 0 && (
+              <>
+                {" "}
+                {t("stock.parts.eachCostume", {
+                  parts: parts.map((p) => t(`stock.parts.${p}`)).join(" + "),
+                  refs: parts.map((p) => partRef(refs[0], p)).join(", "),
+                })}
+              </>
+            )}
           </FieldDescription>
           {field === "quantity" && error && <FieldError>{t(error)}</FieldError>}
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="price_override">{t("stock.priceOverride")}</FieldLabel>
-          <Input
-            id="price_override"
-            name="price_override"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={100}
-            disabled={isPending}
-            className="h-12 text-base"
-          />
-          <FieldDescription>{t("stock.priceOverrideHint")}</FieldDescription>
-        </Field>
+        {/* Un costume divisible tire ses prix du modèle (complet / par
+            partie) : pas de prix propre à la pièce. */}
+        {parts.length === 0 && (
+          <Field>
+            <FieldLabel htmlFor="price_override">{t("stock.priceOverride")}</FieldLabel>
+            <Input
+              id="price_override"
+              name="price_override"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={100}
+              disabled={isPending}
+              className="h-12 text-base"
+            />
+            <FieldDescription>{t("stock.priceOverrideHint")}</FieldDescription>
+          </Field>
+        )}
 
         <Field>
           <FieldLabel htmlFor="purchase_price">{t("stock.purchasePrice")}</FieldLabel>

@@ -42,3 +42,34 @@ export function nextUnitRefs(
     (_, i) => `${prefix}${String(start + i + 1).padStart(2, "0")}`,
   );
 }
+
+/**
+ * Les PARTIES d'un costume divisible, dans l'ordre où on les montre. Un
+ * costume « TUX-A-03 » est un jeu de pièces réelles : « TUX-A-03-V » (veste),
+ * « TUX-A-03-P » (pantalon), « TUX-A-03-G » (gilet). Chacune se loue seule,
+ * ou toutes ensemble pour le costume complet.
+ *
+ * Le numéro du costume suit la même dérivation que les pièces simples :
+ * `highestSuffix` lit « 03 » dans « TUX-A-03-V » (`parseInt` s'arrête au
+ * tiret), donc `nextUnitRefs` donne le prochain costume libre.
+ */
+export const PARTS = ["veste", "pantalon", "gilet"] as const;
+export type Part = (typeof PARTS)[number];
+
+export const PART_SUFFIX: Record<Part, string> = { veste: "V", pantalon: "P", gilet: "G" };
+
+export function isPart(value: unknown): value is Part {
+  return PARTS.includes(value as Part);
+}
+
+/** « TUX-A-03 » + pantalon → « TUX-A-03-P ». */
+export function partRef(setRef: string, part: Part): string {
+  return `${setRef}-${PART_SUFFIX[part]}`;
+}
+
+/** Les parties dans l'ordre d'affichage, quel que soit l'ordre reçu. */
+export function sortParts<T extends { part: string }>(items: T[]): T[] {
+  return [...items].sort(
+    (a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part),
+  );
+}

@@ -1,3 +1,4 @@
+import { sortParts, type Part } from "@/lib/stock-refs";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -55,6 +56,7 @@ export default async function NewUnitPage({
         refCode={model.ref_code}
         existingRefs={(model.article_units ?? []).map((u) => u.ref_code)}
         categorySlug={model.categories?.slug ?? null}
+        parts={sortParts(model.article_model_parts ?? []).map((p) => p.part as Part)}
       />
     </div>
   );

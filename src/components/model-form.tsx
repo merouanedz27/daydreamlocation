@@ -24,8 +24,10 @@ import {
 } from "@/components/ui/select";
 import { PhotoUpload } from "@/components/photo-upload";
 import { ModelPieces } from "@/components/model-pieces";
+import { ModelParts, initialParts } from "@/components/model-parts";
+import { PARTS } from "@/lib/stock-refs";
 import { createModel, updateModel } from "@/lib/actions/stock";
-import type { ArticleModel, Category } from "@/lib/queries/stock";
+import type { ArticleModel, Category, ModelPart } from "@/lib/queries/stock";
 import type { Locale } from "@/i18n/routing";
 
 /**
@@ -42,10 +44,13 @@ import type { Locale } from "@/i18n/routing";
 export function ModelForm({
   categories,
   model,
+  parts = [],
   pieceCount = 0,
 }: {
   categories: Category[];
   model?: ArticleModel;
+  /** Les parties d'un costume divisible déjà enregistrées. */
+  parts?: ModelPart[];
   pieceCount?: number;
 }) {
   const t = useTranslations();
@@ -60,6 +65,10 @@ export function ModelForm({
   const [refCode, setRefCode] = useState(model?.ref_code ?? "");
   const [categoryId, setCategoryId] = useState(model ? String(model.category_id) : "");
   const categorySlug = categories.find((c) => String(c.id) === categoryId)?.slug ?? null;
+  // Un COSTUME se divise en parties (veste, pantalon, gilet), louables seules.
+  const divisible = categorySlug === "costume";
+  const [partsValue, setPartsValue] = useState(() => initialParts(parts));
+  const chosenParts = divisible ? PARTS.filter((p) => partsValue[p].on) : [];
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -158,7 +167,9 @@ export function ModelForm({
         </Field>
 
         <Field data-invalid={field === "base_price" || undefined}>
-          <FieldLabel htmlFor="base_price">{t("stock.rentalPrice")}</FieldLabel>
+          <FieldLabel htmlFor="base_price">
+            {divisible ? t("stock.parts.fullPrice") : t("stock.rentalPrice")}
+          </FieldLabel>
           <Input
             id="base_price"
             name="base_price"
@@ -174,6 +185,15 @@ export function ModelForm({
           <FieldDescription>{t("stock.priceRequiredHint")}</FieldDescription>
           {field === "base_price" && error && <FieldError>{t(error)}</FieldError>}
         </Field>
+
+        {divisible && (
+          <Field data-invalid={field === "parts" || undefined}>
+            <FieldLabel>{t("stock.parts.title")}</FieldLabel>
+            <FieldDescription>{t("stock.parts.hint")}</FieldDescription>
+            <ModelParts value={partsValue} onChange={setPartsValue} disabled={isPending} />
+            {field === "parts" && error && <FieldError>{t(error)}</FieldError>}
+          </Field>
+        )}
 
         <Field data-invalid={field === "purchase_price" || undefined}>
           <FieldLabel htmlFor="purchase_price">{t("stock.purchasePriceModel")}</FieldLabel>
@@ -220,7 +240,12 @@ export function ModelForm({
         {!editing && (
           <Field data-invalid={field === "pieces" || undefined}>
             <FieldLabel>{t("stock.piecesSection")}</FieldLabel>
-            <ModelPieces categorySlug={categorySlug} refCode={refCode} disabled={isPending} />
+            <ModelPieces
+              categorySlug={categorySlug}
+              refCode={refCode}
+              parts={chosenParts}
+              disabled={isPending}
+            />
             {field === "pieces" && error && <FieldError>{t(error)}</FieldError>}
           </Field>
         )}

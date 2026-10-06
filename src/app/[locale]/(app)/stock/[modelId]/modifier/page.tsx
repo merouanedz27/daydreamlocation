@@ -65,7 +65,12 @@ export default async function EditModelPage({
         <span className="ornament-diamond" />
       </div>
 
-      <ModelForm categories={categories} model={model} pieceCount={units.length} />
+      <ModelForm
+        categories={categories}
+        model={model}
+        parts={model.article_model_parts ?? []}
+        pieceCount={units.length}
+      />
 
       {/* Le geste destructeur vit ICI, au bout de la page de modification, et
           non sur la fiche : il faut l'avoir cherché pour le trouver. */}

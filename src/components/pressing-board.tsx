@@ -168,6 +168,7 @@ export function PressingBoard({
                   />
                   <div className="min-w-0 flex-1 py-2">
                     <p className="truncate text-sm font-medium">
+                      {u.part && <span className="me-1.5">{t(`stock.parts.${u.part}`)}</span>}
                       <bdi>{u.ref}</bdi>
                       {u.size && (
                         <span className="text-muted-foreground tabular font-normal">
@@ -242,6 +243,7 @@ export function PressingBoard({
                         label={t("orders.selectNamed", { name: u.ref })}
                       />
                       <span className="min-w-0 flex-1 truncate text-sm">
+                        {u.part && <span className="me-1.5">{t(`stock.parts.${u.part}`)}</span>}
                         <bdi>{u.ref}</bdi>
                       </span>
                       {rented.has(u.id) && (

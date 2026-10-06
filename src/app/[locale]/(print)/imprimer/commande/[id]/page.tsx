@@ -66,7 +66,7 @@ export default async function OrderSlipPage({
   // calcul sert à l'e-mail « Nouvelle commande » (`ticket-fields.ts`).
   const categoryByUnit = new Map<number, string | null>();
   for (const model of models) {
-    for (const unit of model.units) categoryByUnit.set(unit.id, model.category_slug);
+    for (const unit of model.units) categoryByUnit.set(unit.id, unit.part ?? model.category_slug);
   }
   const fields = ticketFields(
     { ...order, order_lines: order.order_lines.filter((line) => line.is_active) },

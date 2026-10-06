@@ -57,6 +57,7 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { SUIT_SIZES } from "@/lib/sizes";
+import { PARTS, type Part } from "@/lib/stock-refs";
 import { HighlightText } from "@/components/highlight";
 import type {
   CustomerSuggestion,
@@ -239,6 +240,15 @@ export function OrderQuickForm({
   const busy = availability.key === windowKey ? availability.busy : EMPTY_BUSY;
   const isChecking = hasStock && Boolean(windowKey) && availability.key !== windowKey;
 
+  /** Prix catalogue de chaque pièce du stock : la clé de répartition du prix. */
+  const listPrice = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const model of models) {
+      for (const unit of model.units) map.set(unit.id, resolveUnitPrice(model, unit));
+    }
+    return map;
+  }, [models]);
+
   // --- lignes envoyées -------------------------------------------------------
   const lines: DraftLine[] = useMemo(() => {
     const filled = draft.slots
@@ -282,8 +292,12 @@ export function OrderQuickForm({
             note,
           };
     });
-    return spreadOutfitPrice(raw, Number(draft.price) || 0);
-  }, [draft.slots, draft.tailor, draft.price, draft.vestSize, draft.pantsSize]);
+    // Le prix de la tenue se répartit au prorata du prix de chaque pièce.
+    const weights = filled.map(({ slot }) =>
+      slot.unitId && !slot.external ? (listPrice.get(slot.unitId) ?? 0) : 0,
+    );
+    return spreadOutfitPrice(raw, Number(draft.price) || 0, weights);
+  }, [draft.slots, draft.tailor, draft.price, draft.vestSize, draft.pantsSize, listPrice]);
 
   const total = Number(draft.price) || 0;
   const balance = total - (Number(draft.paid) || 0);
@@ -399,43 +413,122 @@ export function OrderQuickForm({
   }, [models, locale]);
 
 
+  /**
+   * Costumes DIVISIBLES : les pièces de chaque costume (« TUX-A-03 »), veste
+   * d'abord. Un costume se prend entier (« Complet ») ou partie par partie —
+   * le pantalon de l'un, la veste d'un autre.
+   */
+  const setIndex = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const [id, { unit }] of unitIndex) {
+      if (!unit.set_ref) continue;
+      map.set(unit.set_ref, [...(map.get(unit.set_ref) ?? []), id]);
+    }
+    const rank = (id: number) => PARTS.indexOf(unitIndex.get(id)?.unit.part as Part);
+    for (const ids of map.values()) ids.sort((a, b) => rank(a) - rank(b));
+    return map;
+  }, [unitIndex]);
+
+  const partLabel = (part: string | null) => (part ? t(`stock.parts.${part}`) : "");
+
+  /** Pourquoi une pièce ne peut pas être prise, pour la case `index`. */
+  function unitState(id: number, index: number) {
+    const { unit } = unitIndex.get(id)!;
+    const own = draft.slots[index] as Slot | undefined;
+    const blocked = busy.get(id);
+    const material = unit.status !== "disponible";
+    const elsewhere = pickedUnits.has(id) && own?.unitId !== id;
+
+    let reason: string | null = null;
+    if (!windowValid) reason = t("orders.quick.dateFirst");
+    else if (material) reason = t(unit.status === "nettoyage" ? "stock.cleaning" : "stock.repair");
+    else if (blocked)
+      reason = blocked.freeFrom
+        ? t("orders.freeFrom", { date: formatDate(blocked.freeFrom, locale) })
+        : t("orders.takenOnDates");
+
+    // `taken` : la pièce n'est pas libre sur ces dates (ou pas en état).
+    return { reason, taken: material || Boolean(blocked), elsewhere };
+  }
+
   function pickerOptions(index: number): PickerOption[] {
     const slotNo = Math.min(index + 1, 4);
     // Une pièce EN PLUS peut être n'importe quoi : tout est proposé.
     const extra = index >= FIXED_SLOTS;
-    // La case peut avoir disparu : « + Autre pièce » refermé sans choix la
-    // retire, et la liste se rend encore pendant qu'elle se referme.
-    const own = draft.slots[index] as Slot | undefined;
     const options: PickerOption[] = [];
+    const sizeText = (size: string | null) => (size ? `${t("stock.size")} ${size}` : null);
 
-    // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
-    for (const [id, { model, unit, name, price }] of unitIndex) {
-      const blocked = busy.get(id);
-      const material = unit.status !== "disponible";
-      const elsewhere = pickedUnits.has(id) && own?.unitId !== id;
-
-      let reason: string | null = null;
-      if (!windowValid) reason = t("orders.quick.dateFirst");
-      else if (material) reason = t(unit.status === "nettoyage" ? "stock.cleaning" : "stock.repair");
-      else if (blocked)
-        reason = blocked.freeFrom
-          ? t("orders.freeFrom", { date: formatDate(blocked.freeFrom, locale) })
-          : t("orders.takenOnDates");
-
-      options.push({
+    const unitOption = (id: number, featured: boolean): PickerOption => {
+      const { unit, name, price } = unitIndex.get(id)!;
+      const { reason, taken, elsewhere } = unitState(id, index);
+      return {
         key: `u:${id}`,
-        label: `${name} · ${unit.ref_code}`,
+        label: unit.part
+          ? `${name} · ${unit.ref_code} — ${partLabel(unit.part)}`
+          : `${name} · ${unit.ref_code}`,
         secondary: (
           <>
             <Package className="text-gold-strong me-1 inline size-3" aria-hidden />
-            {unit.size && `${t("stock.size")} ${unit.size}`}
+            {sizeText(unit.size)}
             {reason && <span className="text-warning-foreground"> · {reason}</span>}
           </>
         ),
         trailing: <span className="tabular">{formatMoney(price, locale)}</span>,
-        disabled: !windowValid || elsewhere || material || Boolean(blocked),
-        featured: extra || SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""),
-      });
+        disabled: !windowValid || elsewhere || taken,
+        featured,
+      };
+    };
+
+    // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
+    const seenSets = new Set<string>();
+    for (const [id, { model, unit, name }] of unitIndex) {
+      const featured = extra || Boolean(SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""));
+      const setRef = unit.set_ref;
+
+      // Un costume divisible : « Complet » d'abord, puis chacune de ses parties.
+      if (setRef && !seenSets.has(setRef)) {
+        seenSets.add(setRef);
+        const ids = setIndex.get(setRef) ?? [];
+        const parts = ids.map((partId) => ({
+          unit: unitIndex.get(partId)!.unit,
+          state: unitState(partId, index),
+        }));
+        const blocking = parts.find((p) => p.state.taken);
+        const sizes = new Set(parts.map((p) => p.unit.size ?? ""));
+        // Même taille partout : « Taille 50 » ; sinon « Veste 50 · Pantalon 48 ».
+        const sizeLine =
+          sizes.size <= 1
+            ? sizeText(parts[0]?.unit.size ?? null)
+            : parts.map((p) => `${partLabel(p.unit.part)} ${p.unit.size ?? "—"}`).join(" · ");
+        const reason = !windowValid
+          ? t("orders.quick.dateFirst")
+          : blocking
+            ? t("orders.quick.partBlocked", {
+                part: partLabel(blocking.unit.part),
+                reason: blocking.state.reason ?? "",
+              })
+            : null;
+
+        options.push({
+          key: `s:${setRef}`,
+          label: `${name} · ${setRef} — ${t("orders.quick.complete")}`,
+          secondary: (
+            <>
+              <Package className="text-gold-strong me-1 inline size-3" aria-hidden />
+              {sizeLine}
+              {reason && <span className="text-warning-foreground"> · {reason}</span>}
+            </>
+          ),
+          trailing: <span className="tabular">{formatMoney(model.base_price, locale)}</span>,
+          disabled: !windowValid || Boolean(blocking),
+          featured,
+        });
+        for (const partId of ids) options.push(unitOption(partId, featured));
+        continue;
+      }
+      if (setRef) continue; // déjà listée sous son costume
+
+      options.push(unitOption(id, featured));
     }
 
     // 2. Ses vêtements déjà saisis — ceux de CETTE case montrés d'office.
@@ -450,24 +543,25 @@ export function OrderQuickForm({
   function selectedKeys(index: number): string[] {
     const slot = draft.slots[index] as Slot | undefined;
     if (!slot) return [];
-    if (slot.unitId) return [`u:${slot.unitId}`];
+    if (slot.unitId) {
+      // Toutes les parties de son costume sont dans la commande : « Complet ».
+      const setRef = unitIndex.get(slot.unitId)?.unit.set_ref;
+      const ids = setRef ? setIndex.get(setRef) : undefined;
+      if (setRef && ids && ids.every((id) => pickedUnits.has(id))) return [`s:${setRef}`];
+      return [`u:${slot.unitId}`];
+    }
     const name = slot.name.trim();
     if (!name) return [];
     const known = items.find((i) => normalizeSearch(i.label) === normalizeSearch(name));
     return [known ? `h:${known.label}` : NEW_KEY + name];
   }
 
-  function slotFromKey(key: string): Partial<Slot> | null {
-    if (key.startsWith(NEW_KEY)) {
-      return { name: key.slice(NEW_KEY.length), unitId: null, ref: null, stockPrice: null, external: null };
-    }
-    if (key.startsWith("h:")) {
-      return { name: key.slice(2), unitId: null, ref: null, stockPrice: null, external: null };
-    }
-    const found = unitIndex.get(Number(key.slice(2)));
+  /** Une pièce du stock, prête à remplir une case. */
+  function unitSlot(id: number): Partial<Slot> | null {
+    const found = unitIndex.get(id);
     if (!found) return null;
     return {
-      name: found.name,
+      name: found.unit.part ? `${found.name} · ${partLabel(found.unit.part)}` : found.name,
       size: found.unit.size ?? "",
       unitId: found.unit.id,
       ref: found.unit.ref_code,
@@ -477,13 +571,58 @@ export function OrderQuickForm({
   }
 
   /**
+   * Une clé cochée → une ou PLUSIEURS cases. « Complet » se déplie en ses
+   * parties : la première porte le prix du costume complet, les autres 0 —
+   * le prix automatique vaut alors exactement le prix du costume.
+   */
+  function slotsFromKey(key: string, index: number): Partial<Slot>[] {
+    if (key.startsWith(NEW_KEY)) {
+      return [{ name: key.slice(NEW_KEY.length), unitId: null, ref: null, stockPrice: null, external: null }];
+    }
+    if (key.startsWith("h:")) {
+      return [{ name: key.slice(2), unitId: null, ref: null, stockPrice: null, external: null }];
+    }
+    if (key.startsWith("s:")) {
+      const setRef = key.slice(2);
+      const own = (draft.slots[index] as Slot | undefined)?.unitId;
+      const model = unitIndex.get(setIndex.get(setRef)?.[0] ?? -1)?.model;
+      // Une partie déjà dans une AUTRE case y reste : pas de doublon.
+      const ids = (setIndex.get(setRef) ?? []).filter((id) => !pickedUnits.has(id) || id === own);
+      return ids
+        .map(unitSlot)
+        .filter((slot): slot is Partial<Slot> => slot !== null)
+        .map((slot, i) => ({ ...slot, stockPrice: i === 0 ? (model?.base_price ?? 0) : 0 }));
+    }
+    const slot = unitSlot(Number(key.slice(2)));
+    return slot ? [slot] : [];
+  }
+
+  /**
    * Applique la liste cochée à une case. Comme dans AppSheet on peut en cocher
    * PLUSIEURS : la première remplit la case, les suivantes deviennent des
-   * pièces en plus — deux chemises, deux cravates.
+   * pièces en plus — deux chemises, deux cravates, ou la veste d'un costume et
+   * le pantalon d'un autre.
    */
   function applyPicked(index: number, keys: string[]) {
     setServerIssue(null);
-    const picks = keys.map(slotFromKey).filter((p): p is Partial<Slot> => p !== null);
+    const seen = new Set<number>();
+    const picks = keys
+      .flatMap((key) => slotsFromKey(key, index))
+      .filter((pick) => {
+        if (!pick.unitId) return true;
+        if (seen.has(pick.unitId)) return false;
+        seen.add(pick.unitId);
+        return true;
+      })
+      // Une VESTE remplit la case du costume avant un pantalon : sa taille
+      // est la « Taille » du bon, celle du pantalon va dans sa colonne.
+      .map((pick, order) => ({ pick, order }))
+      .sort((a, b) => {
+        const veste = (x: Partial<Slot>) =>
+          x.unitId && unitIndex.get(x.unitId)?.unit.part === "veste" ? 0 : 1;
+        return veste(a.pick) - veste(b.pick) || a.order - b.order;
+      })
+      .map(({ pick }) => pick);
     const slots = [...store.get().slots];
     const base = slots[index];
     // La taille venait de la pièce du stock : elle part avec elle.
@@ -695,16 +834,34 @@ export function OrderQuickForm({
       })
     : "";
 
+  /** La partie de costume (veste, pantalon, gilet) d'une case, sinon `null`. */
+  const slotPart = (index: number) => {
+    const unitId = draft.slots[index]?.unitId;
+    return unitId ? (unitIndex.get(unitId)?.unit.part ?? null) : null;
+  };
+
+  // Les autres parties d'un costume (son pantalon, son gilet) sont des cases
+  // EN PLUS, mais elles appartiennent au costume : on les range juste sous
+  // lui, nommées « Costume · Pantalon », et non parmi les « Autre pièce ».
+  const isCostumeExtra = (index: number) => index >= FIXED_SLOTS && slotPart(index) !== null;
+  const slotOrder = [
+    0,
+    ...draft.slots.map((_, i) => i).filter(isCostumeExtra),
+    ...draft.slots.map((_, i) => i).filter((i) => i !== 0 && !isCostumeExtra(i)),
+  ];
+
   const slotLabel = (index: number) =>
-    index === 0
-      ? t("orders.quick.costume")
-      : index === 1
-        ? t("orders.quick.shirt")
-        : index === 2
-          ? t("orders.quick.shoes")
-          : index === ACCESSORIES_SLOT
-            ? t("orders.quick.accessories")
-            : t("orders.quick.other");
+    isCostumeExtra(index)
+      ? `${t("orders.quick.costume")} · ${partLabel(slotPart(index))}`
+      : index === 0
+        ? t("orders.quick.costume")
+        : index === 1
+          ? t("orders.quick.shirt")
+          : index === 2
+            ? t("orders.quick.shoes")
+            : index === ACCESSORIES_SLOT
+              ? t("orders.quick.accessories")
+              : t("orders.quick.other");
 
   return (
     <form onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate>
@@ -866,7 +1023,8 @@ export function OrderQuickForm({
         <p className="text-muted-foreground -mt-2 mb-4 text-sm">{t("orders.quick.outfitHint")}</p>
 
         <div className="space-y-4">
-          {draft.slots.map((slot, index) => {
+          {slotOrder.map((index) => {
+            const slot = draft.slots[index];
             const taken = slot.unitId ? busy.get(slot.unitId) : undefined;
             return (
               <div key={index}>

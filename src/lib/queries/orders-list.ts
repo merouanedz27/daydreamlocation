@@ -77,7 +77,7 @@ export async function getOrdersTable(
       `${ROW_COLUMNS},
        order_lines ( id, unit_id, model_name_snapshot, size_snapshot, external_label,
          external_source, external_cost, line_note, is_active,
-         article_units ( ref_code, article_models ( categories ( slug ) ) ) ),
+         article_units ( ref_code, part, article_models ( categories ( slug ) ) ) ),
        profiles ( full_name )`,
       { count: "exact" },
     );
@@ -112,6 +112,7 @@ export async function getOrdersTable(
       is_active: boolean;
       article_units: {
         ref_code: string;
+        part: string | null;
         article_models: { categories: { slug: string } | null } | null;
       } | null;
     }[];
@@ -124,7 +125,10 @@ export async function getOrdersTable(
     const categoryByUnit = new Map<number, string | null>();
     for (const l of lines) {
       if (l.unit_id) {
-        categoryByUnit.set(l.unit_id, l.article_units?.article_models?.categories?.slug ?? null);
+        categoryByUnit.set(
+          l.unit_id,
+          l.article_units?.part ?? l.article_units?.article_models?.categories?.slug ?? null,
+        );
       }
     }
     const fields = ticketFields(

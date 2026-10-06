@@ -195,7 +195,7 @@ export async function notifyNewOrder(orderId: number): Promise<void> {
         .from("orders")
         .select(
           `*, profiles ( full_name ),
-           order_lines ( *, article_units ( ref_code, article_models ( categories ( slug ) ) ) )`,
+           order_lines ( *, article_units ( ref_code, part, article_models ( categories ( slug ) ) ) )`,
         )
         .eq("id", orderId)
         .order("id", { referencedTable: "order_lines", ascending: true })
@@ -208,6 +208,7 @@ export async function notifyNewOrder(orderId: number): Promise<void> {
       is_active: boolean;
       article_units: {
         ref_code: string;
+        part: string | null;
         article_models: { categories: { slug: string } | null } | null;
       } | null;
     };
@@ -222,7 +223,10 @@ export async function notifyNewOrder(orderId: number): Promise<void> {
     const categoryByUnit = new Map<number, string | null>();
     for (const l of lines) {
       if (l.unit_id) {
-        categoryByUnit.set(l.unit_id, l.article_units?.article_models?.categories?.slug ?? null);
+        categoryByUnit.set(
+          l.unit_id,
+          l.article_units?.part ?? l.article_units?.article_models?.categories?.slug ?? null,
+        );
       }
     }
     const fields = ticketFields(

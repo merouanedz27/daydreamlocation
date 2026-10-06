@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PARTS } from "@/lib/stock-refs";
 
 /** Messages = CLÉS i18n, jamais des phrases. Voir `daydream-i18n`. */
 
@@ -92,6 +93,37 @@ export const piecesSchema = z
         message: "errors.tooManyPieces",
       }),
   );
+
+/**
+ * Les PARTIES d'un costume divisible, saisies avec le modèle : « veste:1500 »
+ * = la veste se loue seule 1 500 DA. Au moins deux parties — un costume d'une
+ * seule pièce n'a rien à diviser. Le prix d'une partie est obligatoire, comme
+ * les autres prix du modèle.
+ */
+export const partsSchema = z
+  .array(z.string())
+  .max(PARTS.length)
+  .transform((rows) =>
+    rows.map((row) => {
+      const at = row.indexOf(":");
+      return { part: row.slice(0, at), rent_price: row.slice(at + 1).trim() };
+    }),
+  )
+  .pipe(
+    z
+      .array(
+        z.object({
+          part: z.enum(PARTS),
+          rent_price: requiredMoney,
+        }),
+      )
+      .min(2, { message: "errors.partsMin" })
+      .refine((rows) => new Set(rows.map((r) => r.part)).size === rows.length, {
+        message: "errors.generic",
+      }),
+  );
+
+export type PartInput = z.infer<typeof partsSchema>[number];
 
 export const unitSchema = z.object({
   model_id: z.coerce.number().int().positive(),

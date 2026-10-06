@@ -11,6 +11,8 @@ import { getBlockedUnitIds, getModel, isUnitFree } from "@/lib/queries/stock";
 import { todayIso } from "@/lib/rental-range";
 import { getProfile, canManageStock } from "@/lib/auth";
 import { UnitEdit } from "@/components/unit-edit";
+import { SetDelete } from "@/components/set-delete";
+import { PARTS, type Part } from "@/lib/stock-refs";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { photoUrl } from "@/lib/storage";
@@ -63,6 +65,88 @@ export default async function ModelPage({
   const units = [...(model.article_units ?? [])].sort((a, b) =>
     (a.ref_code ?? "").localeCompare(b.ref_code ?? ""),
   );
+  type Unit = (typeof units)[number];
+
+  // Costume DIVISIBLE : ses parties regroupées sous leur costume
+  // (« TUX-A-03 » → veste, pantalon…). Les pièces simples restent seules.
+  const parts = [...(model.article_model_parts ?? [])].sort(
+    (a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part),
+  );
+  const groups: { setRef: string | null; units: Unit[] }[] = [];
+  for (const unit of units) {
+    const group = unit.set_ref ? groups.find((g) => g.setRef === unit.set_ref) : undefined;
+    if (group) group.units.push(unit);
+    else groups.push({ setRef: unit.set_ref, units: [unit] });
+  }
+  for (const group of groups) {
+    group.units.sort(
+      (a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part),
+    );
+  }
+  const setCount = groups.filter((g) => g.setRef).length;
+  const liveSets = groups.filter(
+    (g) => g.setRef && g.units.some((u) => u.status !== "retire"),
+  );
+  const freeSets = liveSets.filter((g) => g.units.every((u) => isUnitFree(u, blocked))).length;
+
+  const unitBody = (unit: Unit) => {
+    const free = isUnitFree(unit, blocked);
+    const price = unit.price_override ?? model.base_price;
+    return (
+      <>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {unit.part && <span className="me-1.5">{t(`stock.parts.${unit.part}`)}</span>}
+            <bdi className={cn(unit.part && "text-muted-foreground font-normal")}>
+              {unit.ref_code}
+            </bdi>
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-sm">
+            {unit.size && (
+              <>
+                {t("stock.size")}{" "}
+                <span className="tabular text-foreground">{unit.size}</span>
+              </>
+            )}
+            {unit.length_cm && <span className="tabular"> · {unit.length_cm} cm</span>}
+          </p>
+        </div>
+
+        {unit.price_override !== null && (
+          <span className="tabular text-sm font-medium">{formatMoney(price, l)}</span>
+        )}
+
+        <Badge
+          className={
+            free
+              ? "bg-success-soft text-success-foreground border-transparent"
+              : unit.status === "disponible"
+                ? "bg-gold-soft text-foreground border-transparent"
+                : "bg-muted text-muted-foreground border-transparent"
+          }
+        >
+          {free
+            ? t("stock.available")
+            : unit.status === "disponible"
+              ? t("stock.reserved")
+              : t(`stock.${UNIT_STATUS_KEY[unit.status]}`)}
+        </Badge>
+
+        {canEdit && (
+          <UnitEdit
+            unit={{
+              id: unit.id,
+              ref_code: unit.ref_code,
+              size: unit.size,
+              length_cm: unit.length_cm,
+              price_override: unit.price_override,
+            }}
+            categorySlug={unit.part ?? model.categories?.slug ?? null}
+          />
+        )}
+      </>
+    );
+  };
 
   return (
     <div>
@@ -125,9 +209,17 @@ export default async function ModelPage({
           </p>
           <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
             <div>
-              <dt className="text-muted-foreground text-xs">{t("stock.rentalPrice")}</dt>
+              <dt className="text-muted-foreground text-xs">
+                {parts.length ? t("stock.parts.fullPrice") : t("stock.rentalPrice")}
+              </dt>
               <dd className="tabular text-lg font-medium">{formatMoney(model.base_price, l)}</dd>
             </div>
+            {parts.map((p) => (
+              <div key={p.part}>
+                <dt className="text-muted-foreground text-xs">{t(`stock.parts.${p.part}`)}</dt>
+                <dd className="tabular text-lg font-medium">{formatMoney(p.rent_price, l)}</dd>
+              </div>
+            ))}
             <div>
               <dt className="text-muted-foreground text-xs">{t("stock.purchasePriceModel")}</dt>
               <dd className="tabular text-lg font-medium">
@@ -143,12 +235,19 @@ export default async function ModelPage({
       </div>
 
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg">
-          {t("stock.pieces")}{" "}
-          <span className="text-muted-foreground tabular text-base font-normal">
-            ({units.length})
-          </span>
-        </h2>
+        <div>
+          <h2 className="text-lg">
+            {setCount ? t("stock.parts.costumes") : t("stock.pieces")}{" "}
+            <span className="text-muted-foreground tabular text-base font-normal">
+              ({setCount || units.length})
+            </span>
+          </h2>
+          {setCount > 0 && (
+            <p className="text-muted-foreground text-sm">
+              {t("stock.parts.completeFree", { count: freeSets, n: String(freeSets) })}
+            </p>
+          )}
+        </div>
         {canEdit && (
           <Button asChild size="sm" variant="secondary">
             <Link href={`/stock/${model.id}/piece`}>
@@ -160,74 +259,43 @@ export default async function ModelPage({
       </div>
 
       {/* Chaque ligne est UNE pièce réelle. C'est le niveau auquel la
-          disponibilité se calcule — jamais au niveau du modèle. */}
+          disponibilité se calcule — jamais au niveau du modèle. Les parties
+          d'un costume sont rangées sous lui : chacune se loue seule. */}
       <ul className="mt-4 space-y-2">
-        {units.map((unit) => {
-          const free = isUnitFree(unit, blocked);
-          const price = unit.price_override ?? model.base_price;
-
-          return (
-            <li
-              key={unit.id}
-              className={cn(
-                "border-border bg-card flex items-center gap-3 rounded-lg border p-3",
-                canEdit && "py-1.5 pe-1",
-              )}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  <bdi>{unit.ref_code}</bdi>
+        {groups.map((group) =>
+          group.setRef ? (
+            <li key={group.setRef} className="border-border bg-card rounded-lg border">
+              <div className="border-border flex items-center gap-2 border-b py-1 ps-3 pe-1">
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+                  <bdi>{group.setRef}</bdi>
                 </p>
-                <p className="text-muted-foreground mt-0.5 text-sm">
-                  {unit.size && (
-                    <>
-                      {t("stock.size")}{" "}
-                      <span className="tabular text-foreground">{unit.size}</span>
-                    </>
-                  )}
-                  {unit.length_cm && (
-                    <span className="tabular"> · {unit.length_cm} cm</span>
-                  )}
-                </p>
+                {canEdit && <SetDelete modelId={model.id} setRef={group.setRef} />}
               </div>
-
-              {unit.price_override !== null && (
-                <span className="tabular text-sm font-medium">
-                  {formatMoney(price, l)}
-                </span>
-              )}
-
-              <Badge
-                className={
-                  free
-                    ? "bg-success-soft text-success-foreground border-transparent"
-                    : unit.status === "disponible"
-                      ? "bg-gold-soft text-foreground border-transparent"
-                      : "bg-muted text-muted-foreground border-transparent"
-                }
-              >
-                {free
-                  ? t("stock.available")
-                  : unit.status === "disponible"
-                    ? t("stock.reserved")
-                    : t(`stock.${UNIT_STATUS_KEY[unit.status]}`)}
-              </Badge>
-
-              {canEdit && (
-                <UnitEdit
-                  unit={{
-                    id: unit.id,
-                    ref_code: unit.ref_code,
-                    size: unit.size,
-                    length_cm: unit.length_cm,
-                    price_override: unit.price_override,
-                  }}
-                  categorySlug={model.categories?.slug ?? null}
-                />
-              )}
+              <ul className="divide-border divide-y">
+                {group.units.map((unit) => (
+                  <li
+                    key={unit.id}
+                    className={cn("flex items-center gap-3 p-3", canEdit && "py-1.5 pe-1")}
+                  >
+                    {unitBody(unit)}
+                  </li>
+                ))}
+              </ul>
             </li>
-          );
-        })}
+          ) : (
+            group.units.map((unit) => (
+              <li
+                key={unit.id}
+                className={cn(
+                  "border-border bg-card flex items-center gap-3 rounded-lg border p-3",
+                  canEdit && "py-1.5 pe-1",
+                )}
+              >
+                {unitBody(unit)}
+              </li>
+            ))
+          ),
+        )}
       </ul>
     </div>
   );

@@ -6,10 +6,11 @@ import type { Tables } from "@/lib/supabase/database.types";
 export type Category = Tables<"categories">;
 export type ArticleModel = Tables<"article_models">;
 export type ArticleUnit = Tables<"article_units">;
+export type ModelPart = Pick<Tables<"article_model_parts">, "part" | "rent_price">;
 
 export type ModelWithStock = ArticleModel & {
   categories: Pick<Category, "id" | "slug" | "name_fr" | "name_ar"> | null;
-  article_units: Pick<ArticleUnit, "id" | "size" | "status">[];
+  article_units: Pick<ArticleUnit, "id" | "size" | "status" | "set_ref" | "part">[];
 };
 
 /**
@@ -39,7 +40,7 @@ export async function getModels(options?: {
       `id, ref_code, name_fr, name_ar, category_id, color, brand, description,
        base_price, purchase_price, photo_path, is_active, created_at,
        categories ( id, slug, name_fr, name_ar ),
-       article_units ( id, size, status )`,
+       article_units ( id, size, status, set_ref, part )`,
     )
     .eq("is_active", !options?.archived)
     .order("ref_code");
@@ -105,6 +106,8 @@ export type UnitWithHistory = ArticleUnit & {
 export type ModelDetail = ArticleModel & {
   categories: Category | null;
   article_units: UnitWithHistory[];
+  /** Les parties d'un costume divisible (vide pour un modèle simple). */
+  article_model_parts: ModelPart[];
 };
 
 async function fetchModel(id: number): Promise<ModelDetail | null> {
@@ -116,7 +119,8 @@ async function fetchModel(id: number): Promise<ModelDetail | null> {
       `*, categories (*),
        article_units (
          *, order_lines ( id )
-       )`,
+       ),
+       article_model_parts ( part, rent_price )`,
     )
     .eq("id", id)
     .single();
@@ -177,13 +181,25 @@ export function isUnitFree(
   return unit.status === "disponible" && !blockedUnitIds.has(unit.id);
 }
 
-/** Compte les pièces d'un modèle, pour l'affichage en liste. */
+/**
+ * Compte les pièces d'un modèle, pour l'affichage en liste.
+ *
+ * Un costume DIVISIBLE compte pour UN article : il n'est disponible que si
+ * toutes ses parties le sont — c'est ce que le client demande en entrant
+ * (« vous avez le Tuxedo A en 50 ? »). Ses parties louables seules se voient
+ * sur la fiche du modèle.
+ */
 export function countStock(
-  units: Pick<ArticleUnit, "id" | "status">[],
+  units: (Pick<ArticleUnit, "id" | "status"> & { set_ref?: string | null })[],
   blockedUnitIds: ReadonlySet<number>,
 ) {
-  const total = units.length;
-  const available = units.filter((u) => isUnitFree(u, blockedUnitIds)).length;
+  const items = new Map<string, boolean>();
+  for (const unit of units) {
+    const key = unit.set_ref ?? `#${unit.id}`;
+    items.set(key, (items.get(key) ?? true) && isUnitFree(unit, blockedUnitIds));
+  }
+  const total = items.size;
+  const available = [...items.values()].filter(Boolean).length;
   return { total, available, unavailable: total - available };
 }
 
@@ -198,6 +214,8 @@ export type PressingUnit = {
   id: number;
   ref: string;
   size: string | null;
+  /** Partie d'un costume divisible (veste, pantalon, gilet), sinon `null`. */
+  part: string | null;
   status: "disponible" | "nettoyage";
   /** Depuis quand elle est au pressing (ISO), si connu. */
   since: string | null;
@@ -216,7 +234,7 @@ export async function getPressingUnits(): Promise<PressingUnit[]> {
   const { data, error } = await supabase
     .from("article_units")
     .select(
-      `id, ref_code, size, status, status_since,
+      `id, ref_code, size, part, status, status_since,
        article_models!inner ( ref_code, name_fr, name_ar, is_active )`,
     )
     .in("status", ["disponible", "nettoyage"])
@@ -229,6 +247,7 @@ export async function getPressingUnits(): Promise<PressingUnit[]> {
     id: number;
     ref_code: string;
     size: string | null;
+    part: string | null;
     status: "disponible" | "nettoyage";
     status_since: string | null;
     article_models: { ref_code: string; name_fr: string; name_ar: string | null };
@@ -237,6 +256,7 @@ export async function getPressingUnits(): Promise<PressingUnit[]> {
     id: u.id,
     ref: u.ref_code,
     size: u.size,
+    part: u.part,
     status: u.status,
     since: u.status_since,
     modelName: u.article_models.name_fr,

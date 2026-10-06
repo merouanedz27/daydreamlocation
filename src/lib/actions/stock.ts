@@ -7,11 +7,14 @@ import type { ZodError } from "zod";
 import {
   modelSchema,
   modelUpdateSchema,
+  partsSchema,
   piecesSchema,
   unitSchema,
   unitUpdateSchema,
 } from "@/lib/validation/stock";
-import { nextUnitRefs } from "@/lib/stock-refs";
+import { nextUnitRefs, partRef, PARTS, sortParts, type Part } from "@/lib/stock-refs";
+import type { PartInput } from "@/lib/validation/stock";
+import type { Database } from "@/lib/supabase/database.types";
 import { sortSizes } from "@/lib/sizes";
 import { PHOTO_BUCKET } from "@/lib/storage";
 import { redirectTo } from "@/i18n/navigation";
@@ -68,7 +71,157 @@ const MODEL_FIELDS = [
   "base_price",
   "purchase_price",
   "pieces",
+  "parts",
 ] as const;
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+type UnitInsert = Database["public"]["Tables"]["article_units"]["Insert"];
+
+/**
+ * Les parties d'un costume, lues du formulaire. `null` quand le champ n'est
+ * pas à l'écran (catégorie autre que costume) : on ne touche alors à rien.
+ */
+function readParts(
+  formData: FormData,
+): { ok: true; parts: PartInput[] | null } | { ok: false; error: string; field: string } {
+  if (formData.get("parts_field") !== "1") return { ok: true, parts: null };
+  const parsed = partsSchema.safeParse(formData.getAll("parts").map(String));
+  if (parsed.success) return { ok: true, parts: sortParts(parsed.data) };
+  const message = parsed.error.issues[0].message;
+  return {
+    ok: false,
+    error: message.startsWith("errors.") ? message : "errors.generic",
+    field: "parts",
+  };
+}
+
+/**
+ * Les lignes `article_units` d'un ou plusieurs COSTUMES : une pièce par
+ * partie, toutes de la taille du costume (chacune se corrige ensuite).
+ */
+function setRows(
+  modelId: number,
+  sets: { ref: string; size: string | null }[],
+  parts: readonly Part[],
+  extra: Partial<UnitInsert> = {},
+): UnitInsert[] {
+  return sets.flatMap(({ ref, size }) =>
+    parts.map((part) => ({
+      ...extra,
+      model_id: modelId,
+      ref_code: partRef(ref, part),
+      set_ref: ref,
+      part,
+      size,
+    })),
+  );
+}
+
+/**
+ * Aligne les parties d'un modèle sur ce que le formulaire demande.
+ *
+ * - une partie AJOUTÉE (le gilet des Tuxedos) naît dans CHAQUE costume
+ *   existant, à la taille de sa veste ;
+ * - une partie RETIRÉE quitte chaque costume : effacée si elle n'a jamais été
+ *   louée, sinon passée en « retirée » (ses commandes passées la désignent) ;
+ * - des pièces SIMPLES déjà là (modèle qui devient divisible) deviennent
+ *   chacune un costume, dont elles sont la première partie.
+ */
+async function syncModelParts(
+  supabase: Supabase,
+  modelId: number,
+  wanted: PartInput[],
+): Promise<boolean> {
+  const wantedParts = wanted.map((p) => p.part);
+
+  const { error: upsertError } = await supabase.from("article_model_parts").upsert(
+    wanted.map((p) => ({
+      model_id: modelId,
+      part: p.part,
+      rent_price: p.rent_price,
+      position: PARTS.indexOf(p.part) + 1,
+    })),
+  );
+  if (upsertError) return false;
+
+  const dropped = PARTS.filter((part) => !wantedParts.includes(part));
+  if (dropped.length) {
+    const { error } = await supabase
+      .from("article_model_parts")
+      .delete()
+      .eq("model_id", modelId)
+      .in("part", dropped);
+    if (error) return false;
+  }
+
+  const { data: units, error: unitsError } = await supabase
+    .from("article_units")
+    .select("id, ref_code, size, status, set_ref, part")
+    .eq("model_id", modelId);
+  if (unitsError) return false;
+
+  // Pièces simples → costumes : la pièce devient la première partie.
+  for (const unit of units.filter((u) => !u.set_ref)) {
+    const first = wantedParts[0];
+    const { error } = await supabase
+      .from("article_units")
+      .update({ set_ref: unit.ref_code, part: first, ref_code: partRef(unit.ref_code, first) })
+      .eq("id", unit.id);
+    if (error) return false;
+    unit.set_ref = unit.ref_code;
+    unit.part = first;
+  }
+
+  // Taille d'un costume = celle de sa veste, sinon de sa première partie.
+  type UnitRow = (typeof units)[number];
+  const sets = new Map<string, { size: string | null; parts: Map<string, UnitRow> }>();
+  for (const unit of units) {
+    const set = sets.get(unit.set_ref!) ?? { size: null, parts: new Map<string, UnitRow>() };
+    set.parts.set(unit.part!, unit);
+    if (unit.part === "veste" || set.size === null) set.size = unit.size;
+    sets.set(unit.set_ref!, set);
+  }
+
+  // Parties ajoutées : créées, ou remises en stock si elles avaient été retirées.
+  const toCreate: { ref: string; size: string | null; part: Part }[] = [];
+  for (const [ref, set] of sets) {
+    for (const part of wantedParts) {
+      const existing = set.parts.get(part);
+      if (!existing) toCreate.push({ ref, size: set.size, part });
+      else if (existing.status === "retire") {
+        const { error } = await supabase
+          .from("article_units")
+          .update({ status: "disponible", status_since: new Date().toISOString() })
+          .eq("id", existing.id);
+        if (error) return false;
+      }
+    }
+  }
+  if (toCreate.length) {
+    const { error } = await supabase
+      .from("article_units")
+      .insert(toCreate.flatMap(({ ref, size, part }) => setRows(modelId, [{ ref, size }], [part])));
+    if (error) return false;
+  }
+
+  // Parties retirées : effacées, ou retirées si une commande les désigne.
+  for (const set of sets.values()) {
+    for (const part of dropped) {
+      const unit = set.parts.get(part);
+      if (!unit || unit.status === "retire") continue;
+      const { error } = await supabase.from("article_units").delete().eq("id", unit.id);
+      if (error) {
+        if (error.code !== FOREIGN_KEY_VIOLATION) return false;
+        const { error: retireError } = await supabase
+          .from("article_units")
+          .update({ status: "retire" })
+          .eq("id", unit.id);
+        if (retireError) return false;
+      }
+    }
+  }
+  return true;
+}
 
 /**
  * Crée un modèle.
@@ -109,6 +262,9 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
     };
   }
 
+  const parts = readParts(formData);
+  if (!parts.ok) return parts;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("article_models")
@@ -133,11 +289,33 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
     Array.from({ length: quantities.get(size) ?? 0 }, () => size),
   );
 
+  if (parts.parts) {
+    const { error: partsError } = await supabase.from("article_model_parts").insert(
+      parts.parts.map((p) => ({
+        model_id: data.id,
+        part: p.part,
+        rent_price: p.rent_price,
+        position: PARTS.indexOf(p.part) + 1,
+      })),
+    );
+    if (partsError) {
+      await supabase.from("article_models").delete().eq("id", data.id);
+      return { ok: false, error: "errors.generic", field: "parts" };
+    }
+  }
+
   if (sizes.length) {
     const refs = nextUnitRefs(parsed.data.ref_code, [], sizes.length);
-    const { error: unitsError } = await supabase.from("article_units").insert(
-      sizes.map((size, i) => ({ model_id: data.id, ref_code: refs[i], size })),
-    );
+    // Costume divisible : chaque « pièce » saisie est un costume, une ligne
+    // par partie (TUX-H-01-V, TUX-H-01-P…).
+    const rows: UnitInsert[] = parts.parts
+      ? setRows(
+          data.id,
+          refs.map((ref, i) => ({ ref, size: sizes[i] })),
+          parts.parts.map((p) => p.part),
+        )
+      : sizes.map((size, i) => ({ model_id: data.id, ref_code: refs[i], size }));
+    const { error: unitsError } = await supabase.from("article_units").insert(rows);
     if (unitsError) {
       // Pas de modèle à moitié créé : sans ses pièces, on le retire. Il n'a
       // encore ni pièce ni commande, l'effacement ne peut pas être refusé.
@@ -198,7 +376,7 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
 
   const { data: model } = await supabase
     .from("article_models")
-    .select("ref_code")
+    .select("ref_code, article_model_parts(part)")
     .eq("id", model_id)
     .single();
 
@@ -217,12 +395,22 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
     count,
   );
 
-  const rows = refs.map((ref_code, i) => ({
-    ...unit,
-    model_id,
-    ref_code,
-    size: series[i] ?? null,
-  }));
+  // Modèle divisible : chaque nouvelle « pièce » est un costume complet, une
+  // ligne par partie. Le prix de location d'une partie vient du modèle.
+  const parts = sortParts(model.article_model_parts).map((p) => p.part as Part);
+  const rows: UnitInsert[] = parts.length
+    ? setRows(
+        model_id,
+        refs.map((ref, i) => ({ ref, size: series[i] ?? null })),
+        parts,
+        { ...unit, price_override: null },
+      )
+    : refs.map((ref_code, i) => ({
+        ...unit,
+        model_id,
+        ref_code,
+        size: series[i] ?? null,
+      }));
 
   const { error } = await supabase.from("article_units").insert(rows);
 
@@ -384,6 +572,9 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
 
   if (!parsed.success) return firstIssue(parsed.error, MODEL_FIELDS);
 
+  const parts = readParts(formData);
+  if (!parts.ok) return parts;
+
   const { id, ...fields } = parsed.data;
   const supabase = await createClient();
 
@@ -399,9 +590,55 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "errors.generic" };
   }
 
+  if (parts.parts && !(await syncModelParts(supabase, id, parts.parts))) {
+    return { ok: false, error: "errors.generic", field: "parts" };
+  }
+
   revalidatePath(`/${locale}/stock`);
   revalidatePath(`/${locale}/stock/${id}`);
   redirectTo(`/stock/${id}`, locale);
+}
+
+/**
+ * Supprime un COSTUME entier (toutes ses parties) saisi par erreur. Même
+ * règle que `deleteUnit` : jamais loué, il est effacé ; sinon ses parties
+ * passent en « retirée ». Un seul `delete` : la base refuse tout ou rien.
+ */
+export async function deleteSet(
+  formData: FormData,
+): Promise<{ ok: true; retired: boolean } | { ok: false; error: string }> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const setRef = String(formData.get("set_ref") ?? "").trim();
+  const modelId = Number(formData.get("model_id"));
+  if (!setRef || !Number.isInteger(modelId) || modelId <= 0) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  let retired = false;
+  const { error } = await supabase
+    .from("article_units")
+    .delete()
+    .eq("model_id", modelId)
+    .eq("set_ref", setRef);
+  if (error) {
+    if (error.code !== FOREIGN_KEY_VIOLATION) return { ok: false, error: "errors.generic" };
+    const { error: retireError } = await supabase
+      .from("article_units")
+      .update({ status: "retire" })
+      .eq("model_id", modelId)
+      .eq("set_ref", setRef);
+    if (retireError) return { ok: false, error: "errors.generic" };
+    retired = true;
+  }
+
+  revalidatePath(`/${locale}/stock/${modelId}`);
+  revalidatePath(`/${locale}/stock`);
+  return { ok: true, retired };
 }
 
 /**

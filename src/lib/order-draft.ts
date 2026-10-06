@@ -50,7 +50,14 @@ export type DraftLine =
  * champ « Prix » de chaque ligne, toujours modifiable.
  */
 export function resolveUnitPrice(model: PickerModel, unit: PickerUnit): number {
-  return unit.price_override ?? model.base_price;
+  if (unit.price_override !== null) return unit.price_override;
+  // Une PARTIE de costume louée seule : son prix à elle. Le costume complet,
+  // lui, se loue au prix du modèle (voir `setPrice`).
+  if (unit.part) {
+    const part = model.parts.find((p) => p.part === unit.part);
+    if (part) return part.rent_price;
+  }
+  return model.base_price;
 }
 
 export function linesSubtotal(lines: DraftLine[]): number {
@@ -106,10 +113,31 @@ export function toPayload(lines: DraftLine[]) {
 
 /**
  * Le PRIX DE LA TENUE, comme dans le tableur : un seul montant pour toute la
- * commande. Il est porté par la première ligne, les autres à zéro — la règle
- * de la reprise du tableur. La somme des lignes vaut ainsi le prix saisi, ce
- * que le trigger `orders_recompute_totals` recalcule de toute façon.
+ * commande, RÉPARTI sur ses pièces au prorata de leur prix catalogue
+ * (`weights`) — la veste à 8 000 et le pantalon à 4 000 d'un costume vendu
+ * 12 000 portent chacun leur part, et non 12 000 / 0. Une pièce sans prix
+ * (vêtement nommé, hors stock) reçoit 0.
+ *
+ * La somme des lignes vaut TOUJOURS le prix saisi, au dinar près : l'arrondi
+ * restant va à la pièce la plus chère. Les parts sont rondes (à la centaine)
+ * quand le prix l'est. Sans aucun poids, tout reste sur la
+ * première ligne (la règle de la reprise du tableur). Le trigger
+ * `orders_recompute_totals` refait la somme de toute façon.
  */
-export function spreadOutfitPrice<T extends { unitPrice: number }>(lines: T[], total: number): T[] {
-  return lines.map((l, i) => ({ ...l, unitPrice: i === 0 ? Math.max(total, 0) : 0 }));
+export function spreadOutfitPrice<T extends { unitPrice: number }>(
+  lines: T[],
+  total: number,
+  weights: number[] = [],
+): T[] {
+  const amount = Math.max(Math.round(total), 0);
+  const w = lines.map((_, i) => Math.max(weights[i] ?? 0, 0));
+  const sum = w.reduce((a, b) => a + b, 0);
+  if (!sum) return lines.map((l, i) => ({ ...l, unitPrice: i === 0 ? amount : 0 }));
+
+  // Des parts rondes (à la centaine) quand le prix l'est : 6 900, pas 6 858.
+  const step = amount % 100 === 0 ? 100 : 1;
+  const shares = w.map((x) => Math.floor((amount * x) / sum / step) * step);
+  const heaviest = w.indexOf(Math.max(...w));
+  shares[heaviest] += amount - shares.reduce((a, b) => a + b, 0);
+  return lines.map((l, i) => ({ ...l, unitPrice: shares[i] }));
 }

@@ -88,7 +88,7 @@ export default async function EditOrderPage({
   // Ce que la page sait pour remettre chaque pièce dans sa case.
   const categoryByUnit = new Map<number, string | null>();
   for (const model of models) {
-    for (const unit of model.units) categoryByUnit.set(unit.id, model.category_slug);
+    for (const unit of model.units) categoryByUnit.set(unit.id, unit.part ?? model.category_slug);
   }
 
   const initial = draftFromOrder(order, {

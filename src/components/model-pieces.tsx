@@ -6,7 +6,7 @@ import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sizeSeries, sortSizes } from "@/lib/sizes";
-import { nextUnitRefs } from "@/lib/stock-refs";
+import { nextUnitRefs, partRef, type Part } from "@/lib/stock-refs";
 import { MAX_PIECES } from "@/lib/validation/stock";
 import { cn } from "@/lib/utils";
 
@@ -19,10 +19,13 @@ import { cn } from "@/lib/utils";
 export function ModelPieces({
   categorySlug,
   refCode,
+  parts = [],
   disabled,
 }: {
   categorySlug: string | null;
   refCode: string;
+  /** Costume divisible : chaque pièce saisie est un costume de ces parties. */
+  parts?: readonly Part[];
   disabled: boolean;
 }) {
   const t = useTranslations();
@@ -161,6 +164,14 @@ export function ModelPieces({
             })
           : t("stock.piecesHint")}
       </p>
+      {parts.length > 0 && (
+        <p className="text-muted-foreground text-sm">
+          {t("stock.parts.eachCostume", {
+            parts: parts.map((p) => t(`stock.parts.${p}`)).join(" + "),
+            refs: parts.map((p) => partRef(refs[0], p)).join(", "),
+          })}
+        </p>
+      )}
     </div>
   );
 }

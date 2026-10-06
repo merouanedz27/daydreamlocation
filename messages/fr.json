@@ -204,6 +204,8 @@
       "tailor": "Tailleur",
       "tailorPlaceholder": "ex. COME 14 CM + SLIMI",
       "addOther": "Ajouter une pièce",
+      "complete": "Complet",
+      "partBlocked": "{part} : {reason}",
       "payment": "Paiement",
       "price": "Prix de la tenue",
       "paidAll": "Tout payé ({amount})",
@@ -253,6 +255,21 @@
     }
   },
   "stock": {
+    "parts": {
+      "veste": "Veste",
+      "pantalon": "Pantalon",
+      "gilet": "Gilet",
+      "title": "Pièces du costume",
+      "hint": "Cochez ce qui compose ce costume et le prix de chaque pièce louée seule. Un client peut ainsi prendre le pantalon d'un costume et la veste d'un autre.",
+      "fullPrice": "Prix du costume complet",
+      "price": "Prix seul",
+      "priceFor": "Prix de location : {part} seul(e)",
+      "eachCostume": "Chaque costume = {parts} ({refs}).",
+      "costumes": "Costumes",
+      "completeFree": "{count, plural, =0 {Aucun costume complet libre aujourd'hui} =1 {1 costume complet libre aujourd'hui} other {{n} costumes complets libres aujourd'hui}}",
+      "deleteSetNamed": "Supprimer le costume {ref}",
+      "deleteSetBody": "Toutes ses pièces sont supprimées. Si l'une a déjà été louée, elles passent en « retirée » pour garder l'historique."
+    },
     "title": "Stock",
     "model": "Modèle",
     "piece": "Pièce",
@@ -427,6 +444,7 @@
     "noAccount": "Pas encore de compte ? C’est le responsable de la boutique qui les crée."
   },
   "errors": {
+    "partsMin": "Cochez au moins deux pièces (ex. veste + pantalon).",
     "unitUnavailable": "Cette pièce est déjà réservée sur ces dates.",
     "generic": "Une erreur est survenue. Réessayez.",
     "offline": "Vous êtes hors ligne.",
