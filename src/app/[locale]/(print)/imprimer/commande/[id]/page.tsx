@@ -76,11 +76,10 @@ export default async function OrderSlipPage({
     },
   );
 
-  const jacketSize = fields.jacketSize
-    ? fields.vestSize
-      ? `${fields.jacketSize} · ${t("print.ticket.vest")} ${fields.vestSize}`
-      : fields.jacketSize
-    : null;
+  // Un gilet loué sans sa veste garde sa taille sur le ticket.
+  const vestPart = fields.vestSize ? `${t("print.ticket.vest")} ${fields.vestSize}` : null;
+  const jacketSize =
+    [fields.jacketSize, vestPart].filter(Boolean).join(" · ") || null;
 
   const label = (key: string) => t("print.ticket.field", { label: t(key) });
   const values: Record<string, string | null> = {

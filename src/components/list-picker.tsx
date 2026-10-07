@@ -29,8 +29,11 @@ export type PickerOption = {
 /** Préfixe des valeurs tapées dans la recherche, absentes de la liste. */
 export const NEW_KEY = "new:";
 
-/** Au-delà, la liste se parcourt moins bien qu'elle ne se cherche. */
-const MAX_ROWS = 200;
+/**
+ * Garde-fou seulement : l'équipe fait DÉFILER la liste plutôt que de chercher,
+ * aucune pièce ne doit être cachée derrière la recherche.
+ */
+const MAX_ROWS = 600;
 
 /**
  * La liste à cocher de son AppSheet — « COSTUMES 🤵 » : une recherche en haut,
@@ -54,6 +57,9 @@ export function ListPicker({
   options,
   selected,
   onDone,
+  allowNew = true,
+  instant = false,
+  emptyText,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +67,16 @@ export function ListPicker({
   options: PickerOption[];
   selected: string[];
   onDone: (keys: string[]) => void;
+  /** Faux : rien ne s'ajoute depuis la recherche — le STOCK seulement. */
+  allowNew?: boolean;
+  /**
+   * Un seul choix, en UN toucher : la ligne touchée est choisie et la liste
+   * se referme — pas de « Valider ». Plusieurs choix d'un coup restent pour
+   * « + Autre pièce ».
+   */
+  instant?: boolean;
+  /** Le message d'une liste vide, à la place de l'indice général. */
+  emptyText?: string;
 }) {
   const t = useTranslations();
   const [query, setQuery] = useState("");
@@ -93,6 +109,10 @@ export function ListPicker({
   const customs = picked.filter((k) => k.startsWith(NEW_KEY));
 
   function toggle(key: string) {
+    if (instant) {
+      onDone([key]);
+      return;
+    }
     setPicked((current) =>
       current.includes(key) ? current.filter((k) => k !== key) : [...current, key],
     );
@@ -134,7 +154,7 @@ export function ListPicker({
         </div>
 
         <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2" role="listbox" aria-multiselectable>
-          {typed && !exact && (
+          {allowNew && typed && !exact && (
             <PickerRow
               checked={picked.includes(NEW_KEY + typed)}
               onToggle={() => toggle(NEW_KEY + typed)}
@@ -166,29 +186,31 @@ export function ListPicker({
               trailing={option.trailing}
             />
           ))}
-          {!visible.length && !typed && (
+          {!visible.length && (!typed || !allowNew) && (
             <li className="text-muted-foreground px-3 py-8 text-center text-sm">
-              {t("picker.emptyHint")}
+              {emptyText ?? t("picker.emptyHint")}
             </li>
           )}
         </ul>
 
-        <DrawerFooter className="border-border grid grid-cols-2 gap-2 border-t pt-3">
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-12 text-base"
-            onClick={() => setPicked([])}
-            disabled={!picked.length}
-          >
-            {t("picker.clear")}
-          </Button>
-          <Button type="button" className="h-12 text-base" onClick={() => onDone(picked)}>
-            {picked.length > 1
-              ? t("picker.doneCount", { count: picked.length })
-              : t("picker.done")}
-          </Button>
-        </DrawerFooter>
+        {!instant && (
+          <DrawerFooter className="border-border grid grid-cols-2 gap-2 border-t pt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-12 text-base"
+              onClick={() => setPicked([])}
+              disabled={!picked.length}
+            >
+              {t("picker.clear")}
+            </Button>
+            <Button type="button" className="h-12 text-base" onClick={() => onDone(picked)}>
+              {picked.length > 1
+                ? t("picker.doneCount", { count: picked.length })
+                : t("picker.done")}
+            </Button>
+          </DrawerFooter>
+        )}
       </DrawerContent>
     </Drawer>
   );

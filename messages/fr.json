@@ -204,8 +204,9 @@
       "tailor": "Tailleur",
       "tailorPlaceholder": "ex. COME 14 CM + SLIMI",
       "addOther": "Ajouter une pièce",
-      "complete": "Complet",
-      "partBlocked": "{part} : {reason}",
+      "pickPart": "Choisir dans le stock",
+      "noPart": "Aucun(e) {part} dans le stock.",
+      "noPartInSize": "Aucun(e) {part} en {size} dans le stock.",
       "payment": "Paiement",
       "price": "Prix de la tenue",
       "paidAll": "Tout payé ({amount})",
@@ -444,6 +445,7 @@
     "noAccount": "Pas encore de compte ? C’est le responsable de la boutique qui les crée."
   },
   "errors": {
+    "partNeedsStock": "{part} {size} : choisissez une pièce du stock, ou effacez la taille.",
     "partsMin": "Cochez au moins deux pièces (ex. veste + pantalon).",
     "unitUnavailable": "Cette pièce est déjà réservée sur ces dates.",
     "generic": "Une erreur est survenue. Réessayez.",

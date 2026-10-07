@@ -49,7 +49,10 @@ import {
   EMPTY_DRAFT,
   EMPTY_SLOT,
   FIXED_SLOTS,
+  PART_SLOTS,
+  catalogSlotOf,
   costumeSize,
+  partOfSlot,
   type QuickDraft,
   type Slot,
 } from "@/lib/quick-draft";
@@ -57,7 +60,6 @@ import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { SUIT_SIZES } from "@/lib/sizes";
-import { PARTS, type Part } from "@/lib/stock-refs";
 import { HighlightText } from "@/components/highlight";
 import type {
   CustomerSuggestion,
@@ -71,8 +73,8 @@ import type { Locale } from "@/i18n/routing";
 /* --------------------------------------------------------------------------
  * Le brouillon — une LIGNE DU TABLEUR.
  *
- * Quatre cases fixes (costume, chemise, chaussures, accessoires) comme les
- * colonnes de son AppSheet, puis des pièces en plus si besoin. Chaque case est du texte
+ * Six cases fixes (veste, gilet, pantalon, chemise, chaussures, accessoires),
+ * les colonnes de son AppSheet, puis des pièces en plus si besoin. Chaque case est du texte
  * libre ; une suggestion du stock la RATTACHE à une pièce réelle, qui seule
  * bloque des dates.
  *
@@ -97,10 +99,24 @@ const draftStore = createDeviceSetting<QuickDraft>({
       // de jeter une saisie en cours.
       if (slots.length < 3) return null;
       slots = [...slots.slice(0, 3), EMPTY_SLOT, ...slots.slice(3)];
-    } else if (d.v !== 2 || slots.length < FIXED_SLOTS) {
+    } else if (d.v !== 2 && d.v !== 3) {
       return null;
     }
-    return { ...EMPTY_DRAFT, ...d, v: 2, slots };
+    if (d.v !== 3) {
+      // Brouillon d'avant les cases par partie : une seule case « Costume »,
+      // ses tailles gilet / pantalon à part. Un costume nommé les reprend
+      // dans sa taille (« 50 · G 48 · P 52 ») ; gilet et pantalon arrivent vides.
+      if (slots.length < 4) return null;
+      const old = d as { vestSize?: string; pantsSize?: string };
+      const [jacket, ...rest] = slots;
+      const size =
+        jacket.name && !jacket.unitId
+          ? (costumeSize(jacket.size, old.vestSize ?? "", old.pantsSize ?? "") ?? "")
+          : jacket.size;
+      slots = [{ ...jacket, size }, EMPTY_SLOT, EMPTY_SLOT, ...rest];
+    }
+    if (slots.length < FIXED_SLOTS) return null;
+    return { ...EMPTY_DRAFT, ...d, v: 3, slots };
   },
 });
 
@@ -114,7 +130,7 @@ function withAutoPrice(d: QuickDraft): QuickDraft {
 function isDirty(d: QuickDraft): boolean {
   return (
     Boolean(d.customerName || d.customerPhone || d.eventDate || d.tailor || d.price) ||
-    Boolean(d.paid || d.caution || d.notes || d.vestSize || d.pantsSize) ||
+    Boolean(d.paid || d.caution || d.notes) ||
     d.pickedUp ||
     d.returned ||
     d.slots.some((s) => s.name || s.size)
@@ -131,6 +147,9 @@ const FIELD_TARGETS = [
   ["event_date", "q-date"],
   ["pickup_date", "q-pickup"],
   ["return_due_date", "q-return"],
+  ["part_0", "q-slot-0"],
+  ["part_1", "q-slot-1"],
+  ["part_2", "q-slot-2"],
   ["lines", "q-slot-0"],
   ["price", "q-price"],
   ["amount_paid", "q-paid"],
@@ -140,14 +159,12 @@ const FIELD_TARGETS = [
 
 const EMPTY_BUSY = new Map<number, Unavailability>();
 
-/** La liste « Taille » de son AppSheet : 44 à 66, de deux en deux. */
-
 /**
  * Catégories du stock montrées d'office dans chaque case (numérotée comme
- * `slot` des suggestions : 1 tenue, 2 chemise, 3 chaussures, 4 accessoires).
+ * `slot` des suggestions : 2 chemise, 3 chaussures, 4 accessoires). Les
+ * parties du costume ont leurs propres cases, qui ne montrent que la leur.
  */
 const SLOT_CATEGORIES: Record<number, string[]> = {
-  1: ["costume", "veste", "pantalon", "gilet"],
   2: ["chemise"],
   3: ["chaussures", "bligha"],
   4: ["noeud", "accessoire", "barnous"],
@@ -156,7 +173,6 @@ const SLOT_CATEGORIES: Record<number, string[]> = {
 /** Pas des boutons − / + des montants : les prix se comptent en 500 DA. */
 const MONEY_STEP = 500;
 
-type SizeField = "jacket" | "vest" | "pants";
 const MAX_SUGGESTIONS = 6;
 
 /**
@@ -189,6 +205,7 @@ export function OrderQuickForm({
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const router = useRouter();
+  const partLabel = (part: string | null) => (part ? t(`stock.parts.${part}`) : "");
   const [isPending, startTransition] = useTransition();
   // En modification, un brouillon EN MÉMOIRE parti de la commande : le
   // brouillon de nouvelle commande gardé dans le téléphone n'est pas touché.
@@ -255,8 +272,9 @@ export function OrderQuickForm({
       .map((slot, index) => ({ slot, index }))
       .filter(({ slot }) => slot.name.trim());
 
-    // La colonne « Tailleur » va sur le costume, ou à défaut sur la 1re pièce.
-    const tailorAt = filled.some((f) => f.index === 0) ? 0 : (filled[0]?.index ?? -1);
+    // La colonne « Tailleur » va sur le costume (sa 1re partie saisie), ou à
+    // défaut sur la 1re pièce.
+    const tailorAt = filled[0]?.index ?? -1;
     const tailor = draft.tailor.trim() || null;
 
     const raw: DraftLine[] = filled.map(({ slot, index }) => {
@@ -284,10 +302,7 @@ export function OrderQuickForm({
         : {
             kind: "named",
             name: slot.name.trim(),
-            size:
-              index === 0
-                ? costumeSize(slot.size, draft.vestSize, draft.pantsSize)
-                : slot.size.trim() || null,
+            size: slot.size.trim() || null,
             unitPrice: 0,
             note,
           };
@@ -297,7 +312,7 @@ export function OrderQuickForm({
       slot.unitId && !slot.external ? (listPrice.get(slot.unitId) ?? 0) : 0,
     );
     return spreadOutfitPrice(raw, Number(draft.price) || 0, weights);
-  }, [draft.slots, draft.tailor, draft.price, draft.vestSize, draft.pantsSize, listPrice]);
+  }, [draft.slots, draft.tailor, draft.price, listPrice]);
 
   const total = Number(draft.price) || 0;
   const balance = total - (Number(draft.paid) || 0);
@@ -329,6 +344,16 @@ export function OrderQuickForm({
       delete issues.pickup_date;
       delete issues.return_due_date;
     }
+    // Veste, gilet, pantalon : une taille choisie veut une pièce du STOCK.
+    PART_SLOTS.forEach((part, index) => {
+      const slot = draft.slots[index];
+      if (slot?.size.trim() && !slot.unitId && !slot.name.trim()) {
+        issues[`part_${index}`] = {
+          key: "errors.partNeedsStock",
+          values: { part: partLabel(part), size: slot.size.trim() },
+        };
+      }
+    });
     if (draft.price.trim() && !(Number(draft.price) >= 0)) {
       issues.price = { key: "errors.numberInvalid" };
     }
@@ -391,7 +416,7 @@ export function OrderQuickForm({
   // --- listes à cocher -------------------------------------------------------
   // `n` change à chaque ouverture : la liste est remontée et repart de la case.
   const [picker, setPicker] = useState<{ index: number; n: number; open: boolean } | null>(null);
-  const [sizePicker, setSizePicker] = useState<{ field: SizeField; n: number; open: boolean } | null>(
+  const [sizePicker, setSizePicker] = useState<{ index: number; n: number; open: boolean } | null>(
     null,
   );
 
@@ -412,24 +437,6 @@ export function OrderQuickForm({
     return map;
   }, [models, locale]);
 
-
-  /**
-   * Costumes DIVISIBLES : les pièces de chaque costume (« TUX-A-03 »), veste
-   * d'abord. Un costume se prend entier (« Complet ») ou partie par partie —
-   * le pantalon de l'un, la veste d'un autre.
-   */
-  const setIndex = useMemo(() => {
-    const map = new Map<string, number[]>();
-    for (const [id, { unit }] of unitIndex) {
-      if (!unit.set_ref) continue;
-      map.set(unit.set_ref, [...(map.get(unit.set_ref) ?? []), id]);
-    }
-    const rank = (id: number) => PARTS.indexOf(unitIndex.get(id)?.unit.part as Part);
-    for (const ids of map.values()) ids.sort((a, b) => rank(a) - rank(b));
-    return map;
-  }, [unitIndex]);
-
-  const partLabel = (part: string | null) => (part ? t(`stock.parts.${part}`) : "");
 
   /** Pourquoi une pièce ne peut pas être prise, pour la case `index`. */
   function unitState(id: number, index: number) {
@@ -452,11 +459,10 @@ export function OrderQuickForm({
   }
 
   function pickerOptions(index: number): PickerOption[] {
-    const slotNo = Math.min(index + 1, 4);
+    const slotNo = catalogSlotOf(index);
     // Une pièce EN PLUS peut être n'importe quoi : tout est proposé.
-    const extra = index >= FIXED_SLOTS;
+    const extra = slotNo === null;
     const options: PickerOption[] = [];
-    const sizeText = (size: string | null) => (size ? `${t("stock.size")} ${size}` : null);
 
     const unitOption = (id: number, featured: boolean): PickerOption => {
       const { unit, name, price } = unitIndex.get(id)!;
@@ -469,7 +475,7 @@ export function OrderQuickForm({
         secondary: (
           <>
             <Package className="text-gold-strong me-1 inline size-3" aria-hidden />
-            {sizeText(unit.size)}
+            {unit.size && `${t("stock.size")} ${unit.size}`}
             {reason && <span className="text-warning-foreground"> · {reason}</span>}
           </>
         ),
@@ -479,55 +485,31 @@ export function OrderQuickForm({
       };
     };
 
-    // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
-    const seenSets = new Set<string>();
-    for (const [id, { model, unit, name }] of unitIndex) {
-      const featured = extra || Boolean(SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""));
-      const setRef = unit.set_ref;
-
-      // Un costume divisible : « Complet » d'abord, puis chacune de ses parties.
-      if (setRef && !seenSets.has(setRef)) {
-        seenSets.add(setRef);
-        const ids = setIndex.get(setRef) ?? [];
-        const parts = ids.map((partId) => ({
-          unit: unitIndex.get(partId)!.unit,
-          state: unitState(partId, index),
-        }));
-        const blocking = parts.find((p) => p.state.taken);
-        const sizes = new Set(parts.map((p) => p.unit.size ?? ""));
-        // Même taille partout : « Taille 50 » ; sinon « Veste 50 · Pantalon 48 ».
-        const sizeLine =
-          sizes.size <= 1
-            ? sizeText(parts[0]?.unit.size ?? null)
-            : parts.map((p) => `${partLabel(p.unit.part)} ${p.unit.size ?? "—"}`).join(" · ");
-        const reason = !windowValid
-          ? t("orders.quick.dateFirst")
-          : blocking
-            ? t("orders.quick.partBlocked", {
-                part: partLabel(blocking.unit.part),
-                reason: blocking.state.reason ?? "",
-              })
-            : null;
-
-        options.push({
-          key: `s:${setRef}`,
-          label: `${name} · ${setRef} — ${t("orders.quick.complete")}`,
-          secondary: (
-            <>
-              <Package className="text-gold-strong me-1 inline size-3" aria-hidden />
-              {sizeLine}
-              {reason && <span className="text-warning-foreground"> · {reason}</span>}
-            </>
-          ),
-          trailing: <span className="tabular">{formatMoney(model.base_price, locale)}</span>,
-          disabled: !windowValid || Boolean(blocking),
-          featured,
-        });
-        for (const partId of ids) options.push(unitOption(partId, featured));
-        continue;
+    // Veste, gilet, pantalon : le STOCK seulement, de cette partie, dans la
+    // taille choisie. L'équipe FAIT DÉFILER plutôt que de chercher : les
+    // pièces libres d'abord, rangées par taille puis par référence.
+    const part = partOfSlot(index);
+    if (part) {
+      const size = draft.slots[index]?.size.trim() ?? "";
+      const rows: { option: PickerOption; size: string; ref: string }[] = [];
+      for (const [id, { model, unit }] of unitIndex) {
+        if ((unit.part ?? model.category_slug) !== part) continue;
+        if (size && (unit.size ?? "").trim() !== size) continue;
+        rows.push({ option: unitOption(id, true), size: unit.size ?? "", ref: unit.ref_code ?? "" });
       }
-      if (setRef) continue; // déjà listée sous son costume
+      rows.sort(
+        (a, b) =>
+          Number(Boolean(a.option.disabled)) - Number(Boolean(b.option.disabled)) ||
+          a.size.localeCompare(b.size, undefined, { numeric: true }) ||
+          a.ref.localeCompare(b.ref, undefined, { numeric: true }),
+      );
+      return rows.map((r) => r.option);
+    }
 
+    // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
+    for (const [id, { model }] of unitIndex) {
+      const featured =
+        extra || Boolean(slotNo && SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""));
       options.push(unitOption(id, featured));
     }
 
@@ -543,13 +525,7 @@ export function OrderQuickForm({
   function selectedKeys(index: number): string[] {
     const slot = draft.slots[index] as Slot | undefined;
     if (!slot) return [];
-    if (slot.unitId) {
-      // Toutes les parties de son costume sont dans la commande : « Complet ».
-      const setRef = unitIndex.get(slot.unitId)?.unit.set_ref;
-      const ids = setRef ? setIndex.get(setRef) : undefined;
-      if (setRef && ids && ids.every((id) => pickedUnits.has(id))) return [`s:${setRef}`];
-      return [`u:${slot.unitId}`];
-    }
+    if (slot.unitId) return [`u:${slot.unitId}`];
     const name = slot.name.trim();
     if (!name) return [];
     const known = items.find((i) => normalizeSearch(i.label) === normalizeSearch(name));
@@ -570,59 +546,28 @@ export function OrderQuickForm({
     };
   }
 
-  /**
-   * Une clé cochée → une ou PLUSIEURS cases. « Complet » se déplie en ses
-   * parties : la première porte le prix du costume complet, les autres 0 —
-   * le prix automatique vaut alors exactement le prix du costume.
-   */
-  function slotsFromKey(key: string, index: number): Partial<Slot>[] {
+  /** Une clé cochée → de quoi remplir une case. */
+  function slotFromKey(key: string): Partial<Slot> | null {
     if (key.startsWith(NEW_KEY)) {
-      return [{ name: key.slice(NEW_KEY.length), unitId: null, ref: null, stockPrice: null, external: null }];
+      return { name: key.slice(NEW_KEY.length), unitId: null, ref: null, stockPrice: null, external: null };
     }
     if (key.startsWith("h:")) {
-      return [{ name: key.slice(2), unitId: null, ref: null, stockPrice: null, external: null }];
+      return { name: key.slice(2), unitId: null, ref: null, stockPrice: null, external: null };
     }
-    if (key.startsWith("s:")) {
-      const setRef = key.slice(2);
-      const own = (draft.slots[index] as Slot | undefined)?.unitId;
-      const model = unitIndex.get(setIndex.get(setRef)?.[0] ?? -1)?.model;
-      // Une partie déjà dans une AUTRE case y reste : pas de doublon.
-      const ids = (setIndex.get(setRef) ?? []).filter((id) => !pickedUnits.has(id) || id === own);
-      return ids
-        .map(unitSlot)
-        .filter((slot): slot is Partial<Slot> => slot !== null)
-        .map((slot, i) => ({ ...slot, stockPrice: i === 0 ? (model?.base_price ?? 0) : 0 }));
-    }
-    const slot = unitSlot(Number(key.slice(2)));
-    return slot ? [slot] : [];
+    return unitSlot(Number(key.slice(2)));
   }
 
   /**
    * Applique la liste cochée à une case. Comme dans AppSheet on peut en cocher
    * PLUSIEURS : la première remplit la case, les suivantes deviennent des
-   * pièces en plus — deux chemises, deux cravates, ou la veste d'un costume et
-   * le pantalon d'un autre.
+   * pièces en plus — deux cravates, une ceinture. Les cases fixes, elles, se
+   * remplissent d'un seul toucher (`instant`) : une pièce à la fois.
    */
   function applyPicked(index: number, keys: string[]) {
     setServerIssue(null);
-    const seen = new Set<number>();
     const picks = keys
-      .flatMap((key) => slotsFromKey(key, index))
-      .filter((pick) => {
-        if (!pick.unitId) return true;
-        if (seen.has(pick.unitId)) return false;
-        seen.add(pick.unitId);
-        return true;
-      })
-      // Une VESTE remplit la case du costume avant un pantalon : sa taille
-      // est la « Taille » du bon, celle du pantalon va dans sa colonne.
-      .map((pick, order) => ({ pick, order }))
-      .sort((a, b) => {
-        const veste = (x: Partial<Slot>) =>
-          x.unitId && unitIndex.get(x.unitId)?.unit.part === "veste" ? 0 : 1;
-        return veste(a.pick) - veste(b.pick) || a.order - b.order;
-      })
-      .map(({ pick }) => pick);
+      .map(slotFromKey)
+      .filter((pick): pick is Partial<Slot> => pick !== null);
     const slots = [...store.get().slots];
     const base = slots[index];
     // La taille venait de la pièce du stock : elle part avec elle.
@@ -666,22 +611,29 @@ export function OrderQuickForm({
     openPicker(slots.length);
   }
 
-  const sizeValue = (field: SizeField) =>
-    field === "jacket" ? (draft.slots[0]?.size ?? "") : field === "vest" ? draft.vestSize : draft.pantsSize;
-
-  function pickSize(field: SizeField, value: string) {
-    if (field === "jacket") setSlot(0, { size: value });
-    else if (field === "vest") updateDraft({ vestSize: value });
-    else updateDraft({ pantsSize: value });
+  /**
+   * La taille d'une partie du costume — choisie AVANT la pièce, elle filtre sa
+   * liste. Une pièce déjà choisie d'une autre taille s'en va : la case garde
+   * la taille, et attend la bonne pièce.
+   */
+  function pickSize(index: number, value: string) {
+    const slot = store.get().slots[index];
+    const stale = slot.unitId && (unitIndex.get(slot.unitId)?.unit.size ?? "") !== value;
+    setSlot(
+      index,
+      stale
+        ? { size: value, name: "", unitId: null, ref: null, stockPrice: null, external: null }
+        : { size: value },
+    );
     setSizePicker((p) => (p ? { ...p, open: false } : p));
   }
 
-  const sizeTitle = (field: SizeField) =>
-    field === "jacket"
-      ? t("orders.quick.sizeJacketLong")
-      : field === "vest"
-        ? t("orders.quick.sizeVest")
-        : t("orders.quick.sizePants");
+  /** « Taille · Veste » — le titre des listes d'une partie du costume. */
+  const partTitle = (index: number) => {
+    const size = draft.slots[index]?.size.trim();
+    const label = partLabel(partOfSlot(index));
+    return size ? `${label} · ${t("stock.size")} ${size}` : label;
+  };
 
   const customerOptions: SuggestOption[] = (() => {
     const q = normalizeSearch(draft.customerName);
@@ -834,34 +786,16 @@ export function OrderQuickForm({
       })
     : "";
 
-  /** La partie de costume (veste, pantalon, gilet) d'une case, sinon `null`. */
-  const slotPart = (index: number) => {
-    const unitId = draft.slots[index]?.unitId;
-    return unitId ? (unitIndex.get(unitId)?.unit.part ?? null) : null;
-  };
-
-  // Les autres parties d'un costume (son pantalon, son gilet) sont des cases
-  // EN PLUS, mais elles appartiennent au costume : on les range juste sous
-  // lui, nommées « Costume · Pantalon », et non parmi les « Autre pièce ».
-  const isCostumeExtra = (index: number) => index >= FIXED_SLOTS && slotPart(index) !== null;
-  const slotOrder = [
-    0,
-    ...draft.slots.map((_, i) => i).filter(isCostumeExtra),
-    ...draft.slots.map((_, i) => i).filter((i) => i !== 0 && !isCostumeExtra(i)),
-  ];
-
   const slotLabel = (index: number) =>
-    isCostumeExtra(index)
-      ? `${t("orders.quick.costume")} · ${partLabel(slotPart(index))}`
-      : index === 0
-        ? t("orders.quick.costume")
-        : index === 1
-          ? t("orders.quick.shirt")
-          : index === 2
-            ? t("orders.quick.shoes")
-            : index === ACCESSORIES_SLOT
-              ? t("orders.quick.accessories")
-              : t("orders.quick.other");
+    partOfSlot(index)
+      ? partLabel(partOfSlot(index))
+      : index === 3
+        ? t("orders.quick.shirt")
+        : index === 4
+          ? t("orders.quick.shoes")
+          : index === ACCESSORIES_SLOT
+            ? t("orders.quick.accessories")
+            : t("orders.quick.other");
 
   return (
     <form onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate>
@@ -1023,8 +957,9 @@ export function OrderQuickForm({
         <p className="text-muted-foreground -mt-2 mb-4 text-sm">{t("orders.quick.outfitHint")}</p>
 
         <div className="space-y-4">
-          {slotOrder.map((index) => {
-            const slot = draft.slots[index];
+          {draft.slots.map((slot, index) => {
+            const part = partOfSlot(index);
+            const partIssue = issueText(`part_${index}`);
             const taken = slot.unitId ? busy.get(slot.unitId) : undefined;
             return (
               <div key={index}>
@@ -1068,6 +1003,39 @@ export function OrderQuickForm({
                     }
                     className="h-12 text-base"
                   />
+                ) : part ? (
+                  // Veste, gilet, pantalon : la TAILLE d'abord, puis la pièce
+                  // du stock dans cette taille.
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      id={`q-size-${index}`}
+                      aria-label={`${t("stock.size")} · ${partLabel(part)}`}
+                      onClick={() => setSizePicker({ index, n: Date.now(), open: true })}
+                      data-invalid={partIssue ? true : undefined}
+                      className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 data-[invalid=true]:border-destructive flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-md border outline-none focus-visible:ring-[3px]"
+                    >
+                      <span className="text-muted-foreground text-xs leading-none">
+                        {t("stock.size")}
+                      </span>
+                      {slot.size ? (
+                        <span className="tabular mt-0.5 max-w-full truncate px-1 text-base font-medium">
+                          {slot.size}
+                        </span>
+                      ) : (
+                        <Plus className="text-muted-foreground mt-0.5 size-4" aria-hidden />
+                      )}
+                    </button>
+                    <PickerField
+                      id={`q-slot-${index}`}
+                      className="min-w-0 flex-1"
+                      value={slot.name}
+                      placeholder={t("orders.quick.pickPart")}
+                      onOpen={() => openPicker(index)}
+                      onClear={() => applyPicked(index, [])}
+                      invalid={Boolean(partIssue) || (!!issues.lines && index === 0)}
+                    />
+                  </div>
                 ) : (
                   <PickerField
                     id={`q-slot-${index}`}
@@ -1075,17 +1043,22 @@ export function OrderQuickForm({
                     placeholder={t("orders.quick.pickPlaceholder")}
                     onOpen={() => openPicker(index)}
                     onClear={() => applyPicked(index, [])}
-                    invalid={!!issues.lines && index === 0}
                     // Une ancienne saisie avec sa taille à part (avant les
                     // listes) : on la montre plutôt que de la perdre de vue.
                     secondary={
-                      index > 0 && !slot.unitId && slot.size ? (
+                      !slot.unitId && slot.size ? (
                         <span className="text-muted-foreground">
                           {t("orders.quick.size")} {slot.size}
                         </span>
                       ) : undefined
                     }
                   />
+                )}
+
+                {partIssue && (
+                  <p role="alert" className="text-destructive mt-1.5 text-sm">
+                    {partIssue}
+                  </p>
                 )}
 
                 {slot.unitId && (
@@ -1111,46 +1084,9 @@ export function OrderQuickForm({
                   </p>
                 )}
 
-                {/* Sous le costume : Taille, Taille Gelly, Taille pantalon —
-                    les trois listes 44…66 de son AppSheet, côte à côte. Une
-                    pièce du stock a déjà sa taille : on ne la redemande pas. */}
-                {index === 0 && !slot.unitId && (
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {(["jacket", "vest", "pants"] as const).map((field) => (
-                      <div key={field} className="min-w-0">
-                        <span
-                          id={`q-size-${field}-label`}
-                          className="text-muted-foreground mb-1 block truncate text-xs"
-                        >
-                          {field === "jacket"
-                            ? t("orders.quick.sizeJacket")
-                            : field === "vest"
-                              ? t("orders.quick.sizeVestShort")
-                              : t("orders.quick.sizePantsShort")}
-                        </span>
-                        <button
-                          type="button"
-                          id={`q-size-${field}`}
-                          aria-labelledby={`q-size-${field}-label q-size-${field}`}
-                          onClick={() => setSizePicker({ field, n: Date.now(), open: true })}
-                          className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 tabular flex h-12 w-full items-center justify-center gap-1 rounded-md border text-base outline-none focus-visible:ring-[3px]"
-                        >
-                          {sizeValue(field) ||
-                            // Pantalon vide = même taille que la veste : on
-                            // l'affiche en filigrane, c'est ce qui sera retenu.
-                            (field === "pants" && slot.size ? (
-                              <span className="text-muted-foreground">{slot.size}</span>
-                            ) : (
-                              <Plus className="text-muted-foreground size-4" aria-hidden />
-                            ))}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* La colonne « Tailleur » : texte libre (« TK-525 (14CM) »). */}
-                {index === 0 && (
+                {/* La colonne « Tailleur » : texte libre (« TK-525 (14CM) »),
+                    sous le costume — après sa dernière partie. */}
+                {index === PART_SLOTS.length - 1 && (
                   <div className="mt-3">
                     <label htmlFor="q-tailor" className="text-muted-foreground mb-1 block text-xs">
                       {t("orders.quick.tailor")}
@@ -1339,10 +1275,25 @@ export function OrderQuickForm({
           key={picker.n}
           open={picker.open}
           onOpenChange={(open) => (open ? null : closePicker())}
-          title={slotLabel(picker.index)}
+          title={partOfSlot(picker.index) ? partTitle(picker.index) : slotLabel(picker.index)}
           options={pickerOptions(picker.index)}
           selected={selectedKeys(picker.index)}
           onDone={(keys) => applyPicked(picker.index, keys)}
+          // Veste, gilet, pantalon : du stock seulement.
+          allowNew={!partOfSlot(picker.index)}
+          // Les cases fixes : un toucher choisit et referme. « + Autre pièce »
+          // garde ses cases à cocher et « Valider » (cravate + ceinture…).
+          instant={picker.index < FIXED_SLOTS}
+          emptyText={
+            partOfSlot(picker.index)
+              ? draft.slots[picker.index]?.size.trim()
+                ? t("orders.quick.noPartInSize", {
+                    part: partLabel(partOfSlot(picker.index)),
+                    size: draft.slots[picker.index].size.trim(),
+                  })
+                : t("orders.quick.noPart", { part: partLabel(partOfSlot(picker.index)) })
+              : undefined
+          }
         />
       )}
 
@@ -1351,10 +1302,10 @@ export function OrderQuickForm({
           key={sizePicker.n}
           open={sizePicker.open}
           onOpenChange={(open) => (open ? null : setSizePicker({ ...sizePicker, open: false }))}
-          title={sizeTitle(sizePicker.field)}
+          title={`${t("stock.size")} · ${partLabel(partOfSlot(sizePicker.index))}`}
           sizes={SUIT_SIZES}
-          value={sizeValue(sizePicker.field)}
-          onPick={(value) => pickSize(sizePicker.field, value)}
+          value={draft.slots[sizePicker.index]?.size ?? ""}
+          onPick={(value) => pickSize(sizePicker.index, value)}
         />
       )}
 

@@ -3,10 +3,13 @@
  * (navigateur) et la page de modification (serveur), qui en fabrique un à
  * partir d'une commande existante.
  *
- * Une commande se saisit comme une LIGNE de son AppSheet : quatre cases fixes
- * (costume, chemise, chaussures, accessoires), puis des pièces en plus si
- * besoin. Chaque case est un vêtement nommé, ou une pièce du STOCK — la seule
- * qui bloque des dates.
+ * Une commande se saisit comme une LIGNE de son AppSheet : six cases fixes
+ * (veste, gilet, pantalon, chemise, chaussures, accessoires), puis des pièces
+ * en plus si besoin. Chaque case est un vêtement nommé, ou une pièce du STOCK —
+ * la seule qui bloque des dates.
+ *
+ * Le costume se saisit PARTIE PAR PARTIE : une case par pièce, chacune avec sa
+ * taille et sa pièce du stock — la veste d'un costume, le pantalon d'un autre.
  */
 
 export type Slot = {
@@ -25,18 +28,18 @@ export type Slot = {
 };
 
 export type QuickDraft = {
-  v: 2;
+  v: 3;
   customerName: string;
   customerPhone: string;
   eventDate: string;
   pickup: string;
   returnDue: string;
   datesTouched: boolean;
-  /** 0 costume, 1 chemise, 2 chaussures, 3 accessoires, puis les pièces en plus. */
+  /**
+   * 0 veste, 1 gilet, 2 pantalon, 3 chemise, 4 chaussures, 5 accessoires, puis
+   * les pièces en plus.
+   */
   slots: Slot[];
-  /** Tailles du costume au-delà de la veste (case 0) : « Taille Gelly » et pantalon. */
-  vestSize: string;
-  pantsSize: string;
   tailor: string;
   /** « Allez valide » / « Retour valide » de son formulaire AppSheet. */
   pickedUp: boolean;
@@ -57,20 +60,42 @@ export const EMPTY_SLOT: Slot = {
   stockPrice: null,
   external: null,
 };
-export const FIXED_SLOTS = 4;
-export const ACCESSORIES_SLOT = 3;
+export const FIXED_SLOTS = 6;
+export const ACCESSORIES_SLOT = 5;
+
+/** Les cases du costume : une par partie, la veste d'abord. */
+export const PART_SLOTS = ["veste", "gilet", "pantalon"] as const;
+export type SlotPart = (typeof PART_SLOTS)[number];
+
+/** La partie de costume d'une case (0 veste, 1 gilet, 2 pantalon), sinon `null`. */
+export function partOfSlot(index: number): SlotPart | null {
+  return PART_SLOTS[index] ?? null;
+}
+
+/**
+ * Case de la saisie → colonne de son AppSheet, numérotée comme `slot` des
+ * suggestions (1 tenue, 2 chemise, 3 chaussures, 4 accessoires). Les trois
+ * parties du costume sont la colonne « tenue ». Une pièce en plus : `null`.
+ */
+export function catalogSlotOf(index: number): number | null {
+  if (index < PART_SLOTS.length) return 1;
+  return index < FIXED_SLOTS ? index - PART_SLOTS.length + 2 : null;
+}
+
+/** L'inverse : colonne de son AppSheet (1…4) → case de la saisie. */
+function slotOfCatalog(column: number): number {
+  return column <= 1 ? 0 : Math.min(column, 4) + PART_SLOTS.length - 2;
+}
 
 export const EMPTY_DRAFT: QuickDraft = {
-  v: 2,
+  v: 3,
   customerName: "",
   customerPhone: "",
   eventDate: "",
   pickup: "",
   returnDue: "",
   datesTouched: false,
-  slots: [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT],
-  vestSize: "",
-  pantsSize: "",
+  slots: Array.from({ length: FIXED_SLOTS }, () => EMPTY_SLOT),
   tailor: "",
   pickedUp: false,
   returned: false,
@@ -109,18 +134,21 @@ export function splitCostumeSize(size: string | null): {
   return out;
 }
 
-/** Catégories du stock → case de la saisie (0 costume … 3 accessoires). */
+/**
+ * Catégories du stock (ou partie d'un costume) → case de la saisie. Un
+ * costume d'avant le partage en pièces va sur la veste.
+ */
 const CATEGORY_SLOT: Record<string, number> = {
   costume: 0,
   veste: 0,
-  pantalon: 0,
-  gilet: 0,
-  chemise: 1,
-  chaussures: 2,
-  bligha: 2,
-  noeud: 3,
-  accessoire: 3,
-  barnous: 3,
+  gilet: 1,
+  pantalon: 2,
+  chemise: 3,
+  chaussures: 4,
+  bligha: 4,
+  noeud: 5,
+  accessoire: 5,
+  barnous: 5,
 };
 
 export type EditableOrder = {
@@ -171,11 +199,9 @@ export function draftFromOrder(
     defaultWindow: { pickup: string; returnDue: string };
   },
 ): QuickDraft {
-  const slots: Slot[] = [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT].map((s) => ({ ...s }));
+  const slots: Slot[] = EMPTY_DRAFT.slots.map((s) => ({ ...s }));
   const extra: Slot[] = [];
   let tailor = "";
-  let vestSize = "";
-  let pantsSize = "";
   let cursor = 0;
 
   for (const line of order.order_lines) {
@@ -188,13 +214,15 @@ export function draftFromOrder(
       preferred = slug ? (CATEGORY_SLOT[slug] ?? null) : null;
     } else if (!line.external_label) {
       const hint = slotOf(name);
-      preferred = hint ? Math.min(hint, 4) - 1 : null;
+      preferred = hint ? slotOfCatalog(hint) : null;
     }
 
     let index: number | null = null;
     if (preferred !== null && !slots[preferred].name) index = preferred;
     else if (preferred === null) {
       for (let i = cursor; i < slots.length; i++) {
+        // Gilet et pantalon ne prennent qu'une pièce du STOCK.
+        if (i > 0 && partOfSlot(i)) continue;
         if (!slots[i].name) {
           index = i;
           break;
@@ -226,12 +254,8 @@ export function draftFromOrder(
       extra.push(slot);
       continue;
     }
-    if (index === 0 && !line.unit_id) {
-      const sizes = splitCostumeSize(line.size_snapshot);
-      slot.size = sizes.jacket;
-      vestSize = sizes.vest;
-      pantsSize = sizes.pants;
-    }
+    // Un costume NOMMÉ (hors stock, d'avant les cases par partie) reste sur la
+    // veste avec sa taille entière, « 50 · G 48 · P 52 », telle quelle.
     slots[index] = slot;
     cursor = Math.max(cursor, index + 1);
   }
@@ -249,8 +273,6 @@ export function draftFromOrder(
       order.pickup_date !== defaultWindow.pickup ||
       order.return_due_date !== defaultWindow.returnDue,
     slots: [...slots, ...extra],
-    vestSize,
-    pantsSize,
     tailor,
     pickedUp: order.picked_up,
     returned: order.returned,

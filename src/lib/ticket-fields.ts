@@ -1,4 +1,9 @@
-import { draftFromOrder, type EditableOrder, type Slot } from "@/lib/quick-draft";
+import {
+  draftFromOrder,
+  splitCostumeSize,
+  type EditableOrder,
+  type Slot,
+} from "@/lib/quick-draft";
 
 /**
  * Les champs d'une commande tels que son AppSheet les présentait — costume,
@@ -37,17 +42,24 @@ export function ticketFields(
     defaultWindow: { pickup: order.pickup_date, returnDue: order.return_due_date },
   });
 
-  // Un costume DU STOCK, c'est une veste et un pantalon, deux pièces : la
-  // seconde n'a pas de case à elle. Sa taille va sur « Taille pantalon » (ou
-  // « gilet ») au lieu de s'égarer dans les accessoires.
-  const [costume, shirt, shoes, accessory, ...extras] = draft.slots;
-  let pantsSize = draft.pantsSize;
-  let vestSize = draft.vestSize;
+  // Le costume : une case par partie — veste, gilet, pantalon.
+  const [jacket, vest, pants, shirt, shoes, accessory, ...extras] = draft.slots;
+  // Costume NOMMÉ, d'avant les cases par partie : toutes ses tailles tiennent
+  // dans la case de la veste, « 50 · G 48 · P 52 ».
+  const legacy = jacket?.name && !jacket.unitId ? splitCostumeSize(jacket.size) : null;
+  let jacketSize = legacy ? legacy.jacket : (jacket?.name ? jacket.size : "");
+  let vestSize = legacy ? legacy.vest : (vest?.name ? vest.size : "");
+  // Pantalon non précisé = même taille que la veste, comme sur son tableur.
+  let pantsSize = legacy ? legacy.pants || legacy.jacket : (pants?.name ? pants.size : "");
+
+  // Une seconde partie de costume (deux pantalons…) donne sa taille si la
+  // sienne manque, au lieu de s'égarer dans les accessoires.
   const others: Slot[] = [];
   for (const slot of extras) {
     const slug = slot.unitId ? categoryOfUnit(slot.unitId) : null;
     if (slug === "pantalon" && !pantsSize) pantsSize = slot.size;
     else if (slug === "gilet" && !vestSize) vestSize = slot.size;
+    else if (slug === "veste" && !jacketSize) jacketSize = slot.size;
     else others.push(slot);
   }
 
@@ -56,13 +68,13 @@ export function ticketFields(
     const name = slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
     return withSize && slot.size ? `${name} (${slot.size})` : name;
   };
+  const costume = [jacket, vest, pants].map((s) => piece(s, false)).filter(Boolean).join(" · ");
 
   return {
-    costume: piece(costume, false),
-    jacketSize: costume?.name ? costume.size || null : null,
-    vestSize: costume?.name ? vestSize || null : null,
-    // Pantalon non précisé = même taille que la veste, comme sur son tableur.
-    pantsSize: costume?.name ? pantsSize || costume.size || null : null,
+    costume: costume || null,
+    jacketSize: jacketSize || null,
+    vestSize: vestSize || null,
+    pantsSize: pantsSize || null,
     tailor: draft.tailor || null,
     shirt: piece(shirt),
     shoes: piece(shoes),

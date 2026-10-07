@@ -204,8 +204,9 @@
       "tailor": "الخياط",
       "tailorPlaceholder": "مثال: COME 14 CM + SLIMI",
       "addOther": "إضافة قطعة",
-      "complete": "كاملة",
-      "partBlocked": "{part}: {reason}",
+      "pickPart": "اختر من المخزون",
+      "noPart": "لا توجد {part} في المخزون.",
+      "noPartInSize": "لا توجد {part} بمقاس {size} في المخزون.",
       "payment": "الدفع",
       "price": "سعر البدلة",
       "paidAll": "مدفوع بالكامل ({amount})",
@@ -444,6 +445,7 @@
     "noAccount": "ليس لديك حساب بعد؟ اطلبه من مسؤول المحل."
   },
   "errors": {
+    "partNeedsStock": "{part} {size}: اختر قطعة من المخزون، أو امسح المقاس.",
     "partsMin": "حدّد قطعتين على الأقل (مثلاً سترة + سروال).",
     "unitUnavailable": "هذه القطعة محجوزة بالفعل في هذه التواريخ.",
     "generic": "حدث خطأ. أعد المحاولة.",

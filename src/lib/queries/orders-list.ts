@@ -152,11 +152,10 @@ export async function getOrdersTable(
 
 /** « 50 · G 48 · P 52 » — le pantalon n'est écrit que s'il diffère de la veste. */
 function costumeSizes(fields: TicketFields): string | null {
-  if (!fields.jacketSize) return null;
-  const parts = [fields.jacketSize];
+  const parts = fields.jacketSize ? [fields.jacketSize] : [];
   if (fields.vestSize) parts.push(`G ${fields.vestSize}`);
   if (fields.pantsSize && fields.pantsSize !== fields.jacketSize) parts.push(`P ${fields.pantsSize}`);
-  return parts.join(" · ");
+  return parts.join(" · ") || null;
 }
 
 /**
