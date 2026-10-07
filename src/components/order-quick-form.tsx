@@ -467,11 +467,13 @@ export function OrderQuickForm({
     const unitOption = (id: number, featured: boolean): PickerOption => {
       const { unit, name, price } = unitIndex.get(id)!;
       const { reason, taken, elsewhere } = unitState(id, index);
+      // Le NOM seulement, à la demande du client : la référence encombrait la
+      // ligne. Elle reste trouvable par la recherche.
+      const label = unit.part ? `${name} · ${partLabel(unit.part)}` : name;
       return {
         key: `u:${id}`,
-        label: unit.part
-          ? `${name} · ${unit.ref_code} — ${partLabel(unit.part)}`
-          : `${name} · ${unit.ref_code}`,
+        label,
+        search: `${label} ${unit.ref_code}`,
         secondary: (
           <>
             <Package className="text-gold-strong me-1 inline size-3" aria-hidden />

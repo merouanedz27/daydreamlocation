@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 export type PickerOption = {
   key: string;
   label: string;
+  /** Texte cherché à la place du libellé — la référence, sans l'afficher. */
+  search?: string;
   secondary?: React.ReactNode;
   trailing?: React.ReactNode;
   disabled?: boolean;
@@ -90,7 +92,7 @@ export function ListPicker({
   const visible = useMemo(() => {
     if (!q) return options.filter((o) => o.featured || picked.includes(o.key));
     const hits = options
-      .map((o, i) => ({ o, i, n: normalizeSearch(o.label) }))
+      .map((o, i) => ({ o, i, n: normalizeSearch(o.search ?? o.label) }))
       .filter(({ n }) => n.includes(q));
     // Ce qui COMMENCE par la recherche d'abord, puis les choix habituels,
     // puis l'ordre alphabétique d'origine.
