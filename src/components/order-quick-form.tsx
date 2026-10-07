@@ -59,7 +59,7 @@ import {
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import { SUIT_SIZES } from "@/lib/sizes";
+import { SUIT_SIZES, sizeSeries, sortSizes } from "@/lib/sizes";
 import { HighlightText } from "@/components/highlight";
 import type {
   CustomerSuggestion,
@@ -150,6 +150,8 @@ const FIELD_TARGETS = [
   ["part_0", "q-slot-0"],
   ["part_1", "q-slot-1"],
   ["part_2", "q-slot-2"],
+  ["part_3", "q-slot-3"],
+  ["part_4", "q-slot-4"],
   ["lines", "q-slot-0"],
   ["price", "q-price"],
   ["amount_paid", "q-paid"],
@@ -169,6 +171,13 @@ const SLOT_CATEGORIES: Record<number, string[]> = {
   3: ["chaussures", "bligha"],
   4: ["noeud", "accessoire", "barnous"],
 };
+
+/**
+ * Cases qui ne proposent QUE leurs pièces du stock — ni les vêtements déjà
+ * saisis à la main, ni un nouveau tapé dans la recherche (demande du client
+ * pour les chaussures).
+ */
+const STOCK_ONLY_SLOTS = new Set([3]);
 
 /** Pas des boutons − / + des montants : les prix se comptent en 500 DA. */
 const MONEY_STEP = 500;
@@ -206,6 +215,24 @@ export function OrderQuickForm({
   const { locale } = useParams<{ locale: Locale }>();
   const router = useRouter();
   const partLabel = (part: string | null) => (part ? t(`stock.parts.${part}`) : "");
+  const slotLabel = (index: number) =>
+    partOfSlot(index)
+      ? partLabel(partOfSlot(index))
+      : index === 3
+        ? t("orders.quick.shirt")
+        : index === 4
+          ? t("orders.quick.shoes")
+          : index === ACCESSORIES_SLOT
+            ? t("orders.quick.accessories")
+            : t("orders.quick.other");
+
+  /**
+   * Veste, gilet, pantalon, chemise, chaussures : la TAILLE d'abord, puis la
+   * pièce du stock dans cette taille — une liste courte, pas tout le stock.
+   */
+  // Chemise (3) : en attente — le patron n'a pas encore mis ses chemises en
+  // stock. Elle garde sa liste seule ; retirer `index !== 3` lui rend sa taille.
+  const sizedSlot = (index: number) => index < ACCESSORIES_SLOT && index !== 3;
   const [isPending, startTransition] = useTransition();
   // En modification, un brouillon EN MÉMOIRE parti de la commande : le
   // brouillon de nouvelle commande gardé dans le téléphone n'est pas touché.
@@ -344,13 +371,12 @@ export function OrderQuickForm({
       delete issues.pickup_date;
       delete issues.return_due_date;
     }
-    // Veste, gilet, pantalon : une taille choisie veut une pièce du STOCK.
-    PART_SLOTS.forEach((part, index) => {
-      const slot = draft.slots[index];
-      if (slot?.size.trim() && !slot.unitId && !slot.name.trim()) {
+    // Une taille choisie sans pièce : la case attend sa pièce du stock.
+    draft.slots.forEach((slot, index) => {
+      if (sizedSlot(index) && slot.size.trim() && !slot.unitId && !slot.name.trim()) {
         issues[`part_${index}`] = {
           key: "errors.partNeedsStock",
-          values: { part: partLabel(part), size: slot.size.trim() },
+          values: { part: slotLabel(index), size: slot.size.trim() },
         };
       }
     });
@@ -458,6 +484,30 @@ export function OrderQuickForm({
     return { reason, taken: material || Boolean(blocked), elsewhere };
   }
 
+  /** Cette pièce du stock va-t-elle dans la case `index` ? */
+  function unitFitsSlot(
+    index: number,
+    model: PickerModel,
+    unit: PickerModel["units"][number],
+  ): boolean {
+    const part = partOfSlot(index);
+    if (part) return (unit.part ?? model.category_slug) === part;
+    const slotNo = catalogSlotOf(index);
+    return Boolean(slotNo && SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""));
+  }
+
+  /** Les tailles proposées : la série habituelle, plus celles du stock (M, L…). */
+  function slotSizes(index: number): string[] {
+    const series = partOfSlot(index)
+      ? SUIT_SIZES
+      : sizeSeries(index === 3 ? "chemise" : "chaussures");
+    const stock: string[] = [];
+    for (const { model, unit } of unitIndex.values()) {
+      if (unitFitsSlot(index, model, unit) && unit.size) stock.push(unit.size);
+    }
+    return sortSizes([...series, ...stock]);
+  }
+
   function pickerOptions(index: number): PickerOption[] {
     const slotNo = catalogSlotOf(index);
     // Une pièce EN PLUS peut être n'importe quoi : tout est proposé.
@@ -487,15 +537,16 @@ export function OrderQuickForm({
       };
     };
 
-    // Veste, gilet, pantalon : le STOCK seulement, de cette partie, dans la
-    // taille choisie. L'équipe FAIT DÉFILER plutôt que de chercher : les
-    // pièces libres d'abord, rangées par taille puis par référence.
-    const part = partOfSlot(index);
-    if (part) {
-      const size = draft.slots[index]?.size.trim() ?? "";
+    // Veste, gilet, pantalon, chaussures — et la chemise une fois sa taille
+    // choisie : les pièces du stock de CETTE case, dans la taille choisie.
+    // L'équipe FAIT DÉFILER plutôt que de chercher : les pièces libres
+    // d'abord, rangées par taille puis par référence.
+    const size = sizedSlot(index) ? (draft.slots[index]?.size.trim() ?? "") : "";
+    const stockOnly = Boolean(partOfSlot(index)) || (slotNo !== null && STOCK_ONLY_SLOTS.has(slotNo));
+    if (stockOnly || size) {
       const rows: { option: PickerOption; size: string; ref: string }[] = [];
       for (const [id, { model, unit }] of unitIndex) {
-        if ((unit.part ?? model.category_slug) !== part) continue;
+        if (!unitFitsSlot(index, model, unit)) continue;
         if (size && (unit.size ?? "").trim() !== size) continue;
         rows.push({ option: unitOption(id, true), size: unit.size ?? "", ref: unit.ref_code ?? "" });
       }
@@ -505,7 +556,12 @@ export function OrderQuickForm({
           a.size.localeCompare(b.size, undefined, { numeric: true }) ||
           a.ref.localeCompare(b.ref, undefined, { numeric: true }),
       );
-      return rows.map((r) => r.option);
+      options.push(...rows.map((r) => r.option));
+      // Chemise : ses chemises saisies à la main restent trouvables en tapant.
+      if (!stockOnly) {
+        for (const item of items) options.push({ key: `h:${item.label}`, label: item.label });
+      }
+      return options;
     }
 
     // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
@@ -620,7 +676,8 @@ export function OrderQuickForm({
    */
   function pickSize(index: number, value: string) {
     const slot = store.get().slots[index];
-    const stale = slot.unitId && (unitIndex.get(slot.unitId)?.unit.size ?? "") !== value;
+    const stale =
+      slot.unitId && (unitIndex.get(slot.unitId)?.unit.size ?? "").trim() !== value;
     setSlot(
       index,
       stale
@@ -630,10 +687,10 @@ export function OrderQuickForm({
     setSizePicker((p) => (p ? { ...p, open: false } : p));
   }
 
-  /** « Taille · Veste » — le titre des listes d'une partie du costume. */
-  const partTitle = (index: number) => {
+  /** « Veste · Taille 50 » — le titre de la liste d'une case à taille. */
+  const sizedTitle = (index: number) => {
     const size = draft.slots[index]?.size.trim();
-    const label = partLabel(partOfSlot(index));
+    const label = slotLabel(index);
     return size ? `${label} · ${t("stock.size")} ${size}` : label;
   };
 
@@ -787,17 +844,6 @@ export function OrderQuickForm({
         returnDue: formatDate(returnDue, locale),
       })
     : "";
-
-  const slotLabel = (index: number) =>
-    partOfSlot(index)
-      ? partLabel(partOfSlot(index))
-      : index === 3
-        ? t("orders.quick.shirt")
-        : index === 4
-          ? t("orders.quick.shoes")
-          : index === ACCESSORIES_SLOT
-            ? t("orders.quick.accessories")
-            : t("orders.quick.other");
 
   return (
     <form onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate>
@@ -1005,14 +1051,13 @@ export function OrderQuickForm({
                     }
                     className="h-12 text-base"
                   />
-                ) : part ? (
-                  // Veste, gilet, pantalon : la TAILLE d'abord, puis la pièce
-                  // du stock dans cette taille.
+                ) : sizedSlot(index) ? (
+                  // La TAILLE d'abord, puis la pièce du stock dans cette taille.
                   <div className="flex gap-2">
                     <button
                       type="button"
                       id={`q-size-${index}`}
-                      aria-label={`${t("stock.size")} · ${partLabel(part)}`}
+                      aria-label={`${t("stock.size")} · ${slotLabel(index)}`}
                       onClick={() => setSizePicker({ index, n: Date.now(), open: true })}
                       data-invalid={partIssue ? true : undefined}
                       className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 data-[invalid=true]:border-destructive flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-md border outline-none focus-visible:ring-[3px]"
@@ -1032,7 +1077,9 @@ export function OrderQuickForm({
                       id={`q-slot-${index}`}
                       className="min-w-0 flex-1"
                       value={slot.name}
-                      placeholder={t("orders.quick.pickPart")}
+                      placeholder={t(
+                        part || index === 4 ? "orders.quick.pickPart" : "orders.quick.pickPlaceholder",
+                      )}
                       onOpen={() => openPicker(index)}
                       onClear={() => applyPicked(index, [])}
                       invalid={Boolean(partIssue) || (!!issues.lines && index === 0)}
@@ -1277,23 +1324,25 @@ export function OrderQuickForm({
           key={picker.n}
           open={picker.open}
           onOpenChange={(open) => (open ? null : closePicker())}
-          title={partOfSlot(picker.index) ? partTitle(picker.index) : slotLabel(picker.index)}
+          title={sizedSlot(picker.index) ? sizedTitle(picker.index) : slotLabel(picker.index)}
           options={pickerOptions(picker.index)}
           selected={selectedKeys(picker.index)}
           onDone={(keys) => applyPicked(picker.index, keys)}
           // Veste, gilet, pantalon : du stock seulement.
-          allowNew={!partOfSlot(picker.index)}
+          allowNew={
+            !partOfSlot(picker.index) && !STOCK_ONLY_SLOTS.has(catalogSlotOf(picker.index) ?? 0)
+          }
           // Les cases fixes : un toucher choisit et referme. « + Autre pièce »
           // garde ses cases à cocher et « Valider » (cravate + ceinture…).
           instant={picker.index < FIXED_SLOTS}
           emptyText={
-            partOfSlot(picker.index)
+            sizedSlot(picker.index)
               ? draft.slots[picker.index]?.size.trim()
                 ? t("orders.quick.noPartInSize", {
-                    part: partLabel(partOfSlot(picker.index)),
+                    part: slotLabel(picker.index),
                     size: draft.slots[picker.index].size.trim(),
                   })
-                : t("orders.quick.noPart", { part: partLabel(partOfSlot(picker.index)) })
+                : t("orders.quick.noPart", { part: slotLabel(picker.index) })
               : undefined
           }
         />
@@ -1304,8 +1353,8 @@ export function OrderQuickForm({
           key={sizePicker.n}
           open={sizePicker.open}
           onOpenChange={(open) => (open ? null : setSizePicker({ ...sizePicker, open: false }))}
-          title={`${t("stock.size")} · ${partLabel(partOfSlot(sizePicker.index))}`}
-          sizes={SUIT_SIZES}
+          title={`${t("stock.size")} · ${slotLabel(sizePicker.index)}`}
+          sizes={slotSizes(sizePicker.index)}
           value={draft.slots[sizePicker.index]?.size ?? ""}
           onPick={(value) => pickSize(sizePicker.index, value)}
         />

@@ -202,7 +202,7 @@
       "other": "Autre pièce",
       "size": "Taille",
       "tailor": "Tailleur",
-      "tailorPlaceholder": "ex. COME 14 CM + SLIMI",
+      "tailorPlaceholder": "Exemple : 90 CM + Slimi",
       "addOther": "Ajouter une pièce",
       "pickPart": "Choisir dans le stock",
       "noPart": "Aucun(e) {part} dans le stock.",
