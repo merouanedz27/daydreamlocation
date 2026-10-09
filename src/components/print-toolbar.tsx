@@ -14,8 +14,8 @@ import { Link } from "@/i18n/navigation";
  * pour l'envoyer au client, sans bibliothèque PDF — qui gère mal l'arabe.
  *
  * `action` : un bouton propre au document, AVANT « Imprimer » — le bon y met
- * « Partager le PDF » (voir `ticket-share.tsx`), « Imprimer » passe alors en
- * second plan.
+ * « Partager / imprimer le PDF » (voir `ticket-share.tsx`) et retire
+ * « Imprimer » (`printButton={false}`).
  */
 export function PrintToolbar({
   backHref,
@@ -63,9 +63,9 @@ export function PrintToolbar({
         </div>
       </div>
 
-      {/* Le document a ses PROPRES boutons (le bon : Partager / Imprimer) :
-          sur leur ligne — à 390 px, à côté du retour et de la langue, ils
-          débordaient de l'écran. Le dernier prend la place qui reste. */}
+      {/* Le document a son PROPRE bouton (le bon : Partager / imprimer le
+          PDF) : sur sa ligne, toute la largeur — à 390 px, à côté du retour et
+          de la langue, il débordait de l'écran. */}
       {!printButton && action && (
         <div className="mt-2 flex gap-2 [&>*:last-child]:flex-1">{action}</div>
       )}
