@@ -14,6 +14,15 @@ export const signInSchema = z.object({
 
 export type SignInInput = z.infer<typeof signInSchema>;
 
+/** Changer SON nom affiché. Mêmes bornes que `set_own_full_name` en base. */
+export const displayNameSchema = z.object({
+  full_name: z
+    .string()
+    .trim()
+    .min(2, { message: "errors.nameTooShort" })
+    .max(80, { message: "errors.nameTooLong" }),
+});
+
 /**
  * Changer SON PROPRE mot de passe. Mêmes bornes que `resetPasswordSchema`
  * (`validation/team.ts`) : ≥ 8 pour GoTrue, ≤ 72 parce que bcrypt tronque.

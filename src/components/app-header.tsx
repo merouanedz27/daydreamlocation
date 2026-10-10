@@ -255,7 +255,7 @@ export function AppHeader({
               <DropdownMenuItem asChild>
                 <Link href="/mot-de-passe">
                   <KeyRound className="size-4" aria-hidden />
-                  {t("account.changePassword")}
+                  {t("account.profileTitle")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

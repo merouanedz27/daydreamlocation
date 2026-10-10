@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { CalendarClock, TrendingUp } from "lucide-react";
+import { CalendarClock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Link } from "@/i18n/navigation";
 import { RevenueChart, StockChart } from "@/components/dashboard-charts";
 import { DashboardResult } from "@/components/dashboard-result";
+import { UnpaidList } from "@/components/unpaid-list";
 import { requireOwner } from "@/lib/auth";
 import { getDashboardStats, getUnpaidOrders } from "@/lib/queries/dashboard";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -32,10 +32,9 @@ export default async function DashboardPage({
   const t = await getTranslations();
   const l = locale as Locale;
 
-  const [stats, unpaid] = await Promise.all([getDashboardStats(), getUnpaidOrders()]);
+  const [stats, unpaid] = await Promise.all([getDashboardStats(), getUnpaidOrders(null)]);
 
   const kpis = [
-    { label: t("dashboard.today"), value: stats.revenue.day },
     { label: t("dashboard.thisWeek"), value: stats.revenue.week },
     { label: t("dashboard.thisMonth"), value: stats.revenue.month },
     { label: t("dashboard.thisYear"), value: stats.revenue.year },
@@ -62,12 +61,48 @@ export default async function DashboardPage({
         </p>
       </section>
 
-      {/* 1. Locations sur quatre périodes calendaires complètes. */}
+      {/* 1. La CAISSE du jour, telle que le patron la compte : les acomptes
+          pris aujourd'hui + les restes soldés aujourd'hui, toutes commandes
+          confondues (journal `order_payments`). */}
+      <section className="mt-8">
+        <h2 className="text-lg">{t("dashboard.cashTitle")}</h2>
+        <dl className="mt-3 grid grid-cols-2 gap-3">
+          <div className="border-border rounded-lg border p-4">
+            <dt className="text-muted-foreground truncate text-sm">{t("dashboard.paidToday")}</dt>
+            <dd className="tabular mt-1 text-xl font-medium">
+              {formatMoney(stats.cashToday.versement, l)}
+            </dd>
+          </div>
+          <div className="border-border rounded-lg border p-4">
+            <dt className="text-muted-foreground truncate text-sm">{t("dashboard.restToday")}</dt>
+            <dd className="tabular mt-1 text-xl font-medium">
+              {formatMoney(stats.cashToday.reste, l)}
+            </dd>
+          </div>
+          <div className="border-gold-strong/40 bg-gold-soft/40 col-span-2 rounded-lg border p-4">
+            <dt className="text-muted-foreground truncate text-sm">{t("dashboard.cashToday")}</dt>
+            <dd className="tabular mt-1 text-2xl font-medium">
+              {formatMoney(stats.cashToday.versement + stats.cashToday.reste, l)}
+            </dd>
+          </div>
+        </dl>
+        {stats.cashToday.since && (
+          <p className="text-muted-foreground mt-2 text-xs">
+            {t("dashboard.cashHint", { date: formatDate(stats.cashToday.since, l) })}
+          </p>
+        )}
+      </section>
+
+      {/* 2. Locations sur trois périodes calendaires complètes. */}
       <section className="mt-8">
         <h2 className="text-lg">{t("dashboard.revenue")}</h2>
-        <dl className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <dl className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
           {kpis.map((k) => (
-            <div key={k.label} className="border-border rounded-lg border p-4">
+            // Trois cartes sur deux colonnes : la dernière prend la ligne entière.
+            <div
+              key={k.label}
+              className="border-border rounded-lg border p-4 last:col-span-2 lg:last:col-span-1"
+            >
               <dt className="text-muted-foreground truncate text-sm">{k.label}</dt>
               <dd className="tabular mt-1 text-xl font-medium">
                 {formatMoney(k.value, l)}
@@ -77,9 +112,9 @@ export default async function DashboardPage({
         </dl>
 
         {/* CE QUI RÉPOND AU « POURQUOI 0 ? ».
-            Les quatre cartes ci-dessus ne comptent que ce qui SORT du magasin
+            Les cartes ci-dessus ne comptent que ce qui SORT du magasin
             pendant la période. Un registre entièrement fait de mariages de
-            décembre affiche donc quatre zéros en septembre, tout en étant
+            décembre affiche donc des zéros en septembre, tout en étant
             parfaitement juste — et ressemble à un écran cassé.
             Cette ligne dit ce qui est déjà réservé. Elle reste SÉPARÉE des
             cartes et ne s'additionne à aucune : ce n'est pas encore du chiffre
@@ -158,39 +193,7 @@ export default async function DashboardPage({
             ) : (
               <>
                 <Separator className="my-4" />
-                <ul className="space-y-2">
-                  {unpaid.map((o) => (
-                    <li key={o.id}>
-                      <Link
-                        href={`/commandes/${o.id}`}
-                        className="hover:bg-accent -mx-2 flex min-h-11 items-center gap-3 rounded-md px-2"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">
-                            {o.customer_name}
-                          </span>
-                          <span className="text-muted-foreground block truncate text-xs">
-                            <bdi>{o.order_no}</bdi>
-                            {" · "}
-                            <span className="tabular">{formatDate(o.event_date, l)}</span>
-                          </span>
-                        </span>
-                        <span className="text-warning-foreground tabular shrink-0 text-sm font-medium">
-                          {formatMoney(o.balance ?? 0, l)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-
-                {stats.unpaid.count > unpaid.length && (
-                  <p className="text-muted-foreground mt-3 flex items-center gap-1 text-xs">
-                    <TrendingUp className="size-3" aria-hidden />
-                    {t("dashboard.unpaidMore", {
-                      count: formatNumber(stats.unpaid.count - unpaid.length, l),
-                    })}
-                  </p>
-                )}
+                <UnpaidList orders={unpaid} locale={l} />
               </>
             )}
           </div>

@@ -507,6 +507,10 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      set_own_full_name: {
+        Args: { p_name: string };
+        Returns: undefined;
+      };
       set_pressing: {
         Args: {
           p_unit_ids: number[];

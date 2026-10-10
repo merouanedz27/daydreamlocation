@@ -30,9 +30,12 @@ export function ticketFields(
   {
     slotOf,
     categoryOfUnit,
+    hideRefs = {},
   }: {
     slotOf: (label: string) => number | null;
     categoryOfUnit: (unitId: number) => string | null;
+    /** Colonnes affichées SANS la référence — la liste des commandes. */
+    hideRefs?: { costume?: boolean; shoes?: boolean };
   },
 ): TicketFields {
   const draft = draftFromOrder(order, {
@@ -63,12 +66,12 @@ export function ticketFields(
     else others.push(slot);
   }
 
-  const piece = (slot: Slot | undefined, withSize = true) => {
+  const piece = (slot: Slot | undefined, withSize = true, withRef = true) => {
     if (!slot?.name) return null;
-    const name = slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
+    const name = withRef && slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
     return withSize && slot.size ? `${name} (${slot.size})` : name;
   };
-  const costume = [jacket, vest, pants].map((s) => piece(s, false)).filter(Boolean).join(" · ");
+  const costume = [jacket, vest, pants].map((s) => piece(s, false, !hideRefs.costume)).filter(Boolean).join(" · ");
 
   return {
     costume: costume || null,
@@ -77,7 +80,7 @@ export function ticketFields(
     pantsSize: pantsSize || null,
     tailor: draft.tailor || null,
     shirt: piece(shirt),
-    shoes: piece(shoes),
+    shoes: piece(shoes, true, !hideRefs.shoes),
     accessories: [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
   };
 }

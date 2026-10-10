@@ -133,7 +133,13 @@ export async function getOrdersTable(
     }
     const fields = ticketFields(
       { ...order, notes: null, order_lines: lines },
-      { slotOf, categoryOfUnit: (id) => categoryByUnit.get(id) ?? null },
+      // Costume et chaussures : le nom (et la taille) seulement — le client
+      // trouvait la référence de trop dans ces colonnes.
+      {
+        slotOf,
+        categoryOfUnit: (id) => categoryByUnit.get(id) ?? null,
+        hideRefs: { costume: true, shoes: true },
+      },
     );
     return {
       ...order,

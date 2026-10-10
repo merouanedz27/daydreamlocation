@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { DisplayNameForm } from "@/components/display-name-form";
 import { PasswordForm } from "@/components/password-form";
 import { requireProfile } from "@/lib/auth";
 import type { Locale } from "@/i18n/routing";
@@ -9,10 +10,10 @@ export async function generateMetadata(props: {
 }): Promise<Metadata> {
   const { locale } = await props.params;
   const t = await getTranslations({ locale, namespace: "account" });
-  return { title: t("changePassword") };
+  return { title: t("profileTitle") };
 }
 
-/** Pour TOUS les rôles : chacun change son propre mot de passe. */
+/** Pour TOUS les rôles : chacun change son propre nom et son mot de passe. */
 export default async function PasswordPage({
   params,
 }: {
@@ -26,16 +27,23 @@ export default async function PasswordPage({
 
   return (
     <div className="mx-auto max-w-lg">
-      <h1 className="text-2xl">{t("account.changePassword")}</h1>
-      <p className="text-muted-foreground mt-1 text-sm">
-        {t("account.changePasswordHint", { email: profile.email ?? profile.full_name })}
-      </p>
+      <h1 className="text-2xl">{t("account.profileTitle")}</h1>
+
+      <section className="mt-6">
+        <DisplayNameForm initialName={profile.full_name} />
+      </section>
 
       <div className="ornament my-6" aria-hidden>
         <span className="ornament-diamond" />
       </div>
 
-      <PasswordForm />
+      <section>
+        <h2 className="text-lg font-semibold">{t("account.changePassword")}</h2>
+        <p className="text-muted-foreground mt-1 mb-4 text-sm">
+          {t("account.changePasswordHint", { email: profile.email ?? profile.full_name })}
+        </p>
+        <PasswordForm />
+      </section>
     </div>
   );
 }

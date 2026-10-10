@@ -414,13 +414,19 @@
     "thisWeek": "Cette semaine",
     "thisMonth": "Ce mois",
     "thisYear": "Cette année",
+    "paidToday": "Versements · aujourd'hui",
+    "cashTitle": "Caisse du jour",
+    "restToday": "Reste · aujourd'hui",
+    "cashToday": "Caisse · aujourd'hui",
+    "cashHint": "Caisse suivie depuis le {date} : les jours d'avant ne sont pas comptés.",
     "result": "Résultat",
     "twelveMonths": "12 derniers mois",
     "stockState": "État du stock",
     "rented": "En location",
     "unpaid": "Impayés",
     "unpaidCount": "{count} commande(s)",
-    "unpaidMore": "et {count} autre(s)",
+    "unpaidShowAll": "Voir les {count} autres",
+    "unpaidShowLess": "Réduire",
     "allPaid": "Tout est réglé.",
     "noExpensesYet": "Aucun frais enregistré sur cette période : le bénéfice est donc égal aux locations.",
     "upcomingTitle": "Réservations à venir",
@@ -495,7 +501,9 @@
     "tooLong": "Ce texte est trop long.",
     "emailNotConfigured": "L'envoi d'e-mails n'est pas encore configuré.",
     "noRecipients": "Aucun destinataire avec une adresse e-mail.",
-    "emailFailed": "L'e-mail n'a pas pu partir. Réessayez."
+    "emailFailed": "L'e-mail n'a pas pu partir. Réessayez.",
+    "nameTooShort": "Le nom doit contenir au moins 2 caractères.",
+    "nameTooLong": "Le nom ne doit pas dépasser 80 caractères."
   },
   "update": {
     "available": "Nouvelle version de l'application disponible",
@@ -531,9 +539,21 @@
     "inactive": "Désactivé",
     "empty": "Aucun compte pour l'instant.",
     "actionsFor": "Actions pour {name}",
-    "roleTo": {"owner": "Passer administrateur", "moderator": "Passer modérateur", "staff": "Passer membre"},
-    "roleToTitle": {"owner": "Passer {name} administrateur ?", "moderator": "Passer {name} modérateur ?", "staff": "Passer {name} membre ?"},
-    "roleToBody": {"owner": "Il verra le bilan et les dépenses, et pourra gérer l'équipe.", "moderator": "Il garde les commandes et gère le stock : modèles, pièces, ensembles. Pas de bilan, ni de dépenses, ni d'équipe.", "staff": "Il garde les commandes et consulte le stock sans le modifier. Pas de bilan, ni de dépenses, ni d'équipe."},
+    "roleTo": {
+      "owner": "Passer administrateur",
+      "moderator": "Passer modérateur",
+      "staff": "Passer membre"
+    },
+    "roleToTitle": {
+      "owner": "Passer {name} administrateur ?",
+      "moderator": "Passer {name} modérateur ?",
+      "staff": "Passer {name} membre ?"
+    },
+    "roleToBody": {
+      "owner": "Il verra le bilan et les dépenses, et pourra gérer l'équipe.",
+      "moderator": "Il garde les commandes et gère le stock : modèles, pièces, ensembles. Pas de bilan, ni de dépenses, ni d'équipe.",
+      "staff": "Il garde les commandes et consulte le stock sans le modifier. Pas de bilan, ni de dépenses, ni d'équipe."
+    },
     "deactivate": "Désactiver l'accès",
     "activate": "Réactiver l'accès",
     "deactivateTitle": "Désactiver l'accès de {name} ?",
@@ -661,7 +681,12 @@
     "newPassword": "Nouveau mot de passe",
     "newPasswordHint": "8 caractères au minimum.",
     "confirmPassword": "Confirmer le nouveau mot de passe",
-    "passwordChanged": "Mot de passe changé."
+    "passwordChanged": "Mot de passe changé.",
+    "profileTitle": "Nom et mot de passe",
+    "displayName": "Nom affiché",
+    "displayNameHint": "Visible dans l'en-tête, la liste de l'équipe et les e-mails envoyés.",
+    "saveName": "Enregistrer",
+    "nameChanged": "Nom mis à jour."
   },
   "calendar": {
     "day": "Jour",

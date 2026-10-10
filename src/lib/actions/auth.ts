@@ -1,9 +1,10 @@
 "use server";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { redirectTo } from "@/i18n/navigation";
-import { changePasswordSchema, signInSchema } from "@/lib/validation/auth";
+import { changePasswordSchema, displayNameSchema, signInSchema } from "@/lib/validation/auth";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type ActionResult =
@@ -152,5 +153,37 @@ export async function changeOwnPassword(formData: FormData): Promise<PasswordRes
     return { ok: false, error: "errors.generic" };
   }
 
+  return { ok: true };
+}
+
+export type NameResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Changer SON nom affiché (en-tête, liste d'équipe, e-mails envoyés).
+ *
+ * Passe par `set_own_full_name` : la base ne laisse modifier que `full_name`,
+ * et seulement sur la ligne de l'appelant — jamais son rôle.
+ */
+export async function changeOwnName(formData: FormData): Promise<NameResult> {
+  const parsed = displayNameSchema.safeParse({ full_name: formData.get("full_name") });
+  if (!parsed.success) {
+    const message = parsed.error.issues[0].message;
+    return { ok: false, error: message.startsWith("errors.") ? message : "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "errors.forbidden" };
+
+  const { error } = await supabase.rpc("set_own_full_name", { p_name: parsed.data.full_name });
+  if (error) return { ok: false, error: "errors.generic" };
+
+  // Garde la copie de GoTrue alignée (créée avec le compte, voir `team.ts`).
+  await supabase.auth.updateUser({ data: { full_name: parsed.data.full_name } });
+
+  // Le nom s'affiche dans l'en-tête de TOUTES les pages.
+  revalidatePath("/", "layout");
   return { ok: true };
 }

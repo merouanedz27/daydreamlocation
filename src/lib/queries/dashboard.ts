@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { todayIso } from "@/lib/rental-range";
 
 /**
  * Chiffres du tableau de bord.
@@ -58,6 +59,12 @@ export type DashboardStats = {
   today: string;
   stockValue: StockValue;
   revenue: PeriodTotals;
+  /**
+   * La CAISSE du jour, tirée du journal `order_payments` : les acomptes pris
+   * aujourd'hui (`versement`) et les restes soldés aujourd'hui (`reste`), sur
+   * toutes les commandes. `since` : premier jour journalisé — avant, inconnu.
+   */
+  cashToday: { versement: number; reste: number; since: string | null };
   expenses: PeriodTotals;
   monthly: MonthlyPoint[];
   stock: StockState;
@@ -82,6 +89,7 @@ const EMPTY: DashboardStats = {
   today: new Date().toISOString().slice(0, 10),
   stockValue: { pieces: 0, total: 0 },
   revenue: { day: 0, week: 0, month: 0, year: 0 },
+  cashToday: { versement: 0, reste: 0, since: null },
   expenses: { day: 0, week: 0, month: 0, year: 0 },
   monthly: [],
   stock: { louee: 0, disponible: 0, nettoyage: 0, reparation: 0, retire: 0 },
@@ -91,7 +99,8 @@ const EMPTY: DashboardStats = {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("dashboard_stats", {});
+  // Le jour de la BOUTIQUE (Alger), pas celui de la base (UTC).
+  const { data, error } = await supabase.rpc("dashboard_stats", { p_today: todayIso() });
 
   // Un tableau de bord vide vaut mieux qu'un écran d'erreur : le reste de
   // l'application doit rester joignable même si l'agrégation échoue.
@@ -102,11 +111,17 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const unpaid = (raw.unpaid ?? {}) as Record<string, unknown>;
   const upcoming = (raw.upcoming ?? {}) as Record<string, unknown>;
   const stockValue = (raw.stockValue ?? {}) as Record<string, unknown>;
+  const cash = (raw.cash ?? {}) as Record<string, unknown>;
 
   return {
     today: String(raw.today ?? EMPTY.today),
     stockValue: { pieces: num(stockValue.pieces), total: num(stockValue.total) },
     revenue: periods(raw.revenue as Record<string, unknown>),
+    cashToday: {
+      versement: num(cash.versement),
+      reste: num(cash.reste),
+      since: cash.since ? String(cash.since) : null,
+    },
     expenses: periods(raw.expenses as Record<string, unknown>),
     monthly: ((raw.monthly ?? []) as Record<string, unknown>[]).map((m) => ({
       month: String(m.month),
@@ -144,17 +159,19 @@ export type UnpaidOrder = {
  * Les commandes qui doivent encore de l'argent, la plus grosse dette d'abord.
  *
  * Le total et le nombre viennent de `dashboard_stats` (donc de la base, sans
- * plafond) ; cette requête ne sert qu'à AFFICHER les premières lignes.
+ * plafond) ; cette requête sert à AFFICHER les lignes. `null` : toutes — le
+ * tableau de bord en montre huit et déplie le reste (`UnpaidList`).
  */
-export async function getUnpaidOrders(limit = 8): Promise<UnpaidOrder[]> {
+export async function getUnpaidOrders(limit: number | null = 8): Promise<UnpaidOrder[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  let query = supabase
     .from("orders")
     .select("id, order_no, customer_name, event_date, total_price, amount_paid, balance")
     .neq("status", "annulee")
     .gt("balance", 0)
-    .order("balance", { ascending: false })
-    .limit(limit);
+    .order("balance", { ascending: false });
+  if (limit !== null) query = query.limit(limit);
+  const { data } = await query;
 
   return (data ?? []) as UnpaidOrder[];
 }

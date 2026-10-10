@@ -192,7 +192,7 @@ export function AccountSheet({
               )}
             >
               <KeyRound className="text-muted-foreground size-5 shrink-0" aria-hidden />
-              <span className="min-w-0 flex-1 truncate">{t("account.changePassword")}</span>
+              <span className="min-w-0 flex-1 truncate">{t("account.profileTitle")}</span>
               <ChevronRight
                 className="text-muted-foreground size-4 shrink-0 rtl:-scale-x-100"
                 aria-hidden
