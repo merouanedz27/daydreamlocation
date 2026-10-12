@@ -165,10 +165,10 @@ export default async function OrderSlipPage({
         action={<TicketActions />}
       />
 
-      {/* Le format 4 × 6 posé sur TOUT le document, pas seulement sur la page
-          nommée `ticket` : Chrome sur Android ignorait la page nommée et
-          imposait ses marges (et l'URL en pied de page). Rendu dans la page,
-          ce `@page` vient après celui de globals.css et l'emporte.
+        {/* Le format 4 × 6 posé sur TOUT le document : Chrome sur Android
+          imposait parfois ses marges et l'URL en pied de page.
+          Rendu dans la page, ce `@page` vient après celui de globals.css et
+          l'emporte.
           Marge NULLE : la marge est DANS le ticket (5 mm), qui fait pile la
           taille de l'étiquette — plus de hauteur devinée. */}
       <style>{"@page { size: 4in 6in; margin: 0; }"}</style>
