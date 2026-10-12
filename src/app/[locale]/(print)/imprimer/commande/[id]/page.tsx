@@ -6,7 +6,12 @@ import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
 import { TicketFrame } from "@/components/ticket-fit";
 import { TicketPdfProvider } from "@/components/ticket-pdf";
-import { getOrder, getOrderCatalogue, getLabelSlots, getSettings } from "@/lib/queries/orders";
+import {
+  getOrder,
+  getOrderCatalogue,
+  getLabelSlots,
+  getSettings,
+} from "@/lib/queries/orders";
 import { ticketFields } from "@/lib/ticket-fields";
 import { normalizeSearch } from "@/lib/search";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -24,7 +29,9 @@ export async function generateMetadata(props: {
   // Le titre devient le NOM DU FICHIER quand on choisit « Enregistrer au
   // format PDF » : autant qu'il dise de quel bon il s'agit.
   return {
-    title: order ? `${t("slipTitle")} ${order.order_no} — ${order.customer_name}` : t("slipTitle"),
+    title: order
+      ? `${t("slipTitle")} ${order.order_no} — ${order.customer_name}`
+      : t("slipTitle"),
   };
 }
 
@@ -66,10 +73,14 @@ export default async function OrderSlipPage({
   // calcul sert à l'e-mail « Nouvelle commande » (`ticket-fields.ts`).
   const categoryByUnit = new Map<number, string | null>();
   for (const model of models) {
-    for (const unit of model.units) categoryByUnit.set(unit.id, unit.part ?? model.category_slug);
+    for (const unit of model.units)
+      categoryByUnit.set(unit.id, unit.part ?? model.category_slug);
   }
   const fields = ticketFields(
-    { ...order, order_lines: order.order_lines.filter((line) => line.is_active) },
+    {
+      ...order,
+      order_lines: order.order_lines.filter((line) => line.is_active),
+    },
     {
       slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
       categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
@@ -77,7 +88,9 @@ export default async function OrderSlipPage({
   );
 
   // Un gilet loué sans sa veste garde sa taille sur le ticket.
-  const vestPart = fields.vestSize ? `${t("print.ticket.vest")} ${fields.vestSize}` : null;
+  const vestPart = fields.vestSize
+    ? `${t("print.ticket.vest")} ${fields.vestSize}`
+    : null;
   const jacketSize =
     [fields.jacketSize, vestPart].filter(Boolean).join(" · ") || null;
 
@@ -133,8 +146,14 @@ export default async function OrderSlipPage({
   // VERS / PRIX / REST : trois lignes de plus, comme sur son modèle.
   const balance = order.balance ?? 0;
   const money: Row[] = [
-    { label: label("print.ticket.paid"), value: formatMoney(order.amount_paid, l) },
-    { label: label("print.ticket.price"), value: formatMoney(order.total_price, l) },
+    {
+      label: label("print.ticket.paid"),
+      value: formatMoney(order.amount_paid, l),
+    },
+    {
+      label: label("print.ticket.price"),
+      value: formatMoney(order.total_price, l),
+    },
     {
       label: label(balance < 0 ? "orders.toRefund" : "print.ticket.rest"),
       value: formatMoney(Math.abs(balance), l),
@@ -165,7 +184,7 @@ export default async function OrderSlipPage({
         action={<TicketActions />}
       />
 
-        {/* Le format 4 × 6 posé sur TOUT le document : Chrome sur Android
+      {/* Le format 4 × 6 posé sur TOUT le document : Chrome sur Android
           imposait parfois ses marges et l'URL en pied de page.
           Rendu dans la page, ce `@page` vient après celui de globals.css et
           l'emporte.
@@ -205,7 +224,9 @@ export default async function OrderSlipPage({
             {/* TOUJOURS imprimés, et TOUJOURS en arabe (fr.json porte le même
                 texte que ar.json) : ce sont les deux lignes de son modèle. */}
             <div lang="ar" dir="rtl">
-              <p className="underline underline-offset-2">{t("print.ticket.idRequired")}</p>
+              <p className="underline underline-offset-2">
+                {t("print.ticket.idRequired")}
+              </p>
               <p>{t("print.ticket.liability")}</p>
               {terms && <p className="whitespace-pre-line">{terms}</p>}
             </div>
@@ -253,11 +274,19 @@ type Row = RowStyle & { label: string; value: string | null };
  */
 function TicketRows({ rows, className }: { rows: Row[]; className?: string }) {
   return (
-    <div className={cn("space-y-[0.15em] text-center leading-tight", className)}>
+    <div
+      className={cn("space-y-[0.15em] text-center leading-tight", className)}
+    >
       {rows.map(({ label, value, big, underline, bullet }) => (
         <p key={label} className={cn(big && "text-[1.4em]")}>
           {bullet && <span aria-hidden>● </span>}
-          <b className={cn(underline && "underline decoration-2 underline-offset-2")}>{label}</b>
+          <b
+            className={cn(
+              underline && "underline decoration-2 underline-offset-2",
+            )}
+          >
+            {label}
+          </b>
           {value && (
             <>
               {" "}
