@@ -342,6 +342,58 @@ export type Database = {
           },
         ];
       };
+      notifications: {
+        Row: {
+          id: number;
+          recipient_id: string;
+          order_id: number | null;
+          kind: string;
+          title_key: string;
+          body_key: string;
+          payload: Json;
+          dedupe_key: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          recipient_id: string;
+          order_id?: number | null;
+          kind: string;
+          title_key: string;
+          body_key: string;
+          payload?: Json;
+          dedupe_key: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          recipient_id?: string;
+          order_id?: number | null;
+          kind?: string;
+          title_key?: string;
+          body_key?: string;
+          payload?: Json;
+          dedupe_key?: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       orders: {
         Row: {
           id: number;
@@ -461,6 +513,48 @@ export type Database = {
             columns: ["id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      push_subscriptions: {
+        Row: {
+          id: number;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          locale: string;
+          user_agent: string | null;
+          last_seen_at: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          locale?: string;
+          user_agent?: string | null;
+          last_seen_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          locale?: string;
+          user_agent?: string | null;
+          last_seen_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];

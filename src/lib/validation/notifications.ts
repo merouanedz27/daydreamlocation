@@ -19,6 +19,14 @@ export const teamMessageSchema = z.object({
 
 export const EMAIL_LOCALES = ["fr", "ar"] as const;
 
+export const pushSubscriptionSchema = z.object({
+  locale: z.enum(EMAIL_LOCALES),
+  endpoint: z.string().url().max(2048),
+  p256dh: z.string().min(1).max(512),
+  auth: z.string().min(1).max(512),
+  user_agent: z.string().max(500).optional(),
+});
+
 export const notificationPrefsSchema = z.object({
   id: z.string().uuid(),
   notify_new_order: z.boolean(),

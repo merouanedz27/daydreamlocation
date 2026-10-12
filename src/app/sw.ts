@@ -30,6 +30,42 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+type PushMessage = {
+  title?: string;
+  body?: string;
+  url?: string;
+  tag?: string;
+};
+
+self.addEventListener("push", (event) => {
+  const message = (event.data?.json() ?? {}) as PushMessage;
+  event.waitUntil(
+    self.registration.showNotification(message.title ?? "DayDream Location", {
+      body: message.body,
+      icon: "/icons/suit-192.png",
+      badge: "/icons/suit-192.png",
+      tag: message.tag,
+      data: { url: message.url ?? "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(
+    (event.notification.data as { url?: string } | undefined)?.url ?? "/",
+    self.location.origin,
+  ).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const existing = clients.find((client) => "focus" in client) as WindowClient | undefined;
+      if (existing) return existing.navigate(url).then((client) => client?.focus());
+      return self.clients.openWindow(url);
+    }),
+  );
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,

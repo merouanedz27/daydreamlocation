@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { sendTomorrowDigest } from "@/lib/email/notify";
+import { notifyDailyReminders } from "@/lib/notifications/service";
 import { addDays, todayIso } from "@/lib/rental-range";
 
 /**
@@ -29,8 +30,11 @@ export async function GET(request: Request) {
   // « Demain » à l'heure d'Alger, comme l'écran du même nom.
   const day = addDays(todayIso(), 1);
   try {
-    const sent = await sendTomorrowDigest(day);
-    return NextResponse.json({ day, sent });
+    const [sent, notifications] = await Promise.all([
+      sendTomorrowDigest(day),
+      notifyDailyReminders(todayIso()),
+    ]);
+    return NextResponse.json({ day, sent, notifications });
   } catch (error) {
     console.error("[cron demain]", error);
     return NextResponse.json({ error: "failed" }, { status: 500 });

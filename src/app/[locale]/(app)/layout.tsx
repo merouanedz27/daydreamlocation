@@ -5,8 +5,10 @@ import { NewOrderFab } from "@/components/new-order-fab";
 import { AppFooter } from "@/components/app-footer";
 import { UpdateNotifier } from "@/components/update-notifier";
 import { CustomerMessageProvider } from "@/components/customer-message";
+import { NotificationsBell } from "@/components/notifications-bell";
 import { canManageStock, requireProfile, isOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/queries/orders";
+import { getRecentNotifications, getUnreadNotificationCount } from "@/lib/queries/notifications";
 import type { Locale } from "@/i18n/routing";
 
 /**
@@ -28,11 +30,13 @@ export default async function AppLayout({
 
   // En parallèle : chaque attente en série retardait l'affichage de TOUTES les
   // pages. Les réglages ne fuient pas sans session : RLS les refuse.
-  const [profile, t, settings] = await Promise.all([
+  const [profile, t, settings, notificationCount, recentNotifications] = await Promise.all([
     requireProfile(locale as Locale),
     getTranslations("roles"),
     // Le message type de la boutique, pour chaque bouton 💬 des listes.
     getSettings(),
+    getUnreadNotificationCount(),
+    getRecentNotifications(),
   ]);
 
   return (
@@ -43,6 +47,13 @@ export default async function AppLayout({
           profile.role === "owner" || profile.role === "moderator" ? profile.role : "staff",
         )}
         showDashboard={isOwner(profile)}
+        notifications={
+          <NotificationsBell
+            locale={locale as Locale}
+            initialCount={notificationCount}
+            initialNotifications={recentNotifications}
+          />
+        }
       />
 
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

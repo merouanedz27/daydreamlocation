@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { notifyNewOrder } from "@/lib/email/notify";
+import { notifyOrderEvent } from "@/lib/notifications/service";
 import { getProfile, isOwner } from "@/lib/auth";
 import { fieldErrorsOf, orderSchema, paymentSchema } from "@/lib/validation/orders";
 import type { z } from "zod";
@@ -234,7 +235,12 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   // E-mail « Nouvelle commande » (celui de son AppSheet), APRÈS la réponse :
   // la saisie n'attend pas le serveur de messagerie, et un échec d'envoi ne
   // touche pas la commande, déjà enregistrée.
-  after(() => notifyNewOrder(Number(orderId)));
+  after(async () => {
+    await Promise.allSettled([
+      notifyNewOrder(Number(orderId)),
+      notifyOrderEvent(Number(orderId), "order_created"),
+    ]);
+  });
 
   // La saisie rapide navigue elle-même : elle doit d'abord vider son brouillon,
   // puis soit ouvrir la fiche, soit rester sur place pour la commande suivante.
@@ -293,6 +299,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   if (error) return orderWriteError(error);
 
   revalidatePath(`/${locale}/commandes`, "layout");
+  after(() => notifyOrderEvent(orderId, "order_updated").catch(console.error));
   return { ok: true, id: orderId };
 }
 
@@ -345,6 +352,7 @@ export async function setOrderChecks(formData: FormData): Promise<ActionResult> 
 
   revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
+  after(() => notifyOrderEvent(orderId, "order_updated").catch(console.error));
   return { ok: true };
 }
 
@@ -514,6 +522,11 @@ export async function setOrderCancelled(formData: FormData): Promise<ActionResul
   revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   revalidatePath(`/${locale}/tableau-de-bord`);
+  after(() =>
+    notifyOrderEvent(orderId, cancelled ? "order_cancelled" : "order_restored").catch(
+      console.error,
+    ),
+  );
   return { ok: true };
 }
 

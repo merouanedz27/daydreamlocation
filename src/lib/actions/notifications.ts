@@ -5,7 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
 import { emailConfigured } from "@/lib/email/send";
 import { getRecipients, sendTeamMessage } from "@/lib/email/notify";
-import { notificationPrefsSchema, teamMessageSchema } from "@/lib/validation/notifications";
+import {
+  notificationPrefsSchema,
+  pushSubscriptionSchema,
+  teamMessageSchema,
+} from "@/lib/validation/notifications";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type NotifyResult =
@@ -80,4 +84,92 @@ export async function setNotificationPrefs(input: {
 
   revalidatePath(`/${resolveLocale(input.locale)}/equipe/notifications`);
   return { ok: true };
+}
+
+export async function markNotificationRead(input: {
+  locale: string;
+  id: number;
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+  if (!Number.isInteger(input.id) || input.id <= 0) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", input.id)
+    .eq("recipient_id", profile.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, error: "errors.generic" };
+  revalidatePath(`/${resolveLocale(input.locale)}`, "layout");
+  return { ok: true };
+}
+
+export async function markAllNotificationsRead(input: {
+  locale: string;
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("recipient_id", profile.id)
+    .is("read_at", null);
+
+  if (error) return { ok: false, error: "errors.generic" };
+  revalidatePath(`/${resolveLocale(input.locale)}`, "layout");
+  return { ok: true };
+}
+
+export async function savePushSubscription(input: {
+  locale: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string;
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const parsed = pushSubscriptionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("push_subscriptions").upsert(
+    {
+      user_id: profile.id,
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.p256dh,
+      auth: parsed.data.auth,
+      locale: parsed.data.locale,
+      user_agent: parsed.data.user_agent ?? null,
+      last_seen_at: new Date().toISOString(),
+    },
+    { onConflict: "endpoint" },
+  );
+
+  return error ? { ok: false, error: "errors.generic" } : { ok: true };
+}
+
+export async function removePushSubscription(input: {
+  endpoint: string;
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("endpoint", input.endpoint)
+    .eq("user_id", profile.id);
+
+  return error ? { ok: false, error: "errors.generic" } : { ok: true };
 }

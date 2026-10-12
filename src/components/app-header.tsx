@@ -45,10 +45,12 @@ export function AppHeader({
   fullName,
   roleLabel,
   showDashboard,
+  notifications,
 }: {
   fullName: string;
   roleLabel: string;
   showDashboard: boolean;
+  notifications: React.ReactNode;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -171,6 +173,8 @@ export function AppHeader({
           {/* Le commutateur sert aussi la page de connexion, sur fond
               blanc : ses couleurs de barre lui sont passées d'ici. */}
           <LocaleSwitcher className="border-nav-border bg-nav-foreground/10 text-nav-foreground hover:bg-nav-foreground/20" />
+
+          {notifications}
 
           {/* Téléphone : tiroir latéral. Bureau : le menu déroulant ci-dessous.
               Les deux ouvrent la MÊME confirmation de déconnexion. */}

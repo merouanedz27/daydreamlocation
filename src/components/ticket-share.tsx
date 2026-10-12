@@ -45,21 +45,32 @@ export function TicketActions() {
   // Photos ratées : pas de PDF, on imprime quand même la page elle-même.
   if (failed) {
     return (
-      <Button type="button" onClick={() => window.print()} className="h-12 text-base">
-        <Printer className="size-5" aria-hidden />
+      <Button type="button" onClick={() => window.print()} className="h-10 text-sm">
+        <Printer className="size-4" aria-hidden />
         {t("print")}
       </Button>
     );
   }
 
   return (
-    <Button type="button" onClick={share} disabled={!ready} className="h-12 text-base">
-      {ready ? (
-        <Share2 className="size-5" aria-hidden />
-      ) : (
-        <Loader2 className="size-5 animate-spin" aria-hidden />
-      )}
-      {ready ? t("share") : t("preparing")}
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        onClick={share}
+        disabled={!ready}
+        className="rounded-md"
+        aria-label={t("share")}
+        title={t("share")}
+      >
+        {ready ? <Share2 className="size-3.5" aria-hidden /> : <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+      </Button>
+
+      <Button type="button" onClick={() => window.print()} className="h-10 text-sm">
+        <Printer className="size-4" aria-hidden />
+        {t("print")}
+      </Button>
+    </div>
   );
 }
