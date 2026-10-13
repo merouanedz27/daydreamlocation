@@ -127,6 +127,7 @@
       "sizes": "Taille",
       "tailor": "Tailleur",
       "shirt": "Chemise",
+      "jabador": "Jabador",
       "shoes": "Chaussures",
       "accessories": "Accessoires",
       "returnDue": "Retour prévu"
@@ -655,6 +656,7 @@
       "pantsSize": "Taille pantalon 👖",
       "tailor": "Tailleur",
       "shirt": "Chemise 🥼",
+      "jabador": "Jabador 👘",
       "shoes": "Chaussures 👞",
       "accessories": "Accessoires 🦋",
       "paid": "Versement",
@@ -822,6 +824,7 @@
       "pantsSize": "Taille pantalon 👖 :",
       "tailor": "Tailleur :",
       "shirt": "Chemises 🥼 :",
+      "jabador": "Jabador 👘 :",
       "shoes": "Chaussures 👞 :",
       "accessories": "Accessoires 🦋 :",
       "paid": "VERS :",

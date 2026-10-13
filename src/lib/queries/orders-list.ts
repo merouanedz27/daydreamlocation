@@ -147,6 +147,7 @@ export async function getOrdersTable(
       sizes: costumeSizes(fields),
       tailor: fields.tailor,
       shirt: fields.shirt,
+      jabador: fields.jabador,
       shoes: fields.shoes,
       accessories: fields.accessories,
       created_by_name: profiles?.full_name ?? null,

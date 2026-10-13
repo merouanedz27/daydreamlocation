@@ -104,6 +104,7 @@ export default async function OrderSlipPage({
     pantsSize: fields.pantsSize,
     tailor: fields.tailor,
     shirt: fields.shirt,
+    jabador: fields.jabador,
     shoes: fields.shoes,
     accessories: fields.accessories,
   };
@@ -127,6 +128,7 @@ export default async function OrderSlipPage({
     row("pantsSize"),
     row("tailor"),
     row("shirt"),
+    row("jabador"),
     row("shoes"),
     row("accessories"),
   ].flat();
@@ -139,6 +141,7 @@ export default async function OrderSlipPage({
     row("pantsSize", { bullet: true }),
     row("tailor", { big: true, underline: true, bullet: true }),
     row("shirt", { bullet: true }),
+    row("jabador", { bullet: true }),
     row("shoes", { bullet: true }),
     row("accessories", { bullet: true }),
   ].flat();

@@ -85,6 +85,8 @@ import { cn } from "@/lib/utils";
 import {
   ORDER_SHIRT_SIZES,
   SUIT_SIZES,
+  labelHasSize,
+  sizeInLabel,
   sizeSeries,
   sortSizes,
 } from "@/lib/sizes";
@@ -735,10 +737,13 @@ export function OrderQuickForm({
           a.ref.localeCompare(b.ref, undefined, { numeric: true }),
       );
       options.push(...rows.map((r) => r.option));
-      // Chemise et Jabador : leurs noms restent visibles même quand une taille est choisie
-      // et que le stock ne contient encore aucune pièce.
+      // Chemise et Jabador : après les pièces du stock, les noms de SA liste
+      // dans cette taille — le geste marche même stock vide. Une taille
+      // absente de sa liste (Jabador XXL) montre toute la liste plutôt que rien.
       if (!stockOnly) {
-        for (const item of items) {
+        const own = items.filter((item) => item.slot === slotNo);
+        const sized = own.filter((item) => labelHasSize(item.label, size));
+        for (const item of sized.length ? sized : own) {
           options.push({
             key: `h:${item.label}`,
             label: item.label,
@@ -852,10 +857,17 @@ export function OrderQuickForm({
       };
     } else {
       const [first, ...rest] = picks;
+      // Chemise, Jabador : « Jabador M - Vert » choisi sans taille donne M.
+      const named =
+        !first.unitId &&
+        !keptSize &&
+        (index === SHIRT_SLOT || index === JABADOR_SLOT)
+          ? (sizeInLabel(first.name ?? "", slotSizes(index)) ?? "")
+          : "";
       slots[index] = {
         ...base,
         ...first,
-        size: first.unitId ? (first.size ?? "") : keptSize,
+        size: first.unitId ? (first.size ?? "") : keptSize || named,
       };
       for (const more of rest) slots.push({ ...EMPTY_SLOT, ...more });
     }

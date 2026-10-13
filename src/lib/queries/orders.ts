@@ -195,7 +195,12 @@ export async function getLabelSlots(
   const supabase = client ?? (await createClient());
   const { data } = await supabase.rpc("order_item_suggestions");
   const slots = new Map<string, number>();
-  for (const r of data ?? []) slots.set(normalizeSearch(r.label), Number(r.slot));
+  // La position apprise suit l'ANCIENNE ligne (1 tenue, 2 chemise,
+  // 3 chaussures, 4+ accessoires) : depuis le Jabador en 3, on la décale.
+  for (const r of data ?? []) {
+    const learned = Number(r.slot);
+    slots.set(normalizeSearch(r.label), learned >= 4 ? 5 : learned === 3 ? 4 : learned);
+  }
   // Les listes fixes ont le dernier mot : un costume reste un costume.
   for (const label of COSTUME_ITEMS) slots.set(normalizeSearch(label), 1);
   for (const label of SHIRT_ITEMS) slots.set(normalizeSearch(label), 2);

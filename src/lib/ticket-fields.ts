@@ -7,7 +7,7 @@ import {
 
 /**
  * Les champs d'une commande tels que son AppSheet les présentait — costume,
- * tailles, tailleur, chemise, chaussures, accessoires —, partagés par le bon
+ * tailles, tailleur, chemise, jabador, chaussures, accessoires —, partagés par le bon
  * de location et l'e-mail « Nouvelle commande » : les deux disent la même
  * chose, calculée au même endroit. Module PUR.
  *
@@ -21,6 +21,7 @@ export type TicketFields = {
   pantsSize: string | null;
   tailor: string | null;
   shirt: string | null;
+  jabador: string | null;
   shoes: string | null;
   accessories: string | null;
 };
@@ -46,7 +47,7 @@ export function ticketFields(
   });
 
   // Le costume : une case par partie — veste, gilet, pantalon.
-  const [jacket, vest, pants, shirt, shoes, accessory, ...extras] = draft.slots;
+  const [jacket, vest, pants, shirt, jabador, shoes, accessory, ...extras] = draft.slots;
   // Costume NOMMÉ, d'avant les cases par partie : toutes ses tailles tiennent
   // dans la case de la veste, « 50 · G 48 · P 52 ».
   const legacy = jacket?.name && !jacket.unitId ? splitCostumeSize(jacket.size) : null;
@@ -80,6 +81,7 @@ export function ticketFields(
     pantsSize: pantsSize || null,
     tailor: draft.tailor || null,
     shirt: piece(shirt),
+    jabador: piece(jabador),
     shoes: piece(shoes, true, !hideRefs.shoes),
     accessories: [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
   };

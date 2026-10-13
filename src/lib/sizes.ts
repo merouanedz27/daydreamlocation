@@ -28,6 +28,25 @@ export function sizeSeries(categorySlug: string | null | undefined): string[] {
   return (categorySlug && SERIES[categorySlug]) || [];
 }
 
+/** « xxl » et « 2XL » sont la même taille : ses listes écrivent l'une ou l'autre. */
+export function normalizeSize(size: string): string {
+  const s = size.trim().toUpperCase();
+  const x = /^(X{2,4})L$/.exec(s);
+  return x ? `${x[1].length}XL` : s;
+}
+
+/** Le libellé porte-t-il cette taille ? « Chemise Cravate Blanc 2XL » porte XXL. */
+export function labelHasSize(label: string, size: string): boolean {
+  const wanted = normalizeSize(size);
+  if (!wanted) return false;
+  return label.split(/[\s\-·]+/).some((token) => normalizeSize(token) === wanted);
+}
+
+/** La première taille de `series` écrite dans le libellé, sinon `null`. */
+export function sizeInLabel(label: string, series: string[]): string | null {
+  return series.find((size) => labelHasSize(label, size)) ?? null;
+}
+
 /**
  * Tailles distinctes, dans l'ordre naturel : 46, 48, 50… puis le texte libre
  * (M, L…) par ordre alphabétique.

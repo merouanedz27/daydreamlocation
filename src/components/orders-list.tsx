@@ -64,6 +64,7 @@ const COLUMNS = [
   "sizes",
   "tailor",
   "shirt",
+  "jabador",
   "shoes",
   "accessories",
   "amount_paid",
@@ -90,6 +91,7 @@ const HEADERS: Record<Column, string> = {
   sizes: "orders.short.sizes",
   tailor: "orders.short.tailor",
   shirt: "orders.short.shirt",
+  jabador: "orders.short.jabador",
   shoes: "orders.short.shoes",
   accessories: "orders.short.accessories",
   amount_paid: "orders.short.paid",
@@ -109,7 +111,7 @@ const OWNER_ONLY: Column[] = ["created_by_name"];
 const MONEY: Column[] = ["amount_paid", "total_price", "balance", "caution_amount"];
 
 /** Colonnes de texte libre : bornées, le reste se lit au survol (`title`). */
-const TEXT: Column[] = ["costume", "sizes", "tailor", "shirt", "shoes", "accessories"];
+const TEXT: Column[] = ["costume", "sizes", "tailor", "shirt", "jabador", "shoes", "accessories"];
 
 /** Durée d'un appui long, en millisecondes — celle des menus d'Android. */
 const LONG_PRESS_MS = 500;
@@ -470,6 +472,7 @@ export function OrdersList({
       case "sizes":
       case "tailor":
       case "shirt":
+      case "jabador":
       case "shoes":
       case "accessories":
         return order[column] ? <Highlight text={order[column]} /> : "—";
