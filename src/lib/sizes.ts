@@ -8,7 +8,8 @@
 
 /** Costumes : 44 à 66, de deux en deux — les tailles de son tableur. */
 export const SUIT_SIZES = Array.from({ length: 12 }, (_, i) => String(44 + i * 2));
-const SHIRT_SIZES = Array.from({ length: 10 }, (_, i) => String(37 + i));
+/** Chemises dans la saisie d'une commande : tailles de confection. */
+export const ORDER_SHIRT_SIZES = ["S", "M", "L", "XL", "XXL"];
 const SHOE_SIZES = Array.from({ length: 9 }, (_, i) => String(38 + i));
 
 const SERIES: Record<string, string[]> = {
@@ -16,7 +17,8 @@ const SERIES: Record<string, string[]> = {
   pantalon: SUIT_SIZES,
   gilet: SUIT_SIZES,
   costume: SUIT_SIZES,
-  chemise: SHIRT_SIZES,
+  chemise: ORDER_SHIRT_SIZES,
+  jabador: ORDER_SHIRT_SIZES,
   chaussures: SHOE_SIZES,
   bligha: SHOE_SIZES,
 };

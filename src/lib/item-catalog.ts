@@ -33,11 +33,14 @@ export const COSTUME_ITEMS = [
   "Pantalon F",
   "Pantalon G",
   "Pantalon Invite Beige Simple", "Pantalon Invite Blue Nuit Croise", "Pantalon Invite Vert Croise", "Pantalon Invite Noir Simple", "Pantalon Invite Blue Arriere", "Pantalon Invite Gris", "Pantalon Invite Greuna",
+  "Barnous Dore", "Barnous Dore Max", "Barnous Beige Wafa",
+] as const;
+
+export const JABADOR_ITEMS = [
   "Jabador S - Grenat", "Jabador S - Grenat avec Beige", "Jabador S - Beige", "Jabador S - Vert",
   "Jabador M - Grenat", "Jabador M - Grenat avec Beige", "Jabador M - Beige", "Jabador M - Vert",
   "Jabador L - Grenat", "Jabador L - Grenat avec Beige", "Jabador L - Beige", "Jabador L - Vert",
   "Jabador XL - Grenat", "Jabador XL - Grenat avec Beige", "Jabador XL - Beige", "Jabador XL - Vert",
-  "Barnous Dore", "Barnous Dore Max", "Barnous Beige Wafa",
 ] as const;
 
 export const SHIRT_ITEMS = [

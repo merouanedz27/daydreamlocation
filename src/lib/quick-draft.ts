@@ -3,8 +3,8 @@
  * (navigateur) et la page de modification (serveur), qui en fabrique un à
  * partir d'une commande existante.
  *
- * Une commande se saisit comme une LIGNE de son AppSheet : six cases fixes
- * (veste, gilet, pantalon, chemise, chaussures, accessoires), puis des pièces
+ * Une commande se saisit comme une LIGNE de son AppSheet : sept cases fixes
+ * (veste, gilet, pantalon, chemise, jabador, chaussures, accessoires), puis des pièces
  * en plus si besoin. Chaque case est un vêtement nommé, ou une pièce du STOCK —
  * la seule qui bloque des dates.
  *
@@ -28,7 +28,7 @@ export type Slot = {
 };
 
 export type QuickDraft = {
-  v: 3;
+  v: 4;
   customerName: string;
   customerPhone: string;
   eventDate: string;
@@ -36,7 +36,7 @@ export type QuickDraft = {
   returnDue: string;
   datesTouched: boolean;
   /**
-   * 0 veste, 1 gilet, 2 pantalon, 3 chemise, 4 chaussures, 5 accessoires, puis
+  * 0 veste, 1 gilet, 2 pantalon, 3 chemise, 4 jabador, 5 chaussures, 6 accessoires, puis
    * les pièces en plus.
    */
   slots: Slot[];
@@ -60,8 +60,11 @@ export const EMPTY_SLOT: Slot = {
   stockPrice: null,
   external: null,
 };
-export const FIXED_SLOTS = 6;
-export const ACCESSORIES_SLOT = 5;
+export const FIXED_SLOTS = 7;
+export const SHIRT_SLOT = 3;
+export const JABADOR_SLOT = 4;
+export const SHOES_SLOT = 5;
+export const ACCESSORIES_SLOT = 6;
 
 /** Les cases du costume : une par partie, la veste d'abord. */
 export const PART_SLOTS = ["veste", "gilet", "pantalon"] as const;
@@ -74,7 +77,7 @@ export function partOfSlot(index: number): SlotPart | null {
 
 /**
  * Case de la saisie → colonne de son AppSheet, numérotée comme `slot` des
- * suggestions (1 tenue, 2 chemise, 3 chaussures, 4 accessoires). Les trois
+ * suggestions (1 tenue, 2 chemise, 3 jabador, 4 chaussures, 5 accessoires). Les trois
  * parties du costume sont la colonne « tenue ». Une pièce en plus : `null`.
  */
 export function catalogSlotOf(index: number): number | null {
@@ -82,13 +85,13 @@ export function catalogSlotOf(index: number): number | null {
   return index < FIXED_SLOTS ? index - PART_SLOTS.length + 2 : null;
 }
 
-/** L'inverse : colonne de son AppSheet (1…4) → case de la saisie. */
+/** L'inverse : colonne de son AppSheet (1…5) → case de la saisie. */
 function slotOfCatalog(column: number): number {
-  return column <= 1 ? 0 : Math.min(column, 4) + PART_SLOTS.length - 2;
+  return column <= 1 ? 0 : Math.min(column, 5) + PART_SLOTS.length - 2;
 }
 
 export const EMPTY_DRAFT: QuickDraft = {
-  v: 3,
+  v: 4,
   customerName: "",
   customerPhone: "",
   eventDate: "",
@@ -143,12 +146,13 @@ const CATEGORY_SLOT: Record<string, number> = {
   veste: 0,
   gilet: 1,
   pantalon: 2,
-  chemise: 3,
-  chaussures: 4,
-  bligha: 4,
-  noeud: 5,
-  accessoire: 5,
-  barnous: 5,
+  chemise: SHIRT_SLOT,
+  jabador: JABADOR_SLOT,
+  chaussures: SHOES_SLOT,
+  bligha: SHOES_SLOT,
+  noeud: ACCESSORIES_SLOT,
+  accessoire: ACCESSORIES_SLOT,
+  barnous: ACCESSORIES_SLOT,
 };
 
 export type EditableOrder = {
