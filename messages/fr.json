@@ -419,6 +419,7 @@
     "paidToday": "Versements · aujourd'hui",
     "cashTitle": "Caisse du jour",
     "restToday": "Reste · aujourd'hui",
+    "expensesToday": "Frais · aujourd'hui",
     "cashToday": "Caisse · aujourd'hui",
     "cashHint": "Caisse suivie depuis le {date} : les jours d'avant ne sont pas comptés.",
     "result": "Résultat",

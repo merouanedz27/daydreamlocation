@@ -79,6 +79,15 @@ export default async function DashboardPage({
               {formatMoney(stats.cashToday.reste, l)}
             </dd>
           </div>
+          {/* Les frais du jour (frais d'équipe et dépenses, `spent_on`
+              aujourd'hui) : affichés pour information, NON déduits de la
+              caisse — choix du propriétaire. */}
+          <div className="border-border col-span-2 rounded-lg border p-4">
+            <dt className="text-muted-foreground truncate text-sm">{t("dashboard.expensesToday")}</dt>
+            <dd className="tabular mt-1 text-xl font-medium">
+              {formatMoney(stats.expenses.day, l)}
+            </dd>
+          </div>
           <div className="border-gold-strong/40 bg-gold-soft/40 col-span-2 rounded-lg border p-4">
             <dt className="text-muted-foreground truncate text-sm">{t("dashboard.cashToday")}</dt>
             <dd className="tabular mt-1 text-2xl font-medium">
