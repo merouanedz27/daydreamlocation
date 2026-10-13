@@ -237,8 +237,8 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   // touche pas la commande, déjà enregistrée.
   after(async () => {
     await Promise.allSettled([
-      notifyNewOrder(Number(orderId)),
-      notifyOrderEvent(Number(orderId), "order_created"),
+      notifyNewOrder(Number(orderId), profile.id),
+      notifyOrderEvent(Number(orderId), "order_created", profile.id),
     ]);
   });
 
@@ -299,7 +299,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   if (error) return orderWriteError(error);
 
   revalidatePath(`/${locale}/commandes`, "layout");
-  after(() => notifyOrderEvent(orderId, "order_updated").catch(console.error));
+  after(() => notifyOrderEvent(orderId, "order_updated", profile.id).catch(console.error));
   return { ok: true, id: orderId };
 }
 
@@ -352,7 +352,7 @@ export async function setOrderChecks(formData: FormData): Promise<ActionResult> 
 
   revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
-  after(() => notifyOrderEvent(orderId, "order_updated").catch(console.error));
+  after(() => notifyOrderEvent(orderId, "order_updated", profile.id).catch(console.error));
   return { ok: true };
 }
 
@@ -523,7 +523,7 @@ export async function setOrderCancelled(formData: FormData): Promise<ActionResul
   revalidatePath(`/${locale}/commandes/${orderId}`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   after(() =>
-    notifyOrderEvent(orderId, cancelled ? "order_cancelled" : "order_restored").catch(
+    notifyOrderEvent(orderId, cancelled ? "order_cancelled" : "order_restored", profile.id).catch(
       console.error,
     ),
   );

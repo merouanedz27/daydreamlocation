@@ -48,6 +48,8 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-soft: var(--warning-soft);
+  --color-notification-badge: var(--notification-badge);
+  --color-notification-badge-foreground: var(--notification-badge-foreground);
   --color-gold-soft: var(--gold-soft);
   --color-gold-strong: var(--gold-strong);
   --color-cream: var(--cream);
@@ -126,7 +128,7 @@
   --accent-foreground: var(--foreground);
 
   /* #8B2F2F — blanc dessus : 8,25:1 */
-  --destructive: oklch(0.4410 0.1256 23.82);
+  --destructive: oklch(0.441 0.1256 23.82);
   --destructive-foreground: oklch(1 0 0);
 
   /* #E7DFD3 */
@@ -141,18 +143,25 @@
      blanc. Les fonds `-soft` servent aux pastilles. */
   --success: oklch(0.4646 0.0573 137.11); /* #4A6141 — 6,82:1 */
   --success-foreground: oklch(0.4646 0.0573 137.11);
-  --success-soft: oklch(0.9481 0.0135 134.90); /* #EAF0E7 — texte dessus 5,89:1 */
+  --success-soft: oklch(
+    0.9481 0.0135 134.9
+  ); /* #EAF0E7 — texte dessus 5,89:1 */
   /* Terre cuite, et non plus ambre : à côté d'un jaune vif de marque, une
      pastille « Reste dû » en nuance de jaune ne se lit plus comme une alerte. */
-  --warning: oklch(0.5534 0.1739 38.40); /* #C2410C — 5,18:1 */
-  --warning-foreground: oklch(0.5534 0.1739 38.40);
-  --warning-soft: oklch(0.9542 0.0372 75.16); /* #FFEDD5 — texte dessus 4,52:1 */
+  --warning: oklch(0.5534 0.1739 38.4); /* #C2410C — 5,18:1 */
+  --warning-foreground: oklch(0.5534 0.1739 38.4);
+  --warning-soft: oklch(
+    0.9542 0.0372 75.16
+  ); /* #FFEDD5 — texte dessus 4,52:1 */
+  /* Badge d'alerte : rouge stable et blanc lisible dans les deux thèmes. */
+  --notification-badge: oklch(0.48 0.18 25);
+  --notification-badge-foreground: oklch(1 0 0);
 
   /* CREME — #FAF5EA. Surface des BARRES DE NAVIGATION.
      En blanc sur blanc, l'en-tete ne se distinguait du contenu que par un
      filet. Encre dessus : 14,47:1. muted-foreground dessus : 6,32:1 — c'est
      lui qui pouvait ceder, il ne vaut que 6,88:1 sur blanc. */
-  --cream: oklch(0.9710 0.0155 86.42);
+  --cream: oklch(0.971 0.0155 86.42);
   --cream-foreground: var(--foreground);
 
   /* BARRES DE NAVIGATION — BRUN CLAIRCI #765A44.
@@ -209,18 +218,18 @@
   /* Lignes du tableau des commandes — toute la ligne prend la couleur de son
      statut, comme dans son AppSheet. Teintes CLAIRES : le texte noir reste
      lisible dessus (≥ 10:1), même en plein soleil. */
-  --row-reserved: oklch(0.9450 0.0950 100); /* jaune — réservée */
-  --row-out: oklch(0.9000 0.0550 22); /* rouge — sortie */
-  --row-late: oklch(0.8450 0.0900 30); /* rouge plus soutenu — en retard */
-  --row-returned: oklch(0.9200 0.0550 145); /* vert — revenue */
-  --row-cancelled: oklch(0.9200 0.0040 70); /* gris — annulée */
+  --row-reserved: oklch(0.945 0.095 100); /* jaune — réservée */
+  --row-out: oklch(0.9 0.055 22); /* rouge — sortie */
+  --row-late: oklch(0.845 0.09 30); /* rouge plus soutenu — en retard */
+  --row-returned: oklch(0.92 0.055 145); /* vert — revenue */
+  --row-cancelled: oklch(0.92 0.004 70); /* gris — annulée */
   /* Ambre FRANC : doit ressortir sur TOUTES les lignes, jaune comprise. */
-  --highlight: oklch(0.8200 0.1600 70);
+  --highlight: oklch(0.82 0.16 70);
 
   --chart-1: oklch(0.7952 0.1617 86.05); /* jaune */
   --chart-2: oklch(0.4518 0.0497 57.96); /* brun */
   --chart-3: oklch(0.4646 0.0573 137.11); /* vert */
-  --chart-4: oklch(0.5534 0.1739 38.40); /* terre cuite */
+  --chart-4: oklch(0.5534 0.1739 38.4); /* terre cuite */
   --chart-5: oklch(0.7774 0.0504 77.12); /* sable */
 
   --sidebar: oklch(0.9626 0.0091 78.28);
@@ -253,7 +262,9 @@
   --secondary: oklch(0.64 0.07 62); /* #A47A55 caramel */
   --secondary-foreground: oklch(0.18 0.014 65);
   --muted: oklch(0.27 0.02 65); /* #2E241B */
-  --muted-foreground: oklch(0.74 0.03 72); /* #B9A88F sable — ~7:1 sur le fond */
+  --muted-foreground: oklch(
+    0.74 0.03 72
+  ); /* #B9A88F sable — ~7:1 sur le fond */
   --accent: oklch(0.27 0.02 65);
   --accent-foreground: var(--foreground);
   --destructive: oklch(0.66 0.16 25); /* #E06A5A — ~5,5:1 sur le fond */
@@ -263,13 +274,17 @@
   --ring: oklch(0.86 0.17 92);
   --success: oklch(0.74 0.09 145); /* #7FB98A — ~8:1 */
   --success-foreground: oklch(0.74 0.09 145);
-  --success-soft: oklch(0.30 0.045 145);
+  --success-soft: oklch(0.3 0.045 145);
   --warning: oklch(0.77 0.15 58); /* #F29A4A — ~7:1 */
   --warning-foreground: oklch(0.77 0.15 58);
   --warning-soft: oklch(0.29 0.045 55);
+  --notification-badge: oklch(0.48 0.18 25);
+  --notification-badge-foreground: oklch(1 0 0);
   --cream: oklch(0.22 0.016 65);
   --cream-foreground: var(--foreground);
-  --nav: oklch(0.24 0.025 60); /* #261B13 — même valeur que le themeColor sombre */
+  --nav: oklch(
+    0.24 0.025 60
+  ); /* #261B13 — même valeur que le themeColor sombre */
   --nav-foreground: var(--foreground);
   --nav-muted: oklch(0.74 0.03 72);
   --nav-border: oklch(1 0 0 / 11%);
@@ -281,7 +296,7 @@
      clair ; le texte crème reste au-dessus de 10:1. */
   --row-reserved: oklch(0.33 0.06 95); /* #3D3714 or-olive — réservée */
   --row-out: oklch(0.32 0.07 25); /* #44211C brique — sortie */
-  --row-late: oklch(0.38 0.10 30); /* #5C2A21 — en retard */
+  --row-late: oklch(0.38 0.1 30); /* #5C2A21 — en retard */
   --row-returned: oklch(0.32 0.05 145); /* #213A28 forêt — revenue */
   --row-cancelled: oklch(0.27 0.008 70); /* #2D2824 — annulée */
   --highlight: oklch(0.62 0.15 65); /* #C2780F ambre, texte crème dessus */

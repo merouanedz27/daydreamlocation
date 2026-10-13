@@ -128,6 +128,30 @@ export async function markAllNotificationsRead(input: {
   return { ok: true };
 }
 
+export async function deleteNotifications(input: {
+  locale: string;
+  ids: number[];
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const ids = [...new Set(input.ids)].filter((id) => Number.isInteger(id) && id > 0);
+  if (ids.length === 0 || ids.length > 100) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .in("id", ids)
+    .eq("recipient_id", profile.id);
+
+  if (error) return { ok: false, error: "errors.generic" };
+  revalidatePath(`/${resolveLocale(input.locale)}`, "layout");
+  return { ok: true };
+}
+
 export async function savePushSubscription(input: {
   locale: string;
   endpoint: string;

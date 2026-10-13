@@ -20,6 +20,7 @@ export type NotificationInput = {
   payload?: Json;
   orderId?: number | null;
   dedupeKey: string;
+  excludeRecipientId?: string;
 };
 
 type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
@@ -63,7 +64,9 @@ const EVENT_COPY: Record<NotificationKind, { titleKey: string; bodyKey: string }
  */
 export async function notifyActiveTeam(input: NotificationInput): Promise<void> {
   const admin = createAdminClient();
-  const members = await getActiveMemberIds(admin);
+  const members = (await getActiveMemberIds(admin)).filter(
+    (id) => id !== input.excludeRecipientId,
+  );
   if (!members.length) return;
 
   const rows: NotificationInsert[] = members.map((id) => ({
@@ -203,6 +206,7 @@ export async function notifyDailyReminders(day: string): Promise<number> {
 export async function notifyOrderEvent(
   orderId: number,
   kind: Extract<NotificationKind, "order_created" | "order_updated" | "order_cancelled" | "order_restored">,
+  actorId?: string,
 ): Promise<void> {
   const admin = createAdminClient();
   const { data: order, error } = await admin
@@ -221,6 +225,7 @@ export async function notifyOrderEvent(
     titleKey: `notifications.${copy.titleKey}`,
     bodyKey: `notifications.${copy.bodyKey}`,
     orderId,
+    excludeRecipientId: actorId,
     dedupeKey: `${kind}:order:${orderId}:${version}`,
     payload: {
       orderNo: order.order_no,

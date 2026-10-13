@@ -93,6 +93,24 @@ begin
   get diagnostics v_count = row_count;
   perform set_config('role', 'postgres', true);
   insert into test_results values ('staff ne marque pas celle du owner', '0', v_count::text, v_count = 0);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_staff::text, 'role', 'authenticated'
+  )::text, true);
+  perform set_config('role', 'authenticated', true);
+  delete from public.notifications where id = v_notification;
+  get diagnostics v_count = row_count;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('staff ne supprime pas celle du owner', '0', v_count::text, v_count = 0);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_owner::text, 'role', 'authenticated'
+  )::text, true);
+  perform set_config('role', 'authenticated', true);
+  delete from public.notifications where id = v_notification;
+  get diagnostics v_count = row_count;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('owner supprime sa notification', '1', v_count::text, v_count = 1);
 end $$;
 
 select case when ok then 'OK  ' else 'ECHEC' end as resultat, step, attendu, obtenu

@@ -15,6 +15,35 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      article_model_parts: {
+        Row: {
+          model_id: number;
+          part: string;
+          rent_price: number;
+          position: number;
+        };
+        Insert: {
+          model_id: number;
+          part: string;
+          rent_price?: number;
+          position?: number;
+        };
+        Update: {
+          model_id?: number;
+          part?: string;
+          rent_price?: number;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "article_model_parts_model_id_fkey";
+            columns: ["model_id"];
+            isOneToOne: false;
+            referencedRelation: "article_models";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       article_models: {
         Row: {
           id: number;
@@ -65,35 +94,6 @@ export type Database = {
             columns: ["category_id"];
             isOneToOne: false;
             referencedRelation: "categories";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      article_model_parts: {
-        Row: {
-          model_id: number;
-          part: string;
-          rent_price: number;
-          position: number;
-        };
-        Insert: {
-          model_id: number;
-          part: string;
-          rent_price?: number;
-          position?: number;
-        };
-        Update: {
-          model_id?: number;
-          part?: string;
-          rent_price?: number;
-          position?: number;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "article_model_parts_model_id_fkey";
-            columns: ["model_id"];
-            isOneToOne: false;
-            referencedRelation: "article_models";
             referencedColumns: ["id"];
           },
         ];
@@ -284,6 +284,58 @@ export type Database = {
           },
         ];
       };
+      notifications: {
+        Row: {
+          id: number;
+          recipient_id: string;
+          order_id: number | null;
+          kind: string;
+          title_key: string;
+          body_key: string;
+          payload: Json;
+          dedupe_key: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          recipient_id: string;
+          order_id?: number | null;
+          kind: string;
+          title_key: string;
+          body_key: string;
+          payload?: Json;
+          dedupe_key: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          recipient_id?: string;
+          order_id?: number | null;
+          kind?: string;
+          title_key?: string;
+          body_key?: string;
+          payload?: Json;
+          dedupe_key?: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       order_lines: {
         Row: {
           id: number;
@@ -342,54 +394,38 @@ export type Database = {
           },
         ];
       };
-      notifications: {
+      order_payments: {
         Row: {
           id: number;
-          recipient_id: string;
-          order_id: number | null;
+          order_id: number;
+          amount: number;
           kind: string;
-          title_key: string;
-          body_key: string;
-          payload: Json;
-          dedupe_key: string;
-          read_at: string | null;
+          paid_on: string;
+          created_by: string | null;
           created_at: string;
         };
         Insert: {
-          recipient_id: string;
-          order_id?: number | null;
+          order_id: number;
+          amount: number;
           kind: string;
-          title_key: string;
-          body_key: string;
-          payload?: Json;
-          dedupe_key: string;
-          read_at?: string | null;
+          paid_on?: string;
+          created_by?: string | null;
           created_at?: string;
         };
         Update: {
-          recipient_id?: string;
-          order_id?: number | null;
+          order_id?: number;
+          amount?: number;
           kind?: string;
-          title_key?: string;
-          body_key?: string;
-          payload?: Json;
-          dedupe_key?: string;
-          read_at?: string | null;
+          paid_on?: string;
+          created_by?: string | null;
           created_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "notifications_order_id_fkey";
+            foreignKeyName: "order_payments_order_id_fkey";
             columns: ["order_id"];
             isOneToOne: false;
             referencedRelation: "orders";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "notifications_recipient_id_fkey";
-            columns: ["recipient_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -481,9 +517,9 @@ export type Database = {
           is_active: boolean;
           created_at: string;
           email: string | null;
-          email_locale: string;
-          notify_daily: boolean;
           notify_new_order: boolean;
+          notify_daily: boolean;
+          email_locale: string;
         };
         Insert: {
           id: string;
@@ -492,9 +528,9 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           email?: string | null;
-          email_locale?: string;
-          notify_daily?: boolean;
           notify_new_order?: boolean;
+          notify_daily?: boolean;
+          email_locale?: string;
         };
         Update: {
           id?: string;
@@ -503,9 +539,9 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           email?: string | null;
-          email_locale?: string;
-          notify_daily?: boolean;
           notify_new_order?: boolean;
+          notify_daily?: boolean;
+          email_locale?: string;
         };
         Relationships: [
           {
@@ -601,18 +637,6 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
-      set_own_full_name: {
-        Args: { p_name: string };
-        Returns: undefined;
-      };
-      set_pressing: {
-        Args: {
-          p_unit_ids: number[];
-          p_in: boolean;
-          p_cost?: number | null;
-        };
-        Returns: number;
-      };
       add_order_payment: {
         Args: {
           p_order_id: number;
@@ -635,26 +659,9 @@ export type Database = {
         };
         Returns: number;
       };
-      update_order: {
-        Args: {
-          p_order_id: number;
-          p_customer_name: string;
-          p_customer_phone: string;
-          p_event_date: string;
-          p_pickup_date: string;
-          p_return_due_date: string;
-          p_amount_paid?: number;
-          p_caution_amount?: number;
-          p_notes?: string;
-          p_picked_up?: boolean;
-          p_returned?: boolean;
-          p_lines?: Json;
-        };
-        Returns: number;
-      };
       customer_suggestions: {
         Args: Record<PropertyKey, never>;
-        Returns: { name: string; phone: string | null; orders: number }[];
+        Returns: { name: string; phone: string | null }[];
       };
       dashboard_stats: {
         Args: {
@@ -664,7 +671,7 @@ export type Database = {
       };
       order_item_suggestions: {
         Args: Record<PropertyKey, never>;
-        Returns: { label: string; uses: number; slot: number }[];
+        Returns: { label: string; slot: number }[];
       };
       save_ensemble: {
         Args: {
@@ -682,6 +689,37 @@ export type Database = {
           p_cancelled: boolean;
         };
         Returns: string;
+      };
+      set_own_full_name: {
+        Args: {
+          p_name: string;
+        };
+        Returns: undefined;
+      };
+      set_pressing: {
+        Args: {
+          p_unit_ids: number[];
+          p_in: boolean;
+          p_cost?: number;
+        };
+        Returns: number;
+      };
+      update_order: {
+        Args: {
+          p_order_id: number;
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_event_date: string;
+          p_pickup_date: string;
+          p_return_due_date: string;
+          p_amount_paid?: number;
+          p_caution_amount?: number;
+          p_notes?: string;
+          p_picked_up?: boolean;
+          p_returned?: boolean;
+          p_lines?: Json;
+        };
+        Returns: number;
       };
     };
     Enums: { [_ in never]: never };
