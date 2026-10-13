@@ -46,7 +46,7 @@ export async function AppFooter({
       ? [
           { href: "/tableau-de-bord", label: t("nav.dashboard") },
           { href: "/equipe", label: t("nav.team") },
-          { href: "/boutique", label: t("nav.shop") },
+          { href: "/parametres", label: t("nav.settings") },
         ]
       : []),
   ];

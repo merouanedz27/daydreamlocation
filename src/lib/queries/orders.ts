@@ -28,6 +28,8 @@ async function fetchSettings(): Promise<Settings> {
       rental_terms_fr: null,
       rental_terms_ar: null,
       customer_message: null,
+      notification_rules: {},
+      email_texts: {},
     }
   );
 }

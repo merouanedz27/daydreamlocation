@@ -607,6 +607,8 @@ export type Database = {
           rental_terms_fr: string | null;
           rental_terms_ar: string | null;
           customer_message: string | null;
+          notification_rules: Json;
+          email_texts: Json;
         };
         Insert: {
           id?: boolean;
@@ -619,6 +621,8 @@ export type Database = {
           rental_terms_fr?: string | null;
           rental_terms_ar?: string | null;
           customer_message?: string | null;
+          notification_rules?: Json;
+          email_texts?: Json;
         };
         Update: {
           id?: boolean;
@@ -631,6 +635,8 @@ export type Database = {
           rental_terms_fr?: string | null;
           rental_terms_ar?: string | null;
           customer_message?: string | null;
+          notification_rules?: Json;
+          email_texts?: Json;
         };
         Relationships: [];
       };

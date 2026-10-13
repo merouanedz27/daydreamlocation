@@ -111,6 +111,39 @@ begin
   get diagnostics v_count = row_count;
   perform set_config('role', 'postgres', true);
   insert into test_results values ('owner supprime sa notification', '1', v_count::text, v_count = 1);
+
+  insert into public.notifications (
+    recipient_id, kind, title_key, body_key, payload, dedupe_key
+  ) values (
+    v_staff, 'daily_summary', 'notifications.dailySummaryTitle', 'notifications.dailySummaryBody',
+    '{"tomorrow": 2, "due": 0, "late": 1}'::jsonb, 'daily:test'
+  );
+  v_count := pg_temp.count_as(v_staff);
+  insert into test_results values ('résumé quotidien accepté', '2', v_count::text, v_count = 2);
+
+  v_count := pg_temp.count_as(v_moderator);
+  insert into test_results values ('moderator ne voit pas le résumé du staff', '1', v_count::text, v_count = 1);
+
+  -- Réglages des notifications : le propriétaire seul les modifie.
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_staff::text, 'role', 'authenticated'
+  )::text, true);
+  perform set_config('role', 'authenticated', true);
+  update public.settings set notification_rules = '{}'::jsonb where id;
+  get diagnostics v_count = row_count;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('staff ne modifie pas les règles', '0', v_count::text, v_count = 0);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_owner::text, 'role', 'authenticated'
+  )::text, true);
+  perform set_config('role', 'authenticated', true);
+  update public.settings
+    set notification_rules = notification_rules || '{"order_created": {"bell": true, "push": false}}'::jsonb
+    where id;
+  get diagnostics v_count = row_count;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('owner modifie les règles', '1', v_count::text, v_count = 1);
 end $$;
 
 select case when ok then 'OK  ' else 'ECHEC' end as resultat, step, attendu, obtenu

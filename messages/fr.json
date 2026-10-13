@@ -13,6 +13,7 @@
     "expenses": "Dépenses",
     "team": "Équipe",
     "shop": "Boutique",
+    "settings": "Paramètres",
     "account": "Mon compte",
     "admin": "Administration",
     "myAccount": "Mon compte",
@@ -622,6 +623,72 @@
     "messagePlaceholder": "Bonjour '{nom}', votre tenue pour le '{date}' est prête. Retrait le '{retrait}', retour le '{retour}'. Reste à payer : '{reste}'. DayDream Location",
     "saved": "Informations de la boutique enregistrées."
   },
+  "settings": {
+    "title": "Paramètres",
+    "hint": "La boutique, les notifications de l'équipe et les e-mails automatiques.",
+    "tabs": {
+      "boutique": "Boutique",
+      "notifications": "Notifications",
+      "emails": "E-mails"
+    },
+    "rules": {
+      "intro": "Choisissez, pour chaque événement, s'il apparaît dans la cloche 🔔 de l'application et s'il envoie une notification push sur les téléphones. Chaque changement s'enregistre aussitôt.",
+      "bell": "Cloche",
+      "push": "Push",
+      "order_created": {
+        "label": "Nouvelle commande",
+        "hint": "Quand un collègue saisit une commande."
+      },
+      "order_updated": {
+        "label": "Commande modifiée",
+        "hint": "Cloche : toute modification. Push : seulement si la date, les pièces ou le prix changent."
+      },
+      "order_cancelled": {
+        "label": "Commande annulée",
+        "hint": "Quand une commande est annulée."
+      },
+      "order_restored": {
+        "label": "Commande réactivée",
+        "hint": "Quand une commande annulée est remise en route."
+      },
+      "daily_summary": {
+        "label": "Résumé du soir (22 h)",
+        "hint": "Mariages de demain, retours prévus et retours en retard."
+      },
+      "noteActor": "La personne qui fait l'action n'est jamais notifiée.",
+      "notePush": "Le push n'arrive que sur les appareils où il a été activé depuis la cloche."
+    },
+    "emails": {
+      "textsTitle": "Textes des e-mails automatiques",
+      "textsHint": "Objet et première phrase de chaque e-mail, dans les deux langues. Laissez vide pour garder le texte par défaut (en gris). Le détail de la commande reste ajouté automatiquement.",
+      "new_order": {
+        "title": "Nouvelle commande",
+        "hint": "Envoyé aux administrateurs qui ont coché « Nouvelle commande »."
+      },
+      "daily": {
+        "title": "Liste du soir",
+        "hint": "Envoyé chaque soir à 22 h aux administrateurs qui l'ont demandé, quand il y a des mariages le lendemain."
+      },
+      "langFr": "Français",
+      "langAr": "Arabe",
+      "language": "Langue du texte",
+      "subject": "Objet",
+      "intro": "Introduction",
+      "preview": "Aperçu",
+      "fieldsHint": "Touchez un champ pour l'insérer à l'endroit du curseur.",
+      "fields": {
+        "numero": "N° de commande",
+        "nom": "Client",
+        "date": "Date",
+        "auteur": "Saisie par",
+        "nombre": "Nombre de mariages"
+      },
+      "sampleNameFr": "Karim Benali",
+      "sampleNameAr": "كريم بن علي",
+      "save": "Enregistrer",
+      "saved": "Textes enregistrés"
+    }
+  },
   "print": {
     "share": "Partager",
     "preparing": "Préparation du PDF…",
@@ -780,6 +847,8 @@
     "pushEnable": "Activer les notifications push",
     "pushDisable": "Désactiver les notifications push",
     "pushUnavailable": "Les notifications push ne sont pas disponibles sur cet appareil.",
+    "pushDenied": "Les notifications sont bloquées pour ce site : autorisez-les dans les réglages du navigateur.",
+    "pushServiceError": "Ce navigateur n'arrive pas à joindre son service de notifications. Essayez Chrome ou Firefox, désactivez le VPN, ou activez les services push dans les réglages du navigateur.",
     "select": "Sélectionner",
     "selectAll": "Tout sélectionner",
     "deselectAll": "Tout désélectionner",
@@ -790,7 +859,7 @@
     "orderCreatedTitle": "Nouvelle commande",
     "orderCreatedBody": "{orderNo} · {customerName}",
     "orderUpdatedTitle": "Commande mise à jour",
-    "orderUpdatedBody": "{orderNo} · {customerName}",
+    "orderUpdatedBody": "{orderNo} · {customerName}{date, select, yes { · nouvelle date} other {}}{pieces, select, yes { · pièces changées} other {}}{price, select, yes { · nouveau prix} other {}}",
     "orderCancelledTitle": "Commande annulée",
     "orderCancelledBody": "{orderNo} · {customerName}",
     "orderRestoredTitle": "Commande réactivée",
@@ -801,6 +870,8 @@
     "returnDueBody": "{orderNo} · {customerName}",
     "returnLateTitle": "Retour en retard",
     "returnLateBody": "{orderNo} · {customerName}",
+    "dailySummaryTitle": "Programme de demain",
+    "dailySummaryBody": "{tomorrow, plural, =0 {Aucun mariage demain} one {# mariage demain} other {# mariages demain}} · {due, plural, =0 {aucun retour prévu} one {# retour prévu} other {# retours prévus}} · {late, plural, =0 {aucun retard} one {# retour en retard} other {# retours en retard}}",
     "notConfigured": "L'envoi d'e-mails n'est pas encore configuré sur le serveur : rien ne partira tant que les réglages SMTP manquent.",
     "compose": "Écrire aux administrateurs",
     "subject": "Objet",

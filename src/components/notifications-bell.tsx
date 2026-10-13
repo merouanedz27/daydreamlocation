@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Bell, CheckCheck, ListChecks, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -18,74 +18,37 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import {
+  countUnreadNotifications,
+  deleteNotifications,
+  listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-  deleteNotifications,
   removePushSubscription,
   savePushSubscription,
 } from "@/lib/actions/notifications";
+import { copyOf, messageValues, notificationHref } from "@/lib/notifications/kinds";
+import {
+  decodeKey,
+  getPushRegistration,
+  pushSupported,
+  subscriptionFields,
+} from "@/lib/notifications/browser";
+import { createClient } from "@/lib/supabase/client";
 import type { NotificationRow } from "@/lib/queries/notifications";
 import type { Locale } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 
-const COPY_KEYS = {
-  order_created: ["orderCreatedTitle", "orderCreatedBody"],
-  order_updated: ["orderUpdatedTitle", "orderUpdatedBody"],
-  order_cancelled: ["orderCancelledTitle", "orderCancelledBody"],
-  order_restored: ["orderRestoredTitle", "orderRestoredBody"],
-  tomorrow: ["tomorrowTitle", "tomorrowBody"],
-  return_due: ["returnDueTitle", "returnDueBody"],
-  return_late: ["returnLateTitle", "returnLateBody"],
-} as const;
-
-function payloadValues(notification: NotificationRow): Record<string, string> {
-  if (
-    !notification.payload ||
-    typeof notification.payload !== "object" ||
-    Array.isArray(notification.payload)
-  ) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(notification.payload).filter(
-      ([, value]) => typeof value === "string",
-    ),
-  ) as Record<string, string>;
-}
-
-function decodeKey(value: string): Uint8Array {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-}
-
-async function getPushRegistration(): Promise<ServiceWorkerRegistration | null> {
-  if (process.env.NODE_ENV === "development") return null;
-
-  const registration = await Promise.race([
-    navigator.serviceWorker.ready,
-    new Promise<null>((resolve) =>
-      window.setTimeout(() => resolve(null), 5000),
-    ),
-  ]);
-  return registration;
-}
-
 function PushToggle({ locale }: { locale: Locale }) {
   const t = useTranslations();
-  const [state, setState] = useState<
-    "loading" | "unsupported" | "off" | "on" | "denied"
-  >("loading");
+  const [state, setState] = useState<"loading" | "unsupported" | "off" | "on" | "denied">(
+    "loading",
+  );
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     let stopped = false;
     async function inspect() {
-      if (
-        !("serviceWorker" in navigator) ||
-        !("PushManager" in window) ||
-        !("Notification" in window)
-      ) {
+      if (!pushSupported()) {
         if (!stopped) setState("unsupported");
         return;
       }
@@ -93,73 +56,89 @@ function PushToggle({ locale }: { locale: Locale }) {
         if (!stopped) setState("denied");
         return;
       }
+      // Attend l'installation du service worker, aussi longue soit-elle : le
+      // bouton reste grisé en attendant, sans message d'erreur trompeur.
       const registration = await getPushRegistration();
       if (!registration) {
         if (!stopped) setState("unsupported");
         return;
       }
       const subscription = await registration.pushManager.getSubscription();
-      if (!stopped) setState(subscription ? "on" : "off");
+      if (stopped) return;
+      setState(subscription ? "on" : "off");
+      // À chaque ouverture : l'abonnement suit la personne connectée et la
+      // langue affichée, et `last_seen_at` prouve que l'appareil sert encore.
+      if (subscription) void savePushSubscription({ locale, ...subscriptionFields(subscription) });
     }
-    void inspect();
+    inspect().catch(() => {
+      if (!stopped) setState("unsupported");
+    });
     return () => {
       stopped = true;
     };
-  }, []);
+  }, [locale]);
 
   function toggle() {
     startTransition(async () => {
-      const registration = await getPushRegistration();
-      if (!registration) {
-        setState("unsupported");
-        return;
-      }
-      const current = await registration.pushManager.getSubscription();
-      if (current) {
-        await current.unsubscribe();
-        await removePushSubscription({ endpoint: current.endpoint });
-        setState("off");
-        return;
-      }
+      // Une erreur levée dans une transition remonte jusqu'à la page d'erreur :
+      // tout est intercepté ici (refus de la permission, réseau…).
+      try {
+        const registration = await getPushRegistration(20_000);
+        if (!registration) {
+          toast.error(t("errors.generic"));
+          return;
+        }
+        const current = await registration.pushManager.getSubscription();
+        if (current) {
+          await removePushSubscription({ endpoint: current.endpoint });
+          await current.unsubscribe();
+          setState("off");
+          return;
+        }
 
-      const keyResponse = await fetch("/api/push/vapid-public-key", {
-        cache: "no-store",
-      });
-      if (!keyResponse.ok) {
-        setState("unsupported");
-        return;
-      }
-      const { key } = (await keyResponse.json()) as { key: string };
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: decodeKey(key).buffer as ArrayBuffer,
-      });
-      const result = await savePushSubscription({
-        locale,
-        endpoint: subscription.endpoint,
-        p256dh: btoa(
-          String.fromCharCode(
-            ...new Uint8Array(subscription.getKey("p256dh")!),
+        const keyResponse = await fetch("/api/push/vapid-public-key", { cache: "no-store" });
+        if (!keyResponse.ok) {
+          setState("unsupported");
+          return;
+        }
+        const { key } = (await keyResponse.json()) as { key: string };
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeKey(key),
+        });
+        const result = await savePushSubscription({
+          locale,
+          ...subscriptionFields(subscription),
+        });
+        if (!result.ok) {
+          await subscription.unsubscribe();
+          toast.error(t(result.error));
+          return;
+        }
+        setState("on");
+      } catch (error) {
+        if (Notification.permission === "denied") {
+          setState("denied");
+          return;
+        }
+        console.error("[push] activation", error);
+        // AbortError : le navigateur n'a pas pu joindre son service push
+        // (Brave sans services Google, réseau ou VPN qui bloque FCM…).
+        toast.error(
+          t(
+            error instanceof DOMException && error.name === "AbortError"
+              ? "notifications.pushServiceError"
+              : "errors.generic",
           ),
-        ),
-        auth: btoa(
-          String.fromCharCode(...new Uint8Array(subscription.getKey("auth")!)),
-        ),
-        user_agent: navigator.userAgent,
-      });
-      if (!result.ok) {
-        await subscription.unsubscribe();
-        setState("unsupported");
-        return;
+        );
       }
-      setState("on");
     });
   }
 
   if (state === "unsupported" || state === "denied") {
     return (
       <p className="text-muted-foreground text-xs">
-        {t("notifications.pushUnavailable")}
+        {t(state === "denied" ? "notifications.pushDenied" : "notifications.pushUnavailable")}
       </p>
     );
   }
@@ -172,27 +151,28 @@ function PushToggle({ locale }: { locale: Locale }) {
       disabled={pending || state === "loading"}
       className="h-11 w-full"
     >
-      {state === "on"
-        ? t("notifications.pushDisable")
-        : t("notifications.pushEnable")}
+      {state === "on" ? t("notifications.pushDisable") : t("notifications.pushEnable")}
     </Button>
   );
 }
 
 export function NotificationsBell({
   locale,
+  userId,
   initialCount,
-  initialNotifications,
 }: {
   locale: Locale;
+  userId: string;
   initialCount: number;
-  initialNotifications: NotificationRow[];
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const rtl = locale === "ar";
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(initialCount);
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [seenInitial, setSeenInitial] = useState(initialCount);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [pending, startTransition] = useTransition();
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -202,6 +182,72 @@ export function NotificationsBell({
     null,
   );
   const suppressClick = useRef(false);
+  const openRef = useRef(false);
+
+  // Le layout a été rendu à nouveau (navigation, revalidation) : son compteur
+  // fait foi.
+  if (initialCount !== seenInitial) {
+    setSeenInitial(initialCount);
+    setCount(initialCount);
+  }
+
+  /** Relit le badge, et la liste si la cloche est ouverte. */
+  const refresh = useCallback(async () => {
+    try {
+      const [unread, list] = await Promise.all([
+        countUnreadNotifications(),
+        openRef.current ? listNotifications() : Promise.resolve(null),
+      ]);
+      setCount(unread);
+      if (list) {
+        setNotifications(list);
+        setLoaded(true);
+      }
+    } catch (error) {
+      console.error("[notifications] actualisation", error);
+    }
+  }, []);
+
+  // Temps réel : chaque notification créée ou remise à « non lue » pour CETTE
+  // personne (RLS filtre aussi côté serveur). En plus, une relecture quand le
+  // téléphone revient au premier plan — la connexion a pu dormir.
+  useEffect(() => {
+    const supabase = createClient();
+    let timer: number | undefined;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void refresh(), 300);
+    };
+    const filter = `recipient_id=eq.${userId}`;
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter }, schedule)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "notifications", filter }, schedule)
+      .subscribe();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") schedule();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, refresh]);
+
+  // Le nombre sur l'icône de l'app installée (barre des tâches, écran
+  // d'accueil). Les navigateurs sans Badging API l'ignorent.
+  useEffect(() => {
+    if (!("setAppBadge" in navigator)) return;
+    const done = count > 0 ? navigator.setAppBadge(count) : navigator.clearAppBadge();
+    done.catch(() => {});
+  }, [count]);
+
+  function onOpenChange(next: boolean) {
+    openRef.current = next;
+    setOpen(next);
+    if (next) void refresh();
+  }
 
   function markRead(notification: NotificationRow) {
     if (notification.read_at) return;
@@ -214,10 +260,7 @@ export function NotificationsBell({
     );
     setCount((value) => Math.max(0, value - 1));
     startTransition(async () => {
-      const result = await markNotificationRead({
-        locale,
-        id: notification.id,
-      });
+      const result = await markNotificationRead({ id: notification.id });
       if (!result.ok) router.refresh();
     });
   }
@@ -231,7 +274,7 @@ export function NotificationsBell({
     );
     setCount(0);
     startTransition(async () => {
-      const result = await markAllNotificationsRead({ locale });
+      const result = await markAllNotificationsRead();
       if (!result.ok) router.refresh();
     });
   }
@@ -282,7 +325,7 @@ export function NotificationsBell({
     setSelectionMode(false);
     setSwipedId(null);
     startTransition(async () => {
-      const result = await deleteNotifications({ locale, ids });
+      const result = await deleteNotifications({ ids });
       if (!result.ok) {
         toast.error(t(result.error));
         router.refresh();
@@ -301,7 +344,8 @@ export function NotificationsBell({
   function onPointerMove(event: React.PointerEvent) {
     const start = pointerStart.current;
     if (!start || event.pointerType !== "touch") return;
-    const deltaX = event.clientX - start.x;
+    // En arabe, le bouton de suppression est à droite : on glisse vers la gauche.
+    const deltaX = (event.clientX - start.x) * (rtl ? -1 : 1);
     const deltaY = event.clientY - start.y;
     if (Math.abs(deltaX) > 12 || Math.abs(deltaY) > 12) stopLongPress();
     if (Math.abs(deltaX) > Math.abs(deltaY) && deltaX > 56)
@@ -327,13 +371,14 @@ export function NotificationsBell({
       return;
     }
     markRead(notification);
-    setOpen(false);
-    if (notification.order_id)
-      router.push(`/commandes/${notification.order_id}`);
+    onOpenChange(false);
+    router.push(
+      notificationHref(notification.kind, notification.order_id, notification.payload),
+    );
   }
 
   return (
-    <Drawer open={open} onOpenChange={setOpen} direction="bottom">
+    <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
       <DrawerTrigger asChild>
         <Button
           variant="ghost"
@@ -401,14 +446,13 @@ export function NotificationsBell({
         <div className="max-h-[60vh] overflow-y-auto px-4">
           {notifications.length === 0 ? (
             <p className="text-muted-foreground py-12 text-center text-sm">
-              {t("notifications.empty")}
+              {loaded ? t("notifications.empty") : t("common.loading")}
             </p>
           ) : (
             <ul className="border-border divide-y rounded-lg border">
               {notifications.map((notification) => {
-                const keys =
-                  COPY_KEYS[notification.kind as keyof typeof COPY_KEYS];
-                const values = payloadValues(notification);
+                const copy = copyOf(notification.kind);
+                const values = messageValues(notification.payload);
                 return (
                   <li
                     key={notification.id}
@@ -453,7 +497,7 @@ export function NotificationsBell({
                       style={{
                         transform:
                           swipedId === notification.id
-                            ? "translateX(5rem)"
+                            ? `translateX(${rtl ? "-5rem" : "5rem"})`
                             : undefined,
                       }}
                       onClick={() => onNotificationClick(notification)}
@@ -483,10 +527,10 @@ export function NotificationsBell({
                       )}
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium">
-                          {t(`notifications.${keys?.[0] ?? "title"}`, values)}
+                          {t(`notifications.${copy.title}`, values)}
                         </span>
                         <span className="text-muted-foreground block truncate text-sm">
-                          {t(`notifications.${keys?.[1] ?? "hint"}`, values)}
+                          {t(`notifications.${copy.body}`, values)}
                         </span>
                         <span className="text-muted-foreground mt-1 block text-xs">
                           {formatDate(notification.created_at, locale)}

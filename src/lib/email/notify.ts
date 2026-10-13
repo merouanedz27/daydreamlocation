@@ -7,6 +7,7 @@ import { getLabelSlots } from "@/lib/queries/orders";
 import type { EditableOrder } from "@/lib/quick-draft";
 import { normalizeSearch } from "@/lib/search";
 import { ticketFields } from "@/lib/ticket-fields";
+import { fillTemplate, parseEmailTexts, type EmailTexts } from "@/lib/notification-settings";
 import type { Locale } from "@/i18n/routing";
 
 /*
@@ -50,6 +51,26 @@ export async function getRecipients(flag?: Flag, excludeId?: string): Promise<Re
     email: r.email!,
     email_locale: r.email_locale === "ar" ? "ar" : "fr",
   }));
+}
+
+/**
+ * Objet et introduction écrits par l'administrateur (Paramètres → E-mails).
+ * Vide, ou lecture ratée : le texte par défaut de nos traductions.
+ */
+async function getEmailTexts(admin: ReturnType<typeof createAdminClient>): Promise<EmailTexts> {
+  const { data, error } = await admin.from("settings").select("email_texts").eq("id", true).maybeSingle();
+  if (error) console.error("[email] textes", error);
+  return parseEmailTexts(data?.email_texts);
+}
+
+/** Le texte de l'administrateur rempli, ou le texte par défaut. */
+function custom(template: string, values: Record<string, string>, fallback: string): string {
+  return template ? fillTemplate(template, values) : fallback;
+}
+
+/** Un objet d'e-mail tient sur une ligne : un saut de ligne casserait l'en-tête. */
+function oneLine(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 /* --- Mise en page ------------------------------------------------------- */
@@ -187,7 +208,7 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
     if (recipients.length === 0) return;
 
     const admin = createAdminClient();
-    const [{ data }, labelSlots] = await Promise.all([
+    const [{ data }, labelSlots, texts] = await Promise.all([
       admin
         .from("orders")
         .select(
@@ -198,6 +219,7 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
         .order("id", { referencedTable: "order_lines", ascending: true })
         .single(),
       getLabelSlots(admin),
+      getEmailTexts(admin),
     ]);
     if (!data) return;
 
@@ -240,13 +262,26 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
         const t = await getTranslations({ locale: loc, namespace: "email" });
         const yesNo = (v: boolean) => t(v ? "order.yes" : "order.no");
         const balance = order.balance ?? 0;
-        const subject = t("newOrder.subject", {
-          orderNo: order.order_no,
-          customer: order.customer_name,
-        });
+        const own = texts.new_order[loc];
+        const values = {
+          numero: order.order_no,
+          nom: order.customer_name,
+          date: formatDate(order.event_date, loc),
+          auteur: order.profiles?.full_name ?? "",
+        };
+        const subject = oneLine(
+          custom(
+            own.subject,
+            values,
+            t("newOrder.subject", { orderNo: order.order_no, customer: order.customer_name }),
+          ),
+        );
+        const defaultIntro = order.profiles
+          ? t("newOrder.by", { name: order.profiles.full_name })
+          : undefined;
         const { html, text } = layout(loc, {
           title: t("newOrder.title", { orderNo: order.order_no }),
-          intro: order.profiles ? t("newOrder.by", { name: order.profiles.full_name }) : undefined,
+          intro: own.intro ? fillTemplate(own.intro, values) : defaultIntro,
           table: [
             [t("order.customer"), order.customer_name],
             [t("order.phone"), order.customer_phone],
@@ -293,12 +328,15 @@ export async function sendTomorrowDigest(day: string): Promise<number> {
   if (recipients.length === 0) return 0;
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("orders")
-    .select("id, order_no, customer_name, customer_phone, picked_up")
-    .eq("event_date", day)
-    .neq("status", "annulee")
-    .order("customer_name");
+  const [{ data, error }, texts] = await Promise.all([
+    admin
+      .from("orders")
+      .select("id, order_no, customer_name, customer_phone, picked_up")
+      .eq("event_date", day)
+      .neq("status", "annulee")
+      .order("customer_name"),
+    getEmailTexts(admin),
+  ]);
   if (error) throw error;
   const orders = data ?? [];
   if (orders.length === 0) return 0;
@@ -307,7 +345,11 @@ export async function sendTomorrowDigest(day: string): Promise<number> {
     recipients.map(async (r) => {
       const t = await getTranslations({ locale: r.email_locale, namespace: "email" });
       const date = formatLongDay(day, r.email_locale);
-      const subject = t("daily.subject", { count: orders.length, date });
+      const own = texts.daily[r.email_locale];
+      const values = { date, nombre: String(orders.length) };
+      const subject = oneLine(
+        custom(own.subject, values, t("daily.subject", { count: orders.length, date })),
+      );
       const body = `<ul style="padding-inline-start:20px;margin:0">${orders
         .map(
           (o) =>
@@ -317,7 +359,7 @@ export async function sendTomorrowDigest(day: string): Promise<number> {
         .join("")}</ul>`;
       const { html, text } = layout(r.email_locale, {
         title: t("daily.title", { date }),
-        intro: t("daily.intro", { count: orders.length }),
+        intro: custom(own.intro, values, t("daily.intro", { count: orders.length })),
         body,
         links: [[t("openTomorrow"), `${appUrl()}/${r.email_locale}/commandes/demain`]],
         footer: t("footer"),

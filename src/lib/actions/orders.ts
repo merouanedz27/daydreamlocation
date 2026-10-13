@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { notifyNewOrder } from "@/lib/email/notify";
-import { notifyOrderEvent } from "@/lib/notifications/service";
+import { notifyOrderEvent, snapshotOrder } from "@/lib/notifications/service";
 import { getProfile, isOwner } from "@/lib/auth";
 import { fieldErrorsOf, orderSchema, paymentSchema } from "@/lib/validation/orders";
 import type { z } from "zod";
@@ -280,6 +280,10 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   if (!parsed.ok) return parsed.result;
   const input = parsed.input;
 
+  // Date, pièces, prix AVANT : la notification ne sonne que s'ils changent.
+  // Un échec ici ne bloque jamais l'enregistrement.
+  const before = await snapshotOrder(orderId).catch(() => null);
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("update_order", {
     p_order_id: orderId,
@@ -299,7 +303,9 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   if (error) return orderWriteError(error);
 
   revalidatePath(`/${locale}/commandes`, "layout");
-  after(() => notifyOrderEvent(orderId, "order_updated", profile.id).catch(console.error));
+  after(() =>
+    notifyOrderEvent(orderId, "order_updated", profile.id, before).catch(console.error),
+  );
   return { ok: true, id: orderId };
 }
 
