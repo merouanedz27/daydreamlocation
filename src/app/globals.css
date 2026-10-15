@@ -48,6 +48,8 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-soft: var(--warning-soft);
+  --color-notification-badge: var(--notification-badge);
+  --color-notification-badge-foreground: var(--notification-badge-foreground);
   --color-gold-soft: var(--gold-soft);
   --color-gold-strong: var(--gold-strong);
   --color-cream: var(--cream);
@@ -151,6 +153,9 @@
   --warning-soft: oklch(
     0.9542 0.0372 75.16
   ); /* #FFEDD5 — texte dessus 4,52:1 */
+  /* Badge d'alerte : rouge stable et blanc lisible dans les deux thèmes. */
+  --notification-badge: oklch(0.48 0.18 25);
+  --notification-badge-foreground: oklch(1 0 0);
 
   /* CREME — #FAF5EA. Surface des BARRES DE NAVIGATION.
      En blanc sur blanc, l'en-tete ne se distinguait du contenu que par un
@@ -273,6 +278,8 @@
   --warning: oklch(0.77 0.15 58); /* #F29A4A — ~7:1 */
   --warning-foreground: oklch(0.77 0.15 58);
   --warning-soft: oklch(0.29 0.045 55);
+  --notification-badge: oklch(0.48 0.18 25);
+  --notification-badge-foreground: oklch(1 0 0);
   --cream: oklch(0.22 0.016 65);
   --cream-foreground: var(--foreground);
   --nav: oklch(

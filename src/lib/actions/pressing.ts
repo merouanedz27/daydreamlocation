@@ -67,7 +67,7 @@ async function move(formData: FormData, toPressing: boolean): Promise<PressingRe
   const { data, error } = await supabase.rpc("set_pressing", {
     p_unit_ids: ids,
     p_in: toPressing,
-    p_cost: cost,
+    p_cost: cost ?? undefined,
   });
 
   if (error) return { ok: false, error: "errors.generic" };

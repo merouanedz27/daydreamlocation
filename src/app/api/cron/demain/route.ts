@@ -1,11 +1,15 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { sendTomorrowDigest } from "@/lib/email/notify";
+import { notifyDailySummary, pruneNotifications } from "@/lib/notifications/service";
 import { addDays, todayIso } from "@/lib/rental-range";
 
 /**
- * Tâche planifiée du soir (vercel.json, 18 h UTC = 19 h à Alger) : l'e-mail
- * « Demain » — les mariages du lendemain — aux membres qui l'ont demandé.
+ * Tâche planifiée du soir (vercel.json, 21 h UTC = 22 h à Alger) : l'e-mail
+ * « Demain » — les mariages du lendemain — aux membres qui l'ont demandé,
+ * le résumé du soir dans la cloche (et en push), puis le ménage des vieilles
+ * notifications. Chaque tâche échoue seule : un e-mail parti n'est pas
+ * « raté » parce que le push a échoué.
  *
  * Vercel appelle cette adresse avec `Authorization: Bearer <CRON_SECRET>`.
  * Sans ce secret, elle ne fait RIEN : elle lit les commandes par la clé
@@ -27,12 +31,28 @@ export async function GET(request: Request) {
   }
 
   // « Demain » à l'heure d'Alger, comme l'écran du même nom.
-  const day = addDays(todayIso(), 1);
-  try {
-    const sent = await sendTomorrowDigest(day);
-    return NextResponse.json({ day, sent });
-  } catch (error) {
-    console.error("[cron demain]", error);
-    return NextResponse.json({ error: "failed" }, { status: 500 });
+  const today = todayIso();
+  const day = addDays(today, 1);
+  const [sent, notified, pruned] = await Promise.allSettled([
+    sendTomorrowDigest(day),
+    notifyDailySummary(today, day),
+    pruneNotifications(),
+  ]);
+  for (const [name, result] of [
+    ["e-mail", sent],
+    ["résumé", notified],
+    ["ménage", pruned],
+  ] as const) {
+    if (result.status === "rejected") console.error(`[cron demain] ${name}`, result.reason);
   }
+
+  const body = {
+    day,
+    sent: sent.status === "fulfilled" ? sent.value : null,
+    notifications: notified.status === "fulfilled" ? notified.value : null,
+  };
+  const failed = sent.status === "rejected" && notified.status === "rejected";
+  return NextResponse.json(failed ? { ...body, error: "failed" } : body, {
+    status: failed ? 500 : 200,
+  });
 }

@@ -9,7 +9,7 @@ import {
   LayoutGrid,
   WashingMachine,
   LogOut,
-  Store,
+  Settings,
   TrendingUp,
   User,
   Users,
@@ -81,7 +81,7 @@ export function AccountSheet({
       ? [
           { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },
           { href: "/equipe", icon: Users, label: t("nav.team") },
-          { href: "/boutique", icon: Store, label: t("nav.shop") },
+          { href: "/parametres", icon: Settings, label: t("nav.settings") },
         ]
       : []),
   ];

@@ -2,10 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getRecentNotifications,
+  getUnreadNotificationCount,
+  type NotificationRow,
+} from "@/lib/queries/notifications";
 import { getProfile, isOwner } from "@/lib/auth";
 import { emailConfigured } from "@/lib/email/send";
 import { getRecipients, sendTeamMessage } from "@/lib/email/notify";
-import { notificationPrefsSchema, teamMessageSchema } from "@/lib/validation/notifications";
+import {
+  notificationPrefsSchema,
+  pushSubscriptionSchema,
+  teamMessageSchema,
+} from "@/lib/validation/notifications";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type NotifyResult =
@@ -78,6 +88,139 @@ export async function setNotificationPrefs(input: {
     .maybeSingle();
   if (error || !data) return { ok: false, error: "errors.generic" };
 
-  revalidatePath(`/${resolveLocale(input.locale)}/equipe/notifications`);
+  revalidatePath(`/${resolveLocale(input.locale)}/parametres`);
   return { ok: true };
+}
+
+/**
+ * Les 30 dernières notifications de la personne connectée, lues à travers RLS
+ * à l'ouverture de la cloche : rien n'alourdit le layout de chaque page.
+ */
+export async function listNotifications(): Promise<NotificationRow[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+  return getRecentNotifications();
+}
+
+/** Le badge, relu quand le temps réel signale un changement. */
+export async function countUnreadNotifications(): Promise<number> {
+  const profile = await getProfile();
+  if (!profile) return 0;
+  return getUnreadNotificationCount();
+}
+
+/*
+ * Lu / tout lu / suppression : pas de `revalidatePath`. La cloche met son
+ * état à jour d'elle-même (optimiste, puis temps réel) ; revalider le layout
+ * relançait le rendu de toute l'application à chaque toucher.
+ */
+export async function markNotificationRead(input: { id: number }): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+  if (!Number.isInteger(input.id) || input.id <= 0) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", input.id)
+    .eq("recipient_id", profile.id)
+    .select("id")
+    .maybeSingle();
+
+  return error || !data ? { ok: false, error: "errors.generic" } : { ok: true };
+}
+
+export async function markAllNotificationsRead(): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("recipient_id", profile.id)
+    .is("read_at", null);
+
+  return error ? { ok: false, error: "errors.generic" } : { ok: true };
+}
+
+export async function deleteNotifications(input: { ids: number[] }): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const ids = [...new Set(input.ids)].filter((id) => Number.isInteger(id) && id > 0);
+  if (ids.length === 0 || ids.length > 100) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .in("id", ids)
+    .eq("recipient_id", profile.id);
+
+  return error ? { ok: false, error: "errors.generic" } : { ok: true };
+}
+
+/**
+ * Enregistre (ou rafraîchit) l'abonnement push de CET appareil pour la
+ * personne connectée. Appelé à l'activation et à chaque ouverture de l'app :
+ * la langue et `last_seen_at` restent à jour.
+ *
+ * Téléphone partagé : si l'adresse appartient encore à un autre membre, elle
+ * passe à la personne connectée. Le navigateur détient l'abonnement (adresse
+ * + clés) : c'est la preuve qu'il s'agit bien de cet appareil. Le client
+ * admin est nécessaire ici, RLS interdisant de toucher la ligne d'un autre.
+ */
+export async function savePushSubscription(input: {
+  locale: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent?: string;
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+
+  const parsed = pushSubscriptionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.generic" };
+
+  const admin = createAdminClient();
+  const { error } = await admin.from("push_subscriptions").upsert(
+    {
+      user_id: profile.id,
+      endpoint: parsed.data.endpoint,
+      p256dh: parsed.data.p256dh,
+      auth: parsed.data.auth,
+      locale: parsed.data.locale,
+      user_agent: parsed.data.user_agent ?? null,
+      last_seen_at: new Date().toISOString(),
+    },
+    { onConflict: "endpoint" },
+  );
+
+  return error ? { ok: false, error: "errors.generic" } : { ok: true };
+}
+
+export async function removePushSubscription(input: {
+  endpoint: string;
+}): Promise<NotifyResult> {
+  const profile = await getProfile();
+  if (!profile) return { ok: false, error: "errors.forbidden" };
+  if (typeof input.endpoint !== "string" || input.endpoint.length > 2048) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .delete()
+    .eq("endpoint", input.endpoint)
+    .eq("user_id", profile.id);
+
+  return error ? { ok: false, error: "errors.generic" } : { ok: true };
 }

@@ -10,7 +10,7 @@ import {
   LogOut,
   Plane,
   Receipt,
-  Store,
+  Settings,
   TrendingUp,
   Undo2,
   User,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { signOut } from "@/lib/actions/auth";
+import { detachPush } from "@/lib/notifications/browser";
 import { ThemeChoice } from "@/components/theme-choice";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
@@ -45,10 +46,12 @@ export function AppHeader({
   fullName,
   roleLabel,
   showDashboard,
+  notifications,
 }: {
   fullName: string;
   roleLabel: string;
   showDashboard: boolean;
+  notifications: React.ReactNode;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -172,6 +175,8 @@ export function AppHeader({
               blanc : ses couleurs de barre lui sont passées d'ici. */}
           <LocaleSwitcher className="border-nav-border bg-nav-foreground/10 text-nav-foreground hover:bg-nav-foreground/20" />
 
+          {notifications}
+
           {/* Téléphone : tiroir latéral. Bureau : le menu déroulant ci-dessous.
               Les deux ouvrent la MÊME confirmation de déconnexion. */}
           <AccountSheet
@@ -230,7 +235,7 @@ export function AppHeader({
 
               {showDashboard && (
                 <>
-                  {/* L'équipe et la boutique : des gestes rares, réservés au
+                  {/* L'équipe et les paramètres : des gestes rares, réservés au
                       propriétaire. */}
                   <DropdownMenuItem asChild>
                     <Link href="/equipe">
@@ -239,12 +244,12 @@ export function AppHeader({
                     </Link>
                   </DropdownMenuItem>
 
-                  {/* Adresse, téléphone et conditions du bon de location : un
-                      réglage qu'on écrit une fois, rangé à côté de l'équipe. */}
+                  {/* Boutique, notifications, e-mails : des réglages qu'on
+                      écrit une fois, rangés à côté de l'équipe. */}
                   <DropdownMenuItem asChild>
-                    <Link href="/boutique">
-                      <Store className="size-4" aria-hidden />
-                      {t("nav.shop")}
+                    <Link href="/parametres">
+                      <Settings className="size-4" aria-hidden />
+                      {t("nav.settings")}
                     </Link>
                   </DropdownMenuItem>
 
@@ -319,6 +324,8 @@ export function AppHeader({
         onConfirm={async () => {
           const data = new FormData();
           data.set("locale", locale);
+          // Cet appareil ne doit plus recevoir les push du compte qui part.
+          await detachPush();
           // `signOut` redirige : elle ne rend jamais la main.
           await signOut(data);
         }}

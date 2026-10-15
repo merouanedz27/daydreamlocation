@@ -7,6 +7,7 @@ import { getLabelSlots } from "@/lib/queries/orders";
 import type { EditableOrder } from "@/lib/quick-draft";
 import { normalizeSearch } from "@/lib/search";
 import { ticketFields } from "@/lib/ticket-fields";
+import { fillTemplate, parseEmailTexts, type EmailTexts } from "@/lib/notification-settings";
 import type { Locale } from "@/i18n/routing";
 
 /*
@@ -33,7 +34,7 @@ type Flag = "notify_new_order" | "notify_daily";
  * cochée. Un membre `staff` ne reçoit JAMAIS d'e-mail, quelle que soit sa
  * case : c'est le choix du propriétaire (et le coût de l'envoi reste bas).
  */
-export async function getRecipients(flag?: Flag): Promise<Recipient[]> {
+export async function getRecipients(flag?: Flag, excludeId?: string): Promise<Recipient[]> {
   const admin = createAdminClient();
   let request = admin
     .from("profiles")
@@ -42,6 +43,7 @@ export async function getRecipients(flag?: Flag): Promise<Recipient[]> {
     .eq("role", "owner")
     .not("email", "is", null);
   if (flag) request = request.eq(flag, true);
+  if (excludeId) request = request.neq("id", excludeId);
   const { data, error } = await request.order("full_name");
   if (error) throw error;
   return (data ?? []).map((r) => ({
@@ -49,6 +51,26 @@ export async function getRecipients(flag?: Flag): Promise<Recipient[]> {
     email: r.email!,
     email_locale: r.email_locale === "ar" ? "ar" : "fr",
   }));
+}
+
+/**
+ * Objet et introduction écrits par l'administrateur (Paramètres → E-mails).
+ * Vide, ou lecture ratée : le texte par défaut de nos traductions.
+ */
+async function getEmailTexts(admin: ReturnType<typeof createAdminClient>): Promise<EmailTexts> {
+  const { data, error } = await admin.from("settings").select("email_texts").eq("id", true).maybeSingle();
+  if (error) console.error("[email] textes", error);
+  return parseEmailTexts(data?.email_texts);
+}
+
+/** Le texte de l'administrateur rempli, ou le texte par défaut. */
+function custom(template: string, values: Record<string, string>, fallback: string): string {
+  return template ? fillTemplate(template, values) : fallback;
+}
+
+/** Un objet d'e-mail tient sur une ligne : un saut de ligne casserait l'en-tête. */
+function oneLine(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 /* --- Mise en page ------------------------------------------------------- */
@@ -92,36 +114,33 @@ function layout(
 <h1 style="margin:0 0 12px;font-size:20px">${escapeHtml(parts.title)}</h1>
 ${parts.intro ? `<p style="margin:0 0 12px;font-size:15px">${escapeHtml(parts.intro)}</p>` : ""}
 ${lines
-  .map(
-    ([label, value]) =>
-      `<p style="margin:0 0 6px;font-size:15px"><b>${escapeHtml(label)}</b> ${escapeHtml(value!)}</p>`,
-  )
-  .join("\n")}
-${
-  parts.table
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:16px;line-height:1.35">${parts.table
+      .map(
+        ([label, value]) =>
+          `<p style="margin:0 0 6px;font-size:15px"><b>${escapeHtml(label)}</b> ${escapeHtml(value!)}</p>`,
+      )
+      .join("\n")}
+${parts.table
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:16px;line-height:1.35">${parts.table
         .map(
           ([label, value]) =>
             `<tr><td style="padding:5px 0;padding-inline-end:18px;vertical-align:top;white-space:nowrap">${escapeHtml(label)}</td><td style="padding:5px 0;vertical-align:top">${escapeHtml(value ?? "")}</td></tr>`,
         )
         .join("")}</table>`
-    : ""
-}
+      : ""
+    }
 ${parts.body ? `<div style="font-size:15px;line-height:1.5">${parts.body}</div>` : ""}
-${
-  parts.links?.length
-    ? `<p style="margin:18px 0 0">${parts.links
+${parts.links?.length
+      ? `<p style="margin:18px 0 0">${parts.links
         .map(
           ([label, href], i) =>
-            `<a href="${escapeHtml(href)}" style="display:inline-block;margin:0 0 8px;margin-inline-end:8px;text-decoration:none;padding:10px 16px;border-radius:6px;font-size:15px;${
-              i === 0
-                ? "background:#1c1917;color:#ffffff"
-                : "border:1px solid #1c1917;color:#1c1917"
+            `<a href="${escapeHtml(href)}" style="display:inline-block;margin:0 0 8px;margin-inline-end:8px;text-decoration:none;padding:10px 16px;border-radius:6px;font-size:15px;${i === 0
+              ? "background:#1c1917;color:#ffffff"
+              : "border:1px solid #1c1917;color:#1c1917"
             }">${escapeHtml(label)}</a>`,
         )
         .join("")}</p>`
-    : ""
-}
+      : ""
+    }
 </div>
 <p style="margin:12px 0 0;font-size:12px;color:#78716c;text-align:center">${escapeHtml(parts.footer)}</p>
 </div></body></html>`;
@@ -176,21 +195,20 @@ export async function sendTeamMessage(
  * VERS / PRIX / REST », dans cet ordre, avec ses émojis. Les champs sont
  * calculés comme ceux du bon de location (`ticket-fields.ts`).
  *
- * À TOUS ceux qui ont coché « Nouvelle commande », y compris celui qui l'a
- * saisie : son AppSheet lui envoyait aussi ses propres commandes — c'est sa
- * trace. Qui n'en veut pas décoche la case.
+ * À tous ceux qui ont coché « Nouvelle commande », sauf la personne qui vient
+ * de la saisir : une action ne doit pas produire sa propre alerte.
  *
  * Appelé APRÈS la réponse (`after()` dans l'action) : la saisie n'attend pas
  * l'envoi. Une erreur ici ne remonte nulle part : la commande est enregistrée.
  */
-export async function notifyNewOrder(orderId: number): Promise<void> {
+export async function notifyNewOrder(orderId: number, excludeId?: string): Promise<void> {
   if (!emailConfigured()) return;
   try {
-    const recipients = await getRecipients("notify_new_order");
+    const recipients = await getRecipients("notify_new_order", excludeId);
     if (recipients.length === 0) return;
 
     const admin = createAdminClient();
-    const [{ data }, labelSlots] = await Promise.all([
+    const [{ data }, labelSlots, texts] = await Promise.all([
       admin
         .from("orders")
         .select(
@@ -201,6 +219,7 @@ export async function notifyNewOrder(orderId: number): Promise<void> {
         .order("id", { referencedTable: "order_lines", ascending: true })
         .single(),
       getLabelSlots(admin),
+      getEmailTexts(admin),
     ]);
     if (!data) return;
 
@@ -243,13 +262,26 @@ export async function notifyNewOrder(orderId: number): Promise<void> {
         const t = await getTranslations({ locale: loc, namespace: "email" });
         const yesNo = (v: boolean) => t(v ? "order.yes" : "order.no");
         const balance = order.balance ?? 0;
-        const subject = t("newOrder.subject", {
-          orderNo: order.order_no,
-          customer: order.customer_name,
-        });
+        const own = texts.new_order[loc];
+        const values = {
+          numero: order.order_no,
+          nom: order.customer_name,
+          date: formatDate(order.event_date, loc),
+          auteur: order.profiles?.full_name ?? "",
+        };
+        const subject = oneLine(
+          custom(
+            own.subject,
+            values,
+            t("newOrder.subject", { orderNo: order.order_no, customer: order.customer_name }),
+          ),
+        );
+        const defaultIntro = order.profiles
+          ? t("newOrder.by", { name: order.profiles.full_name })
+          : undefined;
         const { html, text } = layout(loc, {
           title: t("newOrder.title", { orderNo: order.order_no }),
-          intro: order.profiles ? t("newOrder.by", { name: order.profiles.full_name }) : undefined,
+          intro: own.intro ? fillTemplate(own.intro, values) : defaultIntro,
           table: [
             [t("order.customer"), order.customer_name],
             [t("order.phone"), order.customer_phone],
@@ -297,12 +329,15 @@ export async function sendTomorrowDigest(day: string): Promise<number> {
   if (recipients.length === 0) return 0;
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("orders")
-    .select("id, order_no, customer_name, customer_phone, picked_up")
-    .eq("event_date", day)
-    .neq("status", "annulee")
-    .order("customer_name");
+  const [{ data, error }, texts] = await Promise.all([
+    admin
+      .from("orders")
+      .select("id, order_no, customer_name, customer_phone, picked_up")
+      .eq("event_date", day)
+      .neq("status", "annulee")
+      .order("customer_name"),
+    getEmailTexts(admin),
+  ]);
   if (error) throw error;
   const orders = data ?? [];
   if (orders.length === 0) return 0;
@@ -311,18 +346,21 @@ export async function sendTomorrowDigest(day: string): Promise<number> {
     recipients.map(async (r) => {
       const t = await getTranslations({ locale: r.email_locale, namespace: "email" });
       const date = formatLongDay(day, r.email_locale);
-      const subject = t("daily.subject", { count: orders.length, date });
+      const own = texts.daily[r.email_locale];
+      const values = { date, nombre: String(orders.length) };
+      const subject = oneLine(
+        custom(own.subject, values, t("daily.subject", { count: orders.length, date })),
+      );
       const body = `<ul style="padding-inline-start:20px;margin:0">${orders
         .map(
           (o) =>
-            `<li style="margin:0 0 6px"><b>${escapeHtml(o.customer_name)}</b> · ${escapeHtml(o.order_no)}${
-              o.customer_phone ? ` · <span dir="ltr">${escapeHtml(o.customer_phone)}</span>` : ""
+            `<li style="margin:0 0 6px"><b>${escapeHtml(o.customer_name)}</b> · ${escapeHtml(o.order_no)}${o.customer_phone ? ` · <span dir="ltr">${escapeHtml(o.customer_phone)}</span>` : ""
             }${o.picked_up ? ` · ${escapeHtml(t("daily.pickedUp"))}` : ""}</li>`,
         )
         .join("")}</ul>`;
       const { html, text } = layout(r.email_locale, {
         title: t("daily.title", { date }),
-        intro: t("daily.intro", { count: orders.length }),
+        intro: custom(own.intro, values, t("daily.intro", { count: orders.length })),
         body,
         links: [[t("openTomorrow"), `${appUrl()}/${r.email_locale}/commandes/demain`]],
         footer: t("footer"),

@@ -13,6 +13,7 @@
     "expenses": "المصاريف",
     "team": "الفريق",
     "shop": "المحل",
+    "settings": "الإعدادات",
     "account": "حسابي",
     "admin": "الإدارة",
     "myAccount": "حسابي",
@@ -625,6 +626,72 @@
     "messagePlaceholder": "مرحبا '{nom}'، لباسك ليوم '{date}' جاهز. الاستلام يوم '{retrait}' والإرجاع يوم '{retour}'. المبلغ المتبقي: '{reste}'. DayDream Location",
     "saved": "تم حفظ معلومات المحل."
   },
+  "settings": {
+    "title": "الإعدادات",
+    "hint": "المحل، إشعارات الفريق والرسائل الإلكترونية التلقائية.",
+    "tabs": {
+      "boutique": "المحل",
+      "notifications": "الإشعارات",
+      "emails": "البريد الإلكتروني"
+    },
+    "rules": {
+      "intro": "اختر لكل حدث هل يظهر في جرس 🔔 التطبيق وهل يُرسل إشعارًا فوريًا إلى الهواتف. يُحفظ كل تغيير فورًا.",
+      "bell": "الجرس",
+      "push": "فوري",
+      "order_created": {
+        "label": "طلب جديد",
+        "hint": "عندما يسجّل زميل طلبًا."
+      },
+      "order_updated": {
+        "label": "تعديل طلب",
+        "hint": "الجرس: كل تعديل. الإشعار الفوري: فقط إذا تغيّر التاريخ أو القطع أو السعر."
+      },
+      "order_cancelled": {
+        "label": "إلغاء طلب",
+        "hint": "عندما يُلغى طلب."
+      },
+      "order_restored": {
+        "label": "إعادة تفعيل طلب",
+        "hint": "عندما يُعاد تفعيل طلب ملغى."
+      },
+      "daily_summary": {
+        "label": "ملخص المساء (22:00)",
+        "hint": "أعراس الغد، الإرجاعات المنتظرة والمتأخرة."
+      },
+      "noteActor": "الشخص الذي قام بالعملية لا يتلقى إشعارًا أبدًا.",
+      "notePush": "لا يصل الإشعار الفوري إلا إلى الأجهزة التي فُعّل عليها من الجرس."
+    },
+    "emails": {
+      "textsTitle": "نصوص الرسائل التلقائية",
+      "textsHint": "موضوع وأول جملة لكل رسالة، باللغتين. اتركه فارغًا للإبقاء على النص الافتراضي (باللون الرمادي). تفاصيل الطلب تُضاف تلقائيًا.",
+      "new_order": {
+        "title": "طلب جديد",
+        "hint": "تُرسل إلى المسؤولين الذين اختاروا «طلب جديد»."
+      },
+      "daily": {
+        "title": "قائمة المساء",
+        "hint": "تُرسل كل مساء على الساعة 22:00 إلى المسؤولين الذين طلبوها، إذا كانت هناك أعراس في الغد."
+      },
+      "langFr": "الفرنسية",
+      "langAr": "العربية",
+      "language": "لغة النص",
+      "subject": "الموضوع",
+      "intro": "المقدمة",
+      "preview": "معاينة",
+      "fieldsHint": "المس حقلًا لإدراجه في مكان المؤشر.",
+      "fields": {
+        "numero": "رقم الطلب",
+        "nom": "الزبون",
+        "date": "التاريخ",
+        "auteur": "سجّله",
+        "nombre": "عدد الأعراس"
+      },
+      "sampleNameFr": "Karim Benali",
+      "sampleNameAr": "كريم بن علي",
+      "save": "حفظ",
+      "saved": "تم حفظ النصوص"
+    }
+  },
   "print": {
     "share": "مشاركة",
     "preparing": "جارٍ تحضير PDF…",
@@ -776,7 +843,39 @@
   },
   "notifications": {
     "title": "الإشعارات",
-    "hint": "المسؤولون وحدهم يتلقون البريد الإلكتروني: راسلهم، واختر من يتلقى الرسائل التلقائية.",
+    "hint": "يتلقى الفريق تنبيهات الطلبيات والتذكيرات المهمة.",
+    "unread": "غير المقروءة",
+    "markAllRead": "تحديد الكل كمقروء",
+    "empty": "لا توجد إشعارات",
+    "open": "فتح الإشعارات",
+    "pushEnable": "تفعيل الإشعارات الفورية",
+    "pushDisable": "تعطيل الإشعارات الفورية",
+    "pushUnavailable": "الإشعارات الفورية غير متاحة على هذا الجهاز.",
+    "pushDenied": "الإشعارات محظورة لهذا الموقع: اسمح بها من إعدادات المتصفح.",
+    "pushServiceError": "تعذّر على هذا المتصفح الاتصال بخدمة الإشعارات. جرّب Chrome أو Firefox، أو أوقف VPN، أو فعّل خدمات الإشعارات في إعدادات المتصفح.",
+    "select": "تحديد",
+    "selectAll": "تحديد الكل",
+    "deselectAll": "إلغاء تحديد الكل",
+    "selectedCount": "تم تحديد {count}",
+    "deleteSelected": "حذف المحدد",
+    "cancelSelection": "الخروج من التحديد",
+    "deletedToast": "تم حذف الإشعار(ات)",
+    "orderCreatedTitle": "طلبية جديدة",
+    "orderCreatedBody": "{orderNo} · {customerName}",
+    "orderUpdatedTitle": "تم تحديث الطلبية",
+    "orderUpdatedBody": "{orderNo} · {customerName}{date, select, yes { · تاريخ جديد} other {}}{pieces, select, yes { · قطع مغيّرة} other {}}{price, select, yes { · سعر جديد} other {}}",
+    "orderCancelledTitle": "أُلغيت الطلبية",
+    "orderCancelledBody": "{orderNo} · {customerName}",
+    "orderRestoredTitle": "أُعيد تفعيل الطلبية",
+    "orderRestoredBody": "{orderNo} · {customerName}",
+    "tomorrowTitle": "طلبية غدًا",
+    "tomorrowBody": "{orderNo} · {customerName}",
+    "returnDueTitle": "موعد الإرجاع اليوم",
+    "returnDueBody": "{orderNo} · {customerName}",
+    "returnLateTitle": "إرجاع متأخر",
+    "returnLateBody": "{orderNo} · {customerName}",
+    "dailySummaryTitle": "برنامج الغد",
+    "dailySummaryBody": "{tomorrow, plural, =0 {لا أعراس غدًا} one {عرس واحد غدًا} two {عرسان غدًا} few {# أعراس غدًا} many {# عرسًا غدًا} other {# عرس غدًا}} · {due, plural, =0 {لا إرجاع اليوم} one {إرجاع واحد اليوم} other {# إرجاعات اليوم}} · {late, plural, =0 {لا تأخير} one {إرجاع واحد متأخر} other {# إرجاعات متأخرة}}",
     "notConfigured": "إرسال البريد غير مُعدّ بعد على الخادم: لن يُرسل شيء ما دامت إعدادات SMTP ناقصة.",
     "compose": "مراسلة المسؤولين",
     "subject": "الموضوع",
