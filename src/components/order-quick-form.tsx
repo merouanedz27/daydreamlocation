@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { flushSync } from "react-dom";
 import { unstable_rethrow, useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -20,7 +26,12 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
@@ -39,17 +50,29 @@ import {
   SizePicker,
   type PickerOption,
 } from "@/components/list-picker";
-import { checkAvailability, createOrder, updateOrder } from "@/lib/actions/orders";
-import { resolveUnitPrice, spreadOutfitPrice, toPayload, type DraftLine } from "@/lib/order-draft";
+import {
+  checkAvailability,
+  createOrder,
+  updateOrder,
+} from "@/lib/actions/orders";
+import {
+  resolveUnitPrice,
+  spreadOutfitPrice,
+  toPayload,
+  type DraftLine,
+} from "@/lib/order-draft";
 import { fieldErrorsOf, orderSchema } from "@/lib/validation/orders";
 import { defaultWindow } from "@/lib/rental-range";
-import { createDeviceSetting, createMemoryStore } from "@/lib/device-setting";
+import { createMemoryStore } from "@/lib/device-setting";
 import {
   ACCESSORIES_SLOT,
   EMPTY_DRAFT,
   EMPTY_SLOT,
   FIXED_SLOTS,
+  JABADOR_SLOT,
   PART_SLOTS,
+  SHOES_SLOT,
+  SHIRT_SLOT,
   catalogSlotOf,
   costumeSize,
   partOfSlot,
@@ -59,7 +82,14 @@ import {
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import { SUIT_SIZES, sizeSeries, sortSizes } from "@/lib/sizes";
+import {
+  ORDER_SHIRT_SIZES,
+  SUIT_SIZES,
+  labelHasSize,
+  sizeInLabel,
+  sizeSeries,
+  sortSizes,
+} from "@/lib/sizes";
 import { HighlightText } from "@/components/highlight";
 import type {
   CustomerSuggestion,
@@ -73,7 +103,7 @@ import type { Locale } from "@/i18n/routing";
 /* --------------------------------------------------------------------------
  * Le brouillon — une LIGNE DU TABLEUR.
  *
- * Six cases fixes (veste, gilet, pantalon, chemise, chaussures, accessoires),
+ * Sept cases fixes (veste, gilet, pantalon, chemise, jabador, chaussures, accessoires),
  * les colonnes de son AppSheet, puis des pièces en plus si besoin. Chaque case est du texte
  * libre ; une suggestion du stock la RATTACHE à une pièce réelle, qui seule
  * bloque des dates.
@@ -85,51 +115,124 @@ import type { Locale } from "@/i18n/routing";
  * vit en mémoire et part de la commande en base (voir `edit`).
  * ------------------------------------------------------------------------ */
 
-const draftStore = createDeviceSetting<QuickDraft>({
-  key: "dd.quickOrder",
-  fallback: EMPTY_DRAFT,
-  sanitize: (value) => {
-    if (!value || typeof value !== "object") return null;
-    const d = value as Omit<Partial<QuickDraft>, "v"> & { v?: number };
-    if (!Array.isArray(d.slots)) return null;
-    let slots = d.slots.map((s) => ({ ...EMPTY_SLOT, ...s }));
-    if (d.v === 1) {
-      // Brouillon d'avant la case « Accessoires » : trois cases fixes, puis
-      // les pièces en plus. On insère la nouvelle case à sa place plutôt que
-      // de jeter une saisie en cours.
-      if (slots.length < 3) return null;
-      slots = [...slots.slice(0, 3), EMPTY_SLOT, ...slots.slice(3)];
-    } else if (d.v !== 2 && d.v !== 3) {
-      return null;
+function sanitizeQuickDraft(value: unknown): QuickDraft | null {
+  if (!value || typeof value !== "object") return null;
+  const d = value as Omit<Partial<QuickDraft>, "v"> & { v?: number };
+  if (!Array.isArray(d.slots)) return null;
+  let slots = d.slots.map((s) => ({ ...EMPTY_SLOT, ...s }));
+  if (d.v === 1) {
+    // Brouillon d'avant la case « Accessoires » : trois cases fixes, puis
+    // les pièces en plus. On insère la nouvelle case à sa place plutôt que
+    // de jeter une saisie en cours.
+    if (slots.length < 3) return null;
+    slots = [...slots.slice(0, 3), EMPTY_SLOT, ...slots.slice(3)];
+  } else if (d.v !== 2 && d.v !== 3 && d.v !== 4) {
+    return null;
+  }
+  if (d.v !== 3) {
+    // Brouillon d'avant les cases par partie : une seule case « Costume »,
+    // ses tailles gilet / pantalon à part. Un costume nommé les reprend
+    // dans sa taille (« 50 · G 48 · P 52 ») ; gilet et pantalon arrivent vides.
+    if (slots.length < 4) return null;
+    const old = d as { vestSize?: string; pantsSize?: string };
+    const [jacket, ...rest] = slots;
+    const size =
+      jacket.name && !jacket.unitId
+        ? (costumeSize(jacket.size, old.vestSize ?? "", old.pantsSize ?? "") ??
+          "")
+        : jacket.size;
+    slots = [{ ...jacket, size }, EMPTY_SLOT, EMPTY_SLOT, ...rest];
+  }
+  // v3 avait six cases fixes. Le Jabador devient la nouvelle case 4 :
+  // les chaussures et accessoires sont donc conservés mais décalés.
+  if (d.v !== 4) {
+    if (slots.length < 6) return null;
+    slots = [
+      ...slots.slice(0, JABADOR_SLOT),
+      EMPTY_SLOT,
+      ...slots.slice(JABADOR_SLOT),
+    ];
+  }
+  if (slots.length < FIXED_SLOTS) return null;
+  return { ...EMPTY_DRAFT, ...d, v: 4, slots };
+}
+
+/**
+ * Store local au formulaire: son premier snapshot est toujours EMPTY_DRAFT.
+ * Ainsi un brouillon mémoire/HMR v3 ne peut pas participer à l'hydratation.
+ */
+function createQuickDraftStore() {
+  let current = EMPTY_DRAFT;
+  let hydrated = false;
+  const listeners = new Set<() => void>();
+
+  function hydrate() {
+    if (hydrated) return;
+    hydrated = true;
+    try {
+      current =
+        sanitizeQuickDraft(
+          JSON.parse(localStorage.getItem("dd.quickOrder") ?? "null"),
+        ) ?? EMPTY_DRAFT;
+    } catch {
+      current = EMPTY_DRAFT;
     }
-    if (d.v !== 3) {
-      // Brouillon d'avant les cases par partie : une seule case « Costume »,
-      // ses tailles gilet / pantalon à part. Un costume nommé les reprend
-      // dans sa taille (« 50 · G 48 · P 52 ») ; gilet et pantalon arrivent vides.
-      if (slots.length < 4) return null;
-      const old = d as { vestSize?: string; pantsSize?: string };
-      const [jacket, ...rest] = slots;
-      const size =
-        jacket.name && !jacket.unitId
-          ? (costumeSize(jacket.size, old.vestSize ?? "", old.pantsSize ?? "") ?? "")
-          : jacket.size;
-      slots = [{ ...jacket, size }, EMPTY_SLOT, EMPTY_SLOT, ...rest];
-    }
-    if (slots.length < FIXED_SLOTS) return null;
-    return { ...EMPTY_DRAFT, ...d, v: 3, slots };
-  },
-});
+    for (const listener of listeners) listener();
+  }
+
+  function subscribe(onChange: () => void) {
+    listeners.add(onChange);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== "dd.quickOrder") return;
+      hydrated = false;
+      hydrate();
+      onChange();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      listeners.delete(onChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }
+
+  return {
+    get: () => (hydrated ? current : EMPTY_DRAFT),
+    hydrate,
+    set(next: QuickDraft) {
+      current = next;
+      hydrated = true;
+      try {
+        localStorage.setItem("dd.quickOrder", JSON.stringify(next));
+      } catch {
+        /* le brouillon vaut pour la session, faute de mieux. */
+      }
+      for (const listener of listeners) listener();
+    },
+    useValue() {
+      return useSyncExternalStore(
+        subscribe,
+        () => (hydrated ? current : EMPTY_DRAFT),
+        () => EMPTY_DRAFT,
+      );
+    },
+  };
+}
 
 /** Tant que le prix n'est pas tapé à la main, il vaut la somme des pièces du stock. */
 function withAutoPrice(d: QuickDraft): QuickDraft {
   if (d.priceTouched) return d;
-  const sum = d.slots.reduce((s, slot) => s + (slot.unitId ? (slot.stockPrice ?? 0) : 0), 0);
+  const sum = d.slots.reduce(
+    (s, slot) => s + (slot.unitId ? (slot.stockPrice ?? 0) : 0),
+    0,
+  );
   return { ...d, price: sum > 0 ? String(sum) : "" };
 }
 
 function isDirty(d: QuickDraft): boolean {
   return (
-    Boolean(d.customerName || d.customerPhone || d.eventDate || d.tailor || d.price) ||
+    Boolean(
+      d.customerName || d.customerPhone || d.eventDate || d.tailor || d.price,
+    ) ||
     Boolean(d.paid || d.caution || d.notes) ||
     d.pickedUp ||
     d.returned ||
@@ -163,13 +266,14 @@ const EMPTY_BUSY = new Map<number, Unavailability>();
 
 /**
  * Catégories du stock montrées d'office dans chaque case (numérotée comme
- * `slot` des suggestions : 2 chemise, 3 chaussures, 4 accessoires). Les
+ * `slot` des suggestions : 2 chemise, 3 jabador, 4 chaussures, 5 accessoires). Les
  * parties du costume ont leurs propres cases, qui ne montrent que la leur.
  */
 const SLOT_CATEGORIES: Record<number, string[]> = {
   2: ["chemise"],
-  3: ["chaussures", "bligha"],
-  4: ["noeud", "accessoire", "barnous"],
+  3: ["jabador"],
+  4: ["chaussures", "bligha"],
+  5: ["noeud", "accessoire", "barnous"],
 };
 
 /**
@@ -177,7 +281,7 @@ const SLOT_CATEGORIES: Record<number, string[]> = {
  * saisis à la main, ni un nouveau tapé dans la recherche (demande du client
  * pour les chaussures).
  */
-const STOCK_ONLY_SLOTS = new Set([3]);
+const STOCK_ONLY_SLOTS = new Set([4]);
 
 /** Pas des boutons − / + des montants : les prix se comptent en 500 DA. */
 const MONEY_STEP = 500;
@@ -214,34 +318,52 @@ export function OrderQuickForm({
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const router = useRouter();
-  const partLabel = (part: string | null) => (part ? t(`stock.parts.${part}`) : "");
+  const partLabel = (part: string | null) =>
+    part ? t(`stock.parts.${part}`) : "";
   const slotLabel = (index: number) =>
     partOfSlot(index)
       ? partLabel(partOfSlot(index))
-      : index === 3
+      : index === SHIRT_SLOT
         ? t("orders.quick.shirt")
-        : index === 4
-          ? t("orders.quick.shoes")
-          : index === ACCESSORIES_SLOT
-            ? t("orders.quick.accessories")
-            : t("orders.quick.other");
+        : index === JABADOR_SLOT
+          ? t("orders.quick.jabador")
+          : index === SHOES_SLOT
+            ? t("orders.quick.shoes")
+            : index === ACCESSORIES_SLOT
+              ? t("orders.quick.accessories")
+              : t("orders.quick.other");
 
   /**
-   * Veste, gilet, pantalon, chemise, chaussures : la TAILLE d'abord, puis la
+   * Veste, gilet, pantalon, chemise, jabador, chaussures : la TAILLE d'abord, puis la
    * pièce du stock dans cette taille — une liste courte, pas tout le stock.
    */
-  // Chemise (3) : en attente — le patron n'a pas encore mis ses chemises en
-  // stock. Elle garde sa liste seule ; retirer `index !== 3` lui rend sa taille.
-  const sizedSlot = (index: number) => index < ACCESSORIES_SLOT && index !== 3;
+  // Chemise et Jabador utilisent eux aussi le geste « taille puis pièce du stock ».
+  const sizedSlot = (index: number) => index < ACCESSORIES_SLOT;
   const [isPending, startTransition] = useTransition();
   // En modification, un brouillon EN MÉMOIRE parti de la commande : le
   // brouillon de nouvelle commande gardé dans le téléphone n'est pas touché.
-  const [store] = useState(() => (edit ? createMemoryStore(edit.initial) : draftStore));
+  const [store] = useState(() =>
+    edit ? createMemoryStore(edit.initial) : createQuickDraftStore(),
+  );
+  const [localReady, setLocalReady] = useState(Boolean(edit));
+  useEffect(() => {
+    if (edit) return;
+    if ("hydrate" in store && typeof store.hydrate === "function") {
+      store.hydrate();
+    }
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setLocalReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [edit, store]);
   // Pendant l'envoi d'une nouvelle commande, la saisie affichée est figée
   // (voir `onSubmit`) : le brouillon stocké est déjà vidé.
   const [frozen, setFrozen] = useState<QuickDraft | null>(null);
   const live = store.useValue();
-  const draft = frozen ?? live;
+  const draft = frozen ?? (localReady ? live : EMPTY_DRAFT);
 
   function updateDraft(patch: Partial<QuickDraft>) {
     store.set(withAutoPrice({ ...store.get(), ...patch }));
@@ -262,18 +384,24 @@ export function OrderQuickForm({
   const { pickup, returnDue } = draft;
   const windowValid = Boolean(pickup && returnDue && returnDue >= pickup);
   const windowKey = windowValid ? `${pickup}|${returnDue}|${recheck}` : "";
-  const hasStock = useMemo(() => models.some((m) => m.units.length > 0), [models]);
+  const hasStock = useMemo(
+    () => models.some((m) => m.units.length > 0),
+    [models],
+  );
 
   // Disponibilité du stock sur la fenêtre — pour GRISER, pas pour décider :
   // la contrainte `EXCLUDE` tranche à l'écriture. Sans stock, rien à demander.
   useEffect(() => {
     if (!hasStock || !windowKey) return;
     let cancelled = false;
-    const [from, to] = windowKey.split("|");  // le 3e morceau est `recheck`
+    const [from, to] = windowKey.split("|"); // le 3e morceau est `recheck`
     // En modification, les pièces de CETTE commande ne sont pas « prises ».
     checkAvailability(from, to, edit?.orderId).then((busy) => {
       if (!cancelled) {
-        setAvailability({ key: windowKey, busy: new Map(busy.map((b) => [b.unitId, b])) });
+        setAvailability({
+          key: windowKey,
+          busy: new Map(busy.map((b) => [b.unitId, b])),
+        });
       }
     });
     return () => {
@@ -282,13 +410,15 @@ export function OrderQuickForm({
   }, [hasStock, windowKey, edit?.orderId]);
 
   const busy = availability.key === windowKey ? availability.busy : EMPTY_BUSY;
-  const isChecking = hasStock && Boolean(windowKey) && availability.key !== windowKey;
+  const isChecking =
+    hasStock && Boolean(windowKey) && availability.key !== windowKey;
 
   /** Prix catalogue de chaque pièce du stock : la clé de répartition du prix. */
   const listPrice = useMemo(() => {
     const map = new Map<number, number>();
     for (const model of models) {
-      for (const unit of model.units) map.set(unit.id, resolveUnitPrice(model, unit));
+      for (const unit of model.units)
+        map.set(unit.id, resolveUnitPrice(model, unit));
     }
     return map;
   }, [models]);
@@ -373,7 +503,12 @@ export function OrderQuickForm({
     }
     // Une taille choisie sans pièce : la case attend sa pièce du stock.
     draft.slots.forEach((slot, index) => {
-      if (sizedSlot(index) && slot.size.trim() && !slot.unitId && !slot.name.trim()) {
+      if (
+        sizedSlot(index) &&
+        slot.size.trim() &&
+        !slot.unitId &&
+        !slot.name.trim()
+      ) {
         issues[`part_${index}`] = {
           key: "errors.partNeedsStock",
           values: { part: slotLabel(index), size: slot.size.trim() },
@@ -407,13 +542,19 @@ export function OrderQuickForm({
       updateDraft({ eventDate: value });
       return;
     }
-    const w = defaultWindow(value, settings.days_before_event, settings.days_after_event);
+    const w = defaultWindow(
+      value,
+      settings.days_before_event,
+      settings.days_after_event,
+    );
     updateDraft({ eventDate: value, pickup: w.pickup, returnDue: w.returnDue });
   }
 
   function setSlot(index: number, patch: Partial<Slot>) {
     setServerIssue(null);
-    const slots = store.get().slots.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    const slots = store
+      .get()
+      .slots.map((s, i) => (i === index ? { ...s, ...patch } : s));
     updateDraft({ slots });
   }
 
@@ -441,10 +582,16 @@ export function OrderQuickForm({
 
   // --- listes à cocher -------------------------------------------------------
   // `n` change à chaque ouverture : la liste est remontée et repart de la case.
-  const [picker, setPicker] = useState<{ index: number; n: number; open: boolean } | null>(null);
-  const [sizePicker, setSizePicker] = useState<{ index: number; n: number; open: boolean } | null>(
-    null,
-  );
+  const [picker, setPicker] = useState<{
+    index: number;
+    n: number;
+    open: boolean;
+  } | null>(null);
+  const [sizePicker, setSizePicker] = useState<{
+    index: number;
+    n: number;
+    open: boolean;
+  } | null>(null);
 
   const pickedUnits = new Set(draft.slots.map((s) => s.unitId).filter(Boolean));
 
@@ -452,17 +599,27 @@ export function OrderQuickForm({
   const unitIndex = useMemo(() => {
     const map = new Map<
       number,
-      { model: PickerModel; unit: PickerModel["units"][number]; name: string; price: number }
+      {
+        model: PickerModel;
+        unit: PickerModel["units"][number];
+        name: string;
+        price: number;
+      }
     >();
     for (const model of models) {
-      const name = (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
+      const name =
+        (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
       for (const unit of model.units) {
-        map.set(unit.id, { model, unit, name, price: resolveUnitPrice(model, unit) });
+        map.set(unit.id, {
+          model,
+          unit,
+          name,
+          price: resolveUnitPrice(model, unit),
+        });
       }
     }
     return map;
   }, [models, locale]);
-
 
   /** Pourquoi une pièce ne peut pas être prise, pour la case `index`. */
   function unitState(id: number, index: number) {
@@ -474,7 +631,10 @@ export function OrderQuickForm({
 
     let reason: string | null = null;
     if (!windowValid) reason = t("orders.quick.dateFirst");
-    else if (material) reason = t(unit.status === "nettoyage" ? "stock.cleaning" : "stock.repair");
+    else if (material)
+      reason = t(
+        unit.status === "nettoyage" ? "stock.cleaning" : "stock.repair",
+      );
     else if (blocked)
       reason = blocked.freeFrom
         ? t("orders.freeFrom", { date: formatDate(blocked.freeFrom, locale) })
@@ -493,14 +653,20 @@ export function OrderQuickForm({
     const part = partOfSlot(index);
     if (part) return (unit.part ?? model.category_slug) === part;
     const slotNo = catalogSlotOf(index);
-    return Boolean(slotNo && SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""));
+    return Boolean(
+      slotNo && SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""),
+    );
   }
 
   /** Les tailles proposées : la série habituelle, plus celles du stock (M, L…). */
   function slotSizes(index: number): string[] {
     const series = partOfSlot(index)
       ? SUIT_SIZES
-      : sizeSeries(index === 3 ? "chemise" : "chaussures");
+      : index === SHIRT_SLOT || index === JABADOR_SLOT
+        ? ORDER_SHIRT_SIZES
+        : index === SHOES_SLOT
+          ? sizeSeries("chaussures")
+          : [];
     const stock: string[] = [];
     for (const { model, unit } of unitIndex.values()) {
       if (unitFitsSlot(index, model, unit) && unit.size) stock.push(unit.size);
@@ -526,9 +692,14 @@ export function OrderQuickForm({
         search: `${label} ${unit.ref_code}`,
         secondary: (
           <>
-            <Package className="text-gold-strong me-1 inline size-3" aria-hidden />
+            <Package
+              className="text-gold-strong me-1 inline size-3"
+              aria-hidden
+            />
             {unit.size && `${t("stock.size")} ${unit.size}`}
-            {reason && <span className="text-warning-foreground"> · {reason}</span>}
+            {reason && (
+              <span className="text-warning-foreground"> · {reason}</span>
+            )}
           </>
         ),
         trailing: <span className="tabular">{formatMoney(price, locale)}</span>,
@@ -537,29 +708,48 @@ export function OrderQuickForm({
       };
     };
 
-    // Veste, gilet, pantalon, chaussures — et la chemise une fois sa taille
-    // choisie : les pièces du stock de CETTE case, dans la taille choisie.
+    // Veste, gilet, pantalon, chemise, jabador et chaussures : les pièces du stock de
+    // CETTE case, dans la taille choisie.
     // L'équipe FAIT DÉFILER plutôt que de chercher : les pièces libres
     // d'abord, rangées par taille puis par référence.
-    const size = sizedSlot(index) ? (draft.slots[index]?.size.trim() ?? "") : "";
-    const stockOnly = Boolean(partOfSlot(index)) || (slotNo !== null && STOCK_ONLY_SLOTS.has(slotNo));
+    const size = sizedSlot(index)
+      ? (draft.slots[index]?.size.trim() ?? "")
+      : "";
+    const stockOnly =
+      Boolean(partOfSlot(index)) ||
+      (slotNo !== null && STOCK_ONLY_SLOTS.has(slotNo));
     if (stockOnly || size) {
       const rows: { option: PickerOption; size: string; ref: string }[] = [];
       for (const [id, { model, unit }] of unitIndex) {
         if (!unitFitsSlot(index, model, unit)) continue;
         if (size && (unit.size ?? "").trim() !== size) continue;
-        rows.push({ option: unitOption(id, true), size: unit.size ?? "", ref: unit.ref_code ?? "" });
+        rows.push({
+          option: unitOption(id, true),
+          size: unit.size ?? "",
+          ref: unit.ref_code ?? "",
+        });
       }
       rows.sort(
         (a, b) =>
-          Number(Boolean(a.option.disabled)) - Number(Boolean(b.option.disabled)) ||
+          Number(Boolean(a.option.disabled)) -
+            Number(Boolean(b.option.disabled)) ||
           a.size.localeCompare(b.size, undefined, { numeric: true }) ||
           a.ref.localeCompare(b.ref, undefined, { numeric: true }),
       );
       options.push(...rows.map((r) => r.option));
-      // Chemise : ses chemises saisies à la main restent trouvables en tapant.
+      // Chemise et Jabador : après les pièces du stock, les noms de SA liste
+      // dans cette taille — le geste marche même stock vide. Une taille
+      // absente de sa liste (Jabador XXL) montre toute la liste plutôt que rien.
       if (!stockOnly) {
-        for (const item of items) options.push({ key: `h:${item.label}`, label: item.label });
+        const own = items.filter((item) => item.slot === slotNo);
+        const sized = own.filter((item) => labelHasSize(item.label, size));
+        for (const item of sized.length ? sized : own) {
+          options.push({
+            key: `h:${item.label}`,
+            label: item.label,
+            featured: true,
+          });
+        }
       }
       return options;
     }
@@ -567,14 +757,22 @@ export function OrderQuickForm({
     // 1. Le stock d'abord : c'est la seule pièce dont on garantit les dates.
     for (const [id, { model }] of unitIndex) {
       const featured =
-        extra || Boolean(slotNo && SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""));
+        extra ||
+        Boolean(
+          slotNo &&
+          SLOT_CATEGORIES[slotNo]?.includes(model.category_slug ?? ""),
+        );
       options.push(unitOption(id, featured));
     }
 
     // 2. Ses vêtements déjà saisis — ceux de CETTE case montrés d'office.
     // Dans l'ordre de SES listes (`item-catalog`), pas l'ordre alphabétique.
     for (const item of items) {
-      options.push({ key: `h:${item.label}`, label: item.label, featured: extra || item.slot === slotNo });
+      options.push({
+        key: `h:${item.label}`,
+        label: item.label,
+        featured: extra || item.slot === slotNo,
+      });
     }
     return options;
   }
@@ -586,7 +784,9 @@ export function OrderQuickForm({
     if (slot.unitId) return [`u:${slot.unitId}`];
     const name = slot.name.trim();
     if (!name) return [];
-    const known = items.find((i) => normalizeSearch(i.label) === normalizeSearch(name));
+    const known = items.find(
+      (i) => normalizeSearch(i.label) === normalizeSearch(name),
+    );
     return [known ? `h:${known.label}` : NEW_KEY + name];
   }
 
@@ -595,7 +795,9 @@ export function OrderQuickForm({
     const found = unitIndex.get(id);
     if (!found) return null;
     return {
-      name: found.unit.part ? `${found.name} · ${partLabel(found.unit.part)}` : found.name,
+      name: found.unit.part
+        ? `${found.name} · ${partLabel(found.unit.part)}`
+        : found.name,
       size: found.unit.size ?? "",
       unitId: found.unit.id,
       ref: found.unit.ref_code,
@@ -607,10 +809,22 @@ export function OrderQuickForm({
   /** Une clé cochée → de quoi remplir une case. */
   function slotFromKey(key: string): Partial<Slot> | null {
     if (key.startsWith(NEW_KEY)) {
-      return { name: key.slice(NEW_KEY.length), unitId: null, ref: null, stockPrice: null, external: null };
+      return {
+        name: key.slice(NEW_KEY.length),
+        unitId: null,
+        ref: null,
+        stockPrice: null,
+        external: null,
+      };
     }
     if (key.startsWith("h:")) {
-      return { name: key.slice(2), unitId: null, ref: null, stockPrice: null, external: null };
+      return {
+        name: key.slice(2),
+        unitId: null,
+        ref: null,
+        stockPrice: null,
+        external: null,
+      };
     }
     return unitSlot(Number(key.slice(2)));
   }
@@ -643,7 +857,18 @@ export function OrderQuickForm({
       };
     } else {
       const [first, ...rest] = picks;
-      slots[index] = { ...base, ...first, size: first.unitId ? (first.size ?? "") : keptSize };
+      // Chemise, Jabador : « Jabador M - Vert » choisi sans taille donne M.
+      const named =
+        !first.unitId &&
+        !keptSize &&
+        (index === SHIRT_SLOT || index === JABADOR_SLOT)
+          ? (sizeInLabel(first.name ?? "", slotSizes(index)) ?? "")
+          : "";
+      slots[index] = {
+        ...base,
+        ...first,
+        size: first.unitId ? (first.size ?? "") : keptSize || named,
+      };
       for (const more of rest) slots.push({ ...EMPTY_SLOT, ...more });
     }
     updateDraft({ slots });
@@ -658,7 +883,8 @@ export function OrderQuickForm({
     if (!picker) return;
     // « + Autre pièce » refermé sans rien choisir : pas de case vide qui traîne.
     const slot = store.get().slots[picker.index];
-    if (picker.index >= FIXED_SLOTS && slot && !slot.name.trim()) removeSlot(picker.index);
+    if (picker.index >= FIXED_SLOTS && slot && !slot.name.trim())
+      removeSlot(picker.index);
     setPicker({ ...picker, open: false });
   }
 
@@ -677,11 +903,19 @@ export function OrderQuickForm({
   function pickSize(index: number, value: string) {
     const slot = store.get().slots[index];
     const stale =
-      slot.unitId && (unitIndex.get(slot.unitId)?.unit.size ?? "").trim() !== value;
+      slot.unitId &&
+      (unitIndex.get(slot.unitId)?.unit.size ?? "").trim() !== value;
     setSlot(
       index,
       stale
-        ? { size: value, name: "", unitId: null, ref: null, stockPrice: null, external: null }
+        ? {
+            size: value,
+            name: "",
+            unitId: null,
+            ref: null,
+            stockPrice: null,
+            external: null,
+          }
         : { size: value },
     );
     setSizePicker((p) => (p ? { ...p, open: false } : p));
@@ -701,14 +935,18 @@ export function OrderQuickForm({
       .filter(
         (c) =>
           normalizeSearch(c.name).includes(q) &&
-          !(normalizeSearch(c.name) === q && (c.phone ?? "") === draft.customerPhone),
+          !(
+            normalizeSearch(c.name) === q &&
+            (c.phone ?? "") === draft.customerPhone
+          ),
       )
       .slice(0, MAX_SUGGESTIONS)
       .map((c) => ({
         key: `${c.name}|${c.phone ?? ""}`,
         primary: <HighlightText text={c.name} q={draft.customerName} />,
         secondary: c.phone ? <bdi dir="ltr">{c.phone}</bdi> : undefined,
-        onPick: () => updateDraft({ customerName: c.name, customerPhone: c.phone ?? "" }),
+        onPick: () =>
+          updateDraft({ customerName: c.name, customerPhone: c.phone ?? "" }),
       }));
   })();
 
@@ -803,7 +1041,10 @@ export function OrderQuickForm({
         // « + Autre » — même mariage, client suivant : on garde la date.
         reset(true);
         toast.success(t("orders.quick.savedToast", { name }), {
-          action: { label: t("orders.quick.view"), onClick: () => router.push(href) },
+          action: {
+            label: t("orders.quick.view"),
+            onClick: () => router.push(href),
+          },
         });
         window.scrollTo({ top: 0, behavior: "smooth" });
         document.getElementById("q-name")?.focus({ preventScroll: true });
@@ -849,7 +1090,9 @@ export function OrderQuickForm({
     <form onSubmit={onSubmit} onKeyDown={onKeyDown} noValidate>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="font-heading text-xl font-medium">
-          {edit ? t("orders.edit.title", { no: edit.orderNo }) : t("orders.newTitle")}
+          {edit
+            ? t("orders.edit.title", { no: edit.orderNo })
+            : t("orders.newTitle")}
         </h1>
         {!edit && isDirty(draft) && (
           <Button
@@ -883,11 +1126,15 @@ export function OrderQuickForm({
               autoCapitalize="words"
               aria-required
             />
-            {issues.customer_name && <FieldError>{issueText("customer_name")}</FieldError>}
+            {issues.customer_name && (
+              <FieldError>{issueText("customer_name")}</FieldError>
+            )}
           </Field>
 
           <Field data-invalid={!!issues.customer_phone || undefined}>
-            <FieldLabel htmlFor="q-phone">{t("orders.quick.phoneOptional")}</FieldLabel>
+            <FieldLabel htmlFor="q-phone">
+              {t("orders.quick.phoneOptional")}
+            </FieldLabel>
             <Input
               id="q-phone"
               data-field
@@ -901,7 +1148,9 @@ export function OrderQuickForm({
               className="h-12 text-base"
               aria-invalid={!!issues.customer_phone || undefined}
             />
-            {issues.customer_phone && <FieldError>{issueText("customer_phone")}</FieldError>}
+            {issues.customer_phone && (
+              <FieldError>{issueText("customer_phone")}</FieldError>
+            )}
           </Field>
 
           <Field data-invalid={!!issues.event_date || undefined}>
@@ -916,12 +1165,17 @@ export function OrderQuickForm({
               placeholder={t("common.pickDate")}
               invalid={!!issues.event_date}
             />
-            {issues.event_date && <FieldError>{issueText("event_date")}</FieldError>}
+            {issues.event_date && (
+              <FieldError>{issueText("event_date")}</FieldError>
+            )}
 
             {windowLabel && (
               <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-sm">
                 <span className="flex items-center gap-1.5">
-                  <CalendarRange className="text-gold-strong size-4 shrink-0" aria-hidden />
+                  <CalendarRange
+                    className="text-gold-strong size-4 shrink-0"
+                    aria-hidden
+                  />
                   <span className="tabular">{windowLabel}</span>
                 </span>
                 <button
@@ -937,32 +1191,46 @@ export function OrderQuickForm({
           </Field>
 
           {draft.eventDate && showDates && (
-              <div className="grid grid-cols-2 gap-3">
-                <Field data-invalid={!!issues.pickup_date || undefined}>
-                  <FieldLabel htmlFor="q-pickup">{t("orders.pickupDate")}</FieldLabel>
-                  <DatePicker
-                    id="q-pickup"
-                    value={pickup}
-                    onChange={(v) => updateDraft({ pickup: v, datesTouched: true })}
-                    invalid={!!issues.pickup_date}
-                    disabledDays={returnDue ? { after: toCalendarDate(returnDue) } : undefined}
-                  />
-                  {issues.pickup_date && <FieldError>{issueText("pickup_date")}</FieldError>}
-                </Field>
-                <Field data-invalid={!!issues.return_due_date || undefined}>
-                  <FieldLabel htmlFor="q-return">{t("orders.returnDate")}</FieldLabel>
-                  <DatePicker
-                    id="q-return"
-                    value={returnDue}
-                    onChange={(v) => updateDraft({ returnDue: v, datesTouched: true })}
-                    invalid={!!issues.return_due_date}
-                    disabledDays={pickup ? { before: toCalendarDate(pickup) } : undefined}
-                  />
-                  {issues.return_due_date && (
-                    <FieldError>{issueText("return_due_date")}</FieldError>
-                  )}
-                </Field>
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field data-invalid={!!issues.pickup_date || undefined}>
+                <FieldLabel htmlFor="q-pickup">
+                  {t("orders.pickupDate")}
+                </FieldLabel>
+                <DatePicker
+                  id="q-pickup"
+                  value={pickup}
+                  onChange={(v) =>
+                    updateDraft({ pickup: v, datesTouched: true })
+                  }
+                  invalid={!!issues.pickup_date}
+                  disabledDays={
+                    returnDue ? { after: toCalendarDate(returnDue) } : undefined
+                  }
+                />
+                {issues.pickup_date && (
+                  <FieldError>{issueText("pickup_date")}</FieldError>
+                )}
+              </Field>
+              <Field data-invalid={!!issues.return_due_date || undefined}>
+                <FieldLabel htmlFor="q-return">
+                  {t("orders.returnDate")}
+                </FieldLabel>
+                <DatePicker
+                  id="q-return"
+                  value={returnDue}
+                  onChange={(v) =>
+                    updateDraft({ returnDue: v, datesTouched: true })
+                  }
+                  invalid={!!issues.return_due_date}
+                  disabledDays={
+                    pickup ? { before: toCalendarDate(pickup) } : undefined
+                  }
+                />
+                {issues.return_due_date && (
+                  <FieldError>{issueText("return_due_date")}</FieldError>
+                )}
+              </Field>
+            </div>
           )}
 
           {/* « Allez valide » / « Retour valide » : les deux cases ✗/✓ de son
@@ -976,13 +1244,17 @@ export function OrderQuickForm({
               checked={draft.pickedUp}
               // Décocher la sortie décoche aussi le retour : une tenue ne
               // revient pas sans être partie.
-              onChange={(v) => updateDraft({ pickedUp: v, returned: v && draft.returned })}
+              onChange={(v) =>
+                updateDraft({ pickedUp: v, returned: v && draft.returned })
+              }
             />
             <FlagToggle
               icon={<CircleCheck className="size-4" aria-hidden />}
               label={t("orders.returned")}
               checked={draft.returned}
-              onChange={(v) => updateDraft({ returned: v, pickedUp: v || draft.pickedUp })}
+              onChange={(v) =>
+                updateDraft({ returned: v, pickedUp: v || draft.pickedUp })
+              }
             />
           </div>
         </FieldGroup>
@@ -1000,9 +1272,13 @@ export function OrderQuickForm({
           </>
         }
         invalid={!!issues.lines}
-        aside={isChecking ? <Spinner className="text-muted-foreground" /> : null}
+        aside={
+          isChecking ? <Spinner className="text-muted-foreground" /> : null
+        }
       >
-        <p className="text-muted-foreground -mt-2 mb-4 text-sm">{t("orders.quick.outfitHint")}</p>
+        <p className="text-muted-foreground -mt-2 mb-4 text-sm">
+          {t("orders.quick.outfitHint")}
+        </p>
 
         <div className="space-y-4">
           {draft.slots.map((slot, index) => {
@@ -1012,7 +1288,10 @@ export function OrderQuickForm({
             return (
               <div key={index}>
                 <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <label htmlFor={`q-slot-${index}`} className="text-sm font-medium">
+                  <label
+                    htmlFor={`q-slot-${index}`}
+                    className="text-sm font-medium"
+                  >
                     {slotLabel(index)}
                   </label>
                   {index >= FIXED_SLOTS && (
@@ -1058,7 +1337,9 @@ export function OrderQuickForm({
                       type="button"
                       id={`q-size-${index}`}
                       aria-label={`${t("stock.size")} · ${slotLabel(index)}`}
-                      onClick={() => setSizePicker({ index, n: Date.now(), open: true })}
+                      onClick={() =>
+                        setSizePicker({ index, n: Date.now(), open: true })
+                      }
                       data-invalid={partIssue ? true : undefined}
                       className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 data-[invalid=true]:border-destructive flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-md border outline-none focus-visible:ring-[3px]"
                     >
@@ -1070,7 +1351,10 @@ export function OrderQuickForm({
                           {slot.size}
                         </span>
                       ) : (
-                        <Plus className="text-muted-foreground mt-0.5 size-4" aria-hidden />
+                        <Plus
+                          className="text-muted-foreground mt-0.5 size-4"
+                          aria-hidden
+                        />
                       )}
                     </button>
                     <PickerField
@@ -1078,11 +1362,15 @@ export function OrderQuickForm({
                       className="min-w-0 flex-1"
                       value={slot.name}
                       placeholder={t(
-                        part || index === 4 ? "orders.quick.pickPart" : "orders.quick.pickPlaceholder",
+                        part || index === SHOES_SLOT
+                          ? "orders.quick.pickPart"
+                          : "orders.quick.pickPlaceholder",
                       )}
                       onOpen={() => openPicker(index)}
                       onClear={() => applyPicked(index, [])}
-                      invalid={Boolean(partIssue) || (!!issues.lines && index === 0)}
+                      invalid={
+                        Boolean(partIssue) || (!!issues.lines && index === 0)
+                      }
                     />
                   </div>
                 ) : (
@@ -1114,11 +1402,16 @@ export function OrderQuickForm({
                   <p
                     className={cn(
                       "mt-1.5 flex items-center gap-1.5 text-xs",
-                      taken ? "text-warning-foreground font-medium" : "text-success",
+                      taken
+                        ? "text-warning-foreground font-medium"
+                        : "text-success",
                     )}
                   >
                     {taken ? (
-                      <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+                      <AlertTriangle
+                        className="size-3.5 shrink-0"
+                        aria-hidden
+                      />
                     ) : (
                       <Package className="size-3.5 shrink-0" aria-hidden />
                     )}
@@ -1127,7 +1420,9 @@ export function OrderQuickForm({
                     {taken &&
                       ` · ${
                         taken.freeFrom
-                          ? t("orders.freeFrom", { date: formatDate(taken.freeFrom, locale) })
+                          ? t("orders.freeFrom", {
+                              date: formatDate(taken.freeFrom, locale),
+                            })
                           : t("orders.takenOnDates")
                       }`}
                   </p>
@@ -1137,7 +1432,10 @@ export function OrderQuickForm({
                     sous le costume — après sa dernière partie. */}
                 {index === PART_SLOTS.length - 1 && (
                   <div className="mt-3">
-                    <label htmlFor="q-tailor" className="text-muted-foreground mb-1 block text-xs">
+                    <label
+                      htmlFor="q-tailor"
+                      className="text-muted-foreground mb-1 block text-xs"
+                    >
                       {t("orders.quick.tailor")}
                     </label>
                     <Input
@@ -1186,7 +1484,9 @@ export function OrderQuickForm({
               onChange={(v) => updateDraft({ paid: v })}
               invalid={!!issues.amount_paid}
             />
-            {issues.amount_paid && <FieldError>{issueText("amount_paid")}</FieldError>}
+            {issues.amount_paid && (
+              <FieldError>{issueText("amount_paid")}</FieldError>
+            )}
           </Field>
 
           <Field data-invalid={!!issues.price || undefined}>
@@ -1207,7 +1507,9 @@ export function OrderQuickForm({
               onClick={() => updateDraft({ paid: String(total) })}
               className="h-11 w-full text-base"
             >
-              {t("orders.quick.paidAll", { amount: formatMoney(total, locale) })}
+              {t("orders.quick.paidAll", {
+                amount: formatMoney(total, locale),
+              })}
             </Button>
           )}
 
@@ -1217,7 +1519,9 @@ export function OrderQuickForm({
             <p
               className={cn(
                 "bg-muted/60 tabular flex h-12 items-center rounded-md px-3 text-base",
-                balance > 0 ? "text-warning-foreground font-medium" : "text-muted-foreground",
+                balance > 0
+                  ? "text-warning-foreground font-medium"
+                  : "text-muted-foreground",
               )}
               aria-live="polite"
             >
@@ -1233,7 +1537,9 @@ export function OrderQuickForm({
               onChange={(v) => updateDraft({ caution: v })}
               invalid={!!issues.caution_amount}
             />
-            {issues.caution_amount && <FieldError>{issueText("caution_amount")}</FieldError>}
+            {issues.caution_amount && (
+              <FieldError>{issueText("caution_amount")}</FieldError>
+            )}
           </Field>
 
           <Field data-invalid={!!issues.notes || undefined}>
@@ -1254,7 +1560,9 @@ export function OrderQuickForm({
       {generalError && (
         <Alert variant="destructive" className="mt-6">
           <AlertCircle />
-          <AlertDescription>{t(generalError.key, generalError.values)}</AlertDescription>
+          <AlertDescription>
+            {t(generalError.key, generalError.values)}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -1282,40 +1590,57 @@ export function OrderQuickForm({
         </div>
 
         {issueCount > 0 && (
-          <p className="text-destructive mb-2 flex items-center gap-2 text-sm" role="status">
+          <p
+            className="text-destructive mb-2 flex items-center gap-2 text-sm"
+            role="status"
+          >
             <AlertCircle className="size-4 shrink-0" aria-hidden />
-            {t("orders.fieldsToFix", { count: formatNumber(issueCount, locale) })}
+            {t("orders.fieldsToFix", {
+              count: formatNumber(issueCount, locale),
+            })}
           </p>
         )}
 
         {edit ? (
           // Modification : enregistrer, ou revenir à la fiche sans rien changer.
           <div className="grid grid-cols-[1fr_auto] gap-2">
-            <Button type="submit" value="save" disabled={isPending} className="h-12 text-base">
+            <Button
+              type="submit"
+              value="save"
+              disabled={isPending}
+              className="h-12 text-base"
+            >
               {isPending && <Spinner />}
               {t("orders.edit.save")}
             </Button>
             <Button asChild variant="outline" className="h-12 px-4 text-base">
-              <Link href={`/commandes/${edit.orderId}`}>{t("common.cancel")}</Link>
+              <Link href={`/commandes/${edit.orderId}`}>
+                {t("common.cancel")}
+              </Link>
             </Button>
           </div>
         ) : (
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <Button type="submit" value="save" disabled={isPending} className="h-12 text-base">
-            {isPending && <Spinner />}
-            {t("orders.quick.save")}
-          </Button>
-          <Button
-            type="submit"
-            value="another"
-            variant="outline"
-            disabled={isPending}
-            className="h-12 px-4 text-base"
-          >
-            <Plus className="size-4" aria-hidden />
-            {t("orders.quick.saveAnother")}
-          </Button>
-        </div>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Button
+              type="submit"
+              value="save"
+              disabled={isPending}
+              className="h-12 text-base"
+            >
+              {isPending && <Spinner />}
+              {t("orders.quick.save")}
+            </Button>
+            <Button
+              type="submit"
+              value="another"
+              variant="outline"
+              disabled={isPending}
+              className="h-12 px-4 text-base"
+            >
+              <Plus className="size-4" aria-hidden />
+              {t("orders.quick.saveAnother")}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1324,13 +1649,18 @@ export function OrderQuickForm({
           key={picker.n}
           open={picker.open}
           onOpenChange={(open) => (open ? null : closePicker())}
-          title={sizedSlot(picker.index) ? sizedTitle(picker.index) : slotLabel(picker.index)}
+          title={
+            sizedSlot(picker.index)
+              ? sizedTitle(picker.index)
+              : slotLabel(picker.index)
+          }
           options={pickerOptions(picker.index)}
           selected={selectedKeys(picker.index)}
           onDone={(keys) => applyPicked(picker.index, keys)}
           // Veste, gilet, pantalon : du stock seulement.
           allowNew={
-            !partOfSlot(picker.index) && !STOCK_ONLY_SLOTS.has(catalogSlotOf(picker.index) ?? 0)
+            !partOfSlot(picker.index) &&
+            !STOCK_ONLY_SLOTS.has(catalogSlotOf(picker.index) ?? 0)
           }
           // Les cases fixes : un toucher choisit et referme. « + Autre pièce »
           // garde ses cases à cocher et « Valider » (cravate + ceinture…).
@@ -1352,7 +1682,9 @@ export function OrderQuickForm({
         <SizePicker
           key={sizePicker.n}
           open={sizePicker.open}
-          onOpenChange={(open) => (open ? null : setSizePicker({ ...sizePicker, open: false }))}
+          onOpenChange={(open) =>
+            open ? null : setSizePicker({ ...sizePicker, open: false })
+          }
           title={`${t("stock.size")} · ${slotLabel(sizePicker.index)}`}
           sizes={slotSizes(sizePicker.index)}
           value={draft.slots[sizePicker.index]?.size ?? ""}
@@ -1394,7 +1726,8 @@ function MoneyStepper({
 }) {
   const t = useTranslations();
   const current = Number(value) || 0;
-  const step = (delta: number) => onChange(String(Math.max(0, current + delta)));
+  const step = (delta: number) =>
+    onChange(String(Math.max(0, current + delta)));
 
   return (
     <div className="flex gap-1.5">
@@ -1510,7 +1843,10 @@ function Section({
       className="border-border scroll-mt-20 border-t pt-5 pb-6 outline-none first-of-type:border-t-0 first-of-type:pt-0"
     >
       <div className="mb-4 flex items-center gap-2">
-        <h2 id={`${id}-title`} className={cn("text-lg font-medium", invalid && "text-destructive")}>
+        <h2
+          id={`${id}-title`}
+          className={cn("text-lg font-medium", invalid && "text-destructive")}
+        >
           {title}
         </h2>
         {aside && <span className="ms-auto">{aside}</span>}

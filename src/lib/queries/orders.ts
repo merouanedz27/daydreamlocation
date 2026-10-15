@@ -4,7 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/lib/supabase/database.types";
-import { COSTUME_ITEMS, SHIRT_ITEMS, SHOE_ITEMS } from "@/lib/item-catalog";
+import {
+  COSTUME_ITEMS,
+  JABADOR_ITEMS,
+  SHIRT_ITEMS,
+  SHOE_ITEMS,
+} from "@/lib/item-catalog";
 import { normalizeSearch } from "@/lib/search";
 
 export type Settings = Tables<"settings">;
@@ -146,7 +151,7 @@ export async function getOrderCatalogue(): Promise<{
 export type ItemSuggestion = {
   label: string;
   uses: number;
-  /** Position habituelle dans la commande : 1 tenue, 2 chemise, 3 chaussures. */
+  /** Position habituelle : 1 tenue, 2 chemise, 3 jabador, 4 chaussures, 5 accessoires. */
   slot: number;
 };
 
@@ -172,14 +177,15 @@ export async function getQuickSuggestions(): Promise<{
     items: [
       ...COSTUME_ITEMS.map((label) => ({ label, uses: 0, slot: 1 })),
       ...SHIRT_ITEMS.map((label) => ({ label, uses: 0, slot: 2 })),
-      ...SHOE_ITEMS.map((label) => ({ label, uses: 0, slot: 3 })),
+      ...JABADOR_ITEMS.map((label) => ({ label, uses: 0, slot: 3 })),
+      ...SHOE_ITEMS.map((label) => ({ label, uses: 0, slot: 4 })),
     ],
     customers: (customers.data ?? []).map((r) => ({ name: r.name, phone: r.phone })),
   };
 }
 
 /**
- * La case HABITUELLE de chaque libellé déjà saisi (1 tenue … 4 accessoires),
+ * La case HABITUELLE de chaque libellé déjà saisi (1 tenue … 5 accessoires),
  * apprise des commandes — y compris les libellés d'avant les listes fixes.
  * Ne sert qu'à REPLACER les pièces d'une commande existante dans leurs cases
  * (modification, bon de location), jamais à proposer quoi que ce soit.
@@ -191,11 +197,17 @@ export async function getLabelSlots(
   const supabase = client ?? (await createClient());
   const { data } = await supabase.rpc("order_item_suggestions");
   const slots = new Map<string, number>();
-  for (const r of data ?? []) slots.set(normalizeSearch(r.label), Number(r.slot));
+  // La position apprise suit l'ANCIENNE ligne (1 tenue, 2 chemise,
+  // 3 chaussures, 4+ accessoires) : depuis le Jabador en 3, on la décale.
+  for (const r of data ?? []) {
+    const learned = Number(r.slot);
+    slots.set(normalizeSearch(r.label), learned >= 4 ? 5 : learned === 3 ? 4 : learned);
+  }
   // Les listes fixes ont le dernier mot : un costume reste un costume.
   for (const label of COSTUME_ITEMS) slots.set(normalizeSearch(label), 1);
   for (const label of SHIRT_ITEMS) slots.set(normalizeSearch(label), 2);
-  for (const label of SHOE_ITEMS) slots.set(normalizeSearch(label), 3);
+  for (const label of JABADOR_ITEMS) slots.set(normalizeSearch(label), 3);
+  for (const label of SHOE_ITEMS) slots.set(normalizeSearch(label), 4);
   return slots;
 }
 

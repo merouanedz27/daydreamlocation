@@ -294,6 +294,7 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
             [t("order.pantsSize"), fields.pantsSize],
             [t("order.tailor"), fields.tailor],
             [t("order.shirt"), fields.shirt],
+            [t("order.jabador"), fields.jabador],
             [t("order.shoes"), fields.shoes],
             [t("order.accessories"), fields.accessories],
             [t("order.paid"), formatMoney(order.amount_paid, loc)],

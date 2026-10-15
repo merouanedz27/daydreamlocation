@@ -33,19 +33,27 @@ export const COSTUME_ITEMS = [
   "Pantalon F",
   "Pantalon G",
   "Pantalon Invite Beige Simple", "Pantalon Invite Blue Nuit Croise", "Pantalon Invite Vert Croise", "Pantalon Invite Noir Simple", "Pantalon Invite Blue Arriere", "Pantalon Invite Gris", "Pantalon Invite Greuna",
+  "Barnous Dore", "Barnous Dore Max", "Barnous Beige Wafa",
+] as const;
+
+export const JABADOR_ITEMS = [
   "Jabador S - Grenat", "Jabador S - Grenat avec Beige", "Jabador S - Beige", "Jabador S - Vert",
   "Jabador M - Grenat", "Jabador M - Grenat avec Beige", "Jabador M - Beige", "Jabador M - Vert",
   "Jabador L - Grenat", "Jabador L - Grenat avec Beige", "Jabador L - Beige", "Jabador L - Vert",
   "Jabador XL - Grenat", "Jabador XL - Grenat avec Beige", "Jabador XL - Beige", "Jabador XL - Vert",
-  "Barnous Dore", "Barnous Dore Max", "Barnous Beige Wafa",
+  "Jabador XXL - Grenat", "Jabador XXL - Grenat avec Beige", "Jabador XXL - Beige", "Jabador XXL - Vert",
+  "Jabador 3XL - Grenat", "Jabador 3XL - Grenat avec Beige", "Jabador 3XL - Beige", "Jabador 3XL - Vert",
+  "Jabador 4XL - Grenat", "Jabador 4XL - Grenat avec Beige", "Jabador 4XL - Beige", "Jabador 4XL - Vert",
+  "Jabador 5XL - Grenat", "Jabador 5XL - Grenat avec Beige", "Jabador 5XL - Beige", "Jabador 5XL - Vert",
+  "Jabador 6XL - Grenat", "Jabador 6XL - Grenat avec Beige", "Jabador 6XL - Beige", "Jabador 6XL - Vert",
 ] as const;
 
 export const SHIRT_ITEMS = [
-  "Chemise Papillon Blanc S", "Chemise Papillon Blanc M", "Chemise Papillon Blanc L", "Chemise Papillon Blanc XL", "Chemise Papillon Blanc 2XL", "Chemise Papillon Blanc 3XL", "Chemise Papillon Blanc 4XL",
-  "Chemise Cravate Blanc S", "Chemise Cravate Blanc M", "Chemise Cravate Blanc L", "Chemise Cravate Blanc XL", "Chemise Cravate Blanc 2XL", "Chemise Cravate Blanc 3XL", "Chemise Cravate Blanc 4XL",
-  "Chemise Cravate Bleu S", "Chemise Cravate Bleu M", "Chemise Cravate Bleu L", "Chemise Cravate Bleu XL", "Chemise Cravate Bleu 2XL", "Chemise Cravate Bleu 3XL", "Chemise Cravate Bleu 4XL",
-  "Chemise Cravate Noir S", "Chemise Cravate Noir M", "Chemise Cravate Noir L", "Chemise Cravate Noir XL", "Chemise Cravate Noir 2XL", "Chemise Cravate Noir 3XL", "Chemise Cravate Noir 4XL",
-  "Chemise Zara Noir S", "Chemise Zara Noir M", "Chemise Zara Noir L", "Chemise Zara Noir XL", "Chemise Zara Noir 2XL", "Chemise Zara Noir 3XL", "Chemise Zara Noir 4XL",
+  "Chemise Papillon Blanc S", "Chemise Papillon Blanc M", "Chemise Papillon Blanc L", "Chemise Papillon Blanc XL", "Chemise Papillon Blanc 2XL", "Chemise Papillon Blanc 3XL", "Chemise Papillon Blanc 4XL", "Chemise Papillon Blanc 5XL", "Chemise Papillon Blanc 6XL",
+  "Chemise Cravate Blanc S", "Chemise Cravate Blanc M", "Chemise Cravate Blanc L", "Chemise Cravate Blanc XL", "Chemise Cravate Blanc 2XL", "Chemise Cravate Blanc 3XL", "Chemise Cravate Blanc 4XL", "Chemise Cravate Blanc 5XL", "Chemise Cravate Blanc 6XL",
+  "Chemise Cravate Bleu S", "Chemise Cravate Bleu M", "Chemise Cravate Bleu L", "Chemise Cravate Bleu XL", "Chemise Cravate Bleu 2XL", "Chemise Cravate Bleu 3XL", "Chemise Cravate Bleu 4XL", "Chemise Cravate Bleu 5XL", "Chemise Cravate Bleu 6XL",
+  "Chemise Cravate Noir S", "Chemise Cravate Noir M", "Chemise Cravate Noir L", "Chemise Cravate Noir XL", "Chemise Cravate Noir 2XL", "Chemise Cravate Noir 3XL", "Chemise Cravate Noir 4XL", "Chemise Cravate Noir 5XL", "Chemise Cravate Noir 6XL",
+  "Chemise Zara Noir S", "Chemise Zara Noir M", "Chemise Zara Noir L", "Chemise Zara Noir XL", "Chemise Zara Noir 2XL", "Chemise Zara Noir 3XL", "Chemise Zara Noir 4XL", "Chemise Zara Noir 5XL", "Chemise Zara Noir 6XL",
 ] as const;
 
 export const SHOE_ITEMS = [

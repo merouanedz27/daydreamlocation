@@ -29,19 +29,32 @@ export function createDeviceSetting<T>({
   sanitize: (value: unknown) => T | null;
 }) {
   let current: { value: T } | null = null;
+  let hydrated = false;
   const listeners = new Set<() => void>();
 
-  function get(): T {
-    if (current === null) {
-      let stored: T | null = null;
-      try {
-        stored = sanitize(JSON.parse(localStorage.getItem(key) ?? "null"));
-      } catch {
-        /* stockage bloqué ou contenu illisible : valeur par défaut. */
-      }
-      current = { value: stored ?? fallback };
+  function hydrate(): void {
+    if (hydrated) return;
+    hydrated = true;
+
+    // Revalider aussi la valeur mémoire : HMR peut conserver un brouillon
+    // d'une ancienne version entre deux exécutions du module.
+    if (current !== null) {
+      current = { value: sanitize(current.value) ?? fallback };
+      return;
     }
-    return current.value;
+
+    let stored: T | null = null;
+    try {
+      stored = sanitize(JSON.parse(localStorage.getItem(key) ?? "null"));
+    } catch {
+      /* stockage bloqué ou contenu illisible : valeur par défaut. */
+    }
+    current = { value: stored ?? fallback };
+  }
+
+  function get(): T {
+    // Le premier snapshot client doit rester identique au snapshot serveur.
+    return hydrated ? (current?.value ?? fallback) : fallback;
   }
 
   function getServerSnapshot(): T {
@@ -52,11 +65,15 @@ export function createDeviceSetting<T>({
     listeners.add(onChange);
     const onStorage = (e: StorageEvent) => {
       if (e.key === key) {
-        current = null; // forcer la relecture
+        current = null;
+        hydrated = false;
+        hydrate();
         onChange();
       }
     };
     window.addEventListener("storage", onStorage);
+    hydrate();
+    onChange();
     return () => {
       listeners.delete(onChange);
       window.removeEventListener("storage", onStorage);
@@ -65,6 +82,7 @@ export function createDeviceSetting<T>({
 
   function set(next: T): void {
     current = { value: next };
+    hydrated = true;
     try {
       localStorage.setItem(key, JSON.stringify(next));
     } catch {

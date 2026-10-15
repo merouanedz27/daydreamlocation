@@ -52,16 +52,24 @@ export default async function LoginPage({
                 1080 px pour une image de 64 — sur un forfait mobile algérien,
                 c'est du gâchis pur. Petit, aussi : à 390 px de large, un grand
                 logo poussait « Se connecter » sous le clavier ouvert. */}
-            <Image src={suit} alt="" priority sizes="64px" className="mx-auto h-auto w-16" />
+            <Image
+              src={suit}
+              alt=""
+              priority
+              sizes="64px"
+              className="mx-auto h-auto w-16 dark:brightness-0 dark:invert"
+            />
             <Image
               src={wordmark}
               alt={t("app.name")}
               priority
               sizes="208px"
-              className="mx-auto mt-3 h-auto w-52"
+              className="mx-auto mt-3 h-auto w-52 dark:brightness-0 dark:invert"
             />
           </h1>
-          <p className="text-muted-foreground mt-3 text-sm">{t("app.tagline")}</p>
+          <p className="text-muted-foreground mt-3 text-sm">
+            {t("app.tagline")}
+          </p>
         </header>
 
         <div className="ornament my-6" aria-hidden>
@@ -76,7 +84,9 @@ export default async function LoginPage({
             <h2 id="login-title" className="font-heading text-xl font-medium">
               {t("auth.welcome")}
             </h2>
-            <p className="text-muted-foreground mt-1 text-sm">{t("auth.welcomeHint")}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {t("auth.welcomeHint")}
+            </p>
           </div>
           <SignInForm />
         </section>

@@ -70,6 +70,7 @@ export type OrderTableRow = OrderRow & {
   /** La colonne « Tailleur » : la note portée par les pièces. */
   tailor: string | null;
   shirt: string | null;
+  jabador: string | null;
   shoes: string | null;
   accessories: string | null;
   /**
