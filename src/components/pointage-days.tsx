@@ -6,15 +6,24 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Check, Lock } from "lucide-react";
 import { sheet } from "@/components/sheet-table";
-import { setDay, setToday } from "@/lib/actions/pointage";
+import { setDay, setMyDay } from "@/lib/actions/pointage";
 import { formatDayMonth, formatWeekdayShort } from "@/lib/format";
-import { isLocked, noon, periodDays } from "@/lib/pointage";
+import {
+  SHIFTS,
+  isLocked,
+  noon,
+  periodDays,
+  selfCanToggle,
+  slotKey,
+  type ShiftKind,
+} from "@/lib/pointage";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
 /**
- * Le compteur de la période : « 18 jours », depuis le 01/10. L'employé lit le
- * MÊME chiffre que le propriétaire au moment de la paie.
+ * Le compteur de la période : « 18 jours », depuis le 01/10 — chaque case
+ * cochée compte un jour. L'employé lit le MÊME chiffre que le propriétaire au
+ * moment de la paie.
  */
 export function PointageCounter({ count, start }: { count: number; start: string }) {
   const t = useTranslations("pointage");
@@ -30,16 +39,17 @@ export function PointageCounter({ count, start }: { count: number; start: string
 }
 
 /**
- * Le tableau du client : deux colonnes, le JOUR et sa CASE. Aujourd'hui en
- * tête, sur fond doré : c'est la seule case que l'employé peut toucher.
+ * Le tableau du client : le JOUR, puis deux cases — MATIN et APRÈS-MIDI.
+ * D'habitude l'employé n'en coche qu'une ; les deux font deux jours.
+ * Aujourd'hui en tête, sur fond doré.
  *
- *   - `self`  : l'employé — seule la case du jour est active, à la date du
- *               serveur ;
+ *   - `self`  : l'employé — il coche aujourd'hui ou un jour oublié de sa
+ *               période ; il ne décoche qu'aujourd'hui (`selfCanToggle`) ;
  *   - `owner` : le propriétaire — toute case non payée (oubli, erreur).
  *
  * Le toucher est optimiste : la case change tout de suite, l'erreur la remet
- * en place et s'affiche en toast. Un jour coché porte aussi une coche ✓ et
- * son nom accessible « Présent » : jamais la couleur seule.
+ * en place et s'affiche en toast. Une case cochée en lecture seule porte une
+ * coche ✓ et son nom accessible « Présent » : jamais la couleur seule.
  */
 export function PointageDays({
   mode,
@@ -53,6 +63,7 @@ export function PointageDays({
   userId: string;
   start: string;
   today: string;
+  /** Cases cochées (`slotKey`). */
   checked: string[];
   /** Dernier jour payé : ces cases sont fermées. */
   lockedThrough: string | null;
@@ -62,19 +73,21 @@ export function PointageDays({
   const [, startTransition] = useTransition();
   const [optimistic, toggle] = useOptimistic(
     new Set(checked),
-    (current: Set<string>, change: { day: string; on: boolean }) => {
+    (current: Set<string>, change: { key: string; on: boolean }) => {
       const next = new Set(current);
-      if (change.on) next.add(change.day);
-      else next.delete(change.day);
+      if (change.on) next.add(change.key);
+      else next.delete(change.key);
       return next;
     },
   );
 
-  function onToggle(day: string, on: boolean) {
+  function onToggle(day: string, shift: ShiftKind, on: boolean) {
     startTransition(async () => {
-      toggle({ day, on });
+      toggle({ key: slotKey(day, shift), on });
       const result =
-        mode === "self" ? await setToday(locale, on) : await setDay(locale, userId, day, on);
+        mode === "self"
+          ? await setMyDay(locale, day, shift, on)
+          : await setDay(locale, userId, day, shift, on);
       if (!result.ok) toast.error(t(result.error));
     });
   }
@@ -89,17 +102,19 @@ export function PointageDays({
             <th scope="col" className={cn(sheet.th, "text-start")}>
               <span className={sheet.thInner}>{t("pointage.day")}</span>
             </th>
-            <th scope="col" className={cn(sheet.th, "w-24 text-center")}>
-              <span className={cn(sheet.thInner, "justify-center")}>{t("pointage.present")}</span>
-            </th>
+            {SHIFTS.map((shift) => (
+              <th key={shift} scope="col" className={cn(sheet.th, "w-24 text-center")}>
+                <span className={cn(sheet.thInner, "justify-center")}>
+                  {t(`pointage.shifts.${shift}`)}
+                </span>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {days.map((day) => {
             const isToday = day === today;
-            const on = optimistic.has(day);
             const locked = isLocked(day, lockedThrough);
-            const editable = !locked && (mode === "owner" || isToday);
             const label = `${formatWeekdayShort(noon(day), locale)} ${formatDayMonth(noon(day), locale)}`;
             return (
               <tr
@@ -112,34 +127,45 @@ export function PointageDays({
                 <th scope="row" className={cn(sheet.td, "text-start font-normal")}>
                   <span className="tabular">{label}</span>
                   {isToday && (
-                    <span className="bg-primary text-primary-foreground ms-2 rounded-full px-1.5 text-[11px] leading-5 font-medium">
+                    <span className="bg-primary text-primary-foreground ms-2 inline-block rounded-full px-1.5 text-[11px] leading-5 font-medium">
                       {t("pointage.today")}
                     </span>
                   )}
                 </th>
-                <td className={cn(sheet.td, "py-0 text-center md:py-0")}>
-                  {editable ? (
-                    <label className="mx-auto flex size-11 cursor-pointer items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={on}
-                        onChange={(e) => onToggle(day, e.target.checked)}
-                        aria-label={`${t("pointage.present")} — ${label}`}
-                        className="accent-primary size-6 cursor-pointer"
-                      />
-                    </label>
-                  ) : (
-                    <span className="text-muted-foreground mx-auto flex size-11 items-center justify-center">
-                      {on ? (
-                        <Check className="text-success size-5" aria-label={t("pointage.present")} />
-                      ) : locked ? (
-                        <Lock className="size-3.5" aria-label={t("pointage.paidDay")} />
+                {SHIFTS.map((shift) => {
+                  const on = optimistic.has(slotKey(day, shift));
+                  const editable =
+                    mode === "owner" ? !locked : selfCanToggle(day, on, today, lockedThrough);
+                  const name = `${t(`pointage.shifts.${shift}`)} — ${label}`;
+                  return (
+                    <td key={shift} className={cn(sheet.td, "py-0 text-center md:py-0")}>
+                      {editable ? (
+                        <label className="mx-auto flex size-11 cursor-pointer items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={(e) => onToggle(day, shift, e.target.checked)}
+                            aria-label={name}
+                            className="accent-primary size-6 cursor-pointer"
+                          />
+                        </label>
                       ) : (
-                        <span aria-label={t("pointage.absent")}>—</span>
+                        <span className="text-muted-foreground mx-auto flex size-11 items-center justify-center">
+                          {on ? (
+                            <Check
+                              className="text-success size-5"
+                              aria-label={`${name} : ${t("pointage.present")}`}
+                            />
+                          ) : locked ? (
+                            <Lock className="size-3.5" aria-label={t("pointage.paidDay")} />
+                          ) : (
+                            <span aria-label={`${name} : ${t("pointage.absent")}`}>—</span>
+                          )}
+                        </span>
                       )}
-                    </span>
-                  )}
-                </td>
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}

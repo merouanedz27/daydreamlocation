@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   ChevronRight,
-  Clock,
+  CalendarDays,
   Download,
   KeyRound,
   LayoutGrid,
@@ -76,7 +76,7 @@ export function AccountSheet({
   // de son AppSheet) : le stock pour tous, et pour le propriétaire le bilan
   // et l'administration.
   const links = [
-    { href: "/pointage", icon: Clock, label: t("nav.pointage") },
+    { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
     ...(showAdmin

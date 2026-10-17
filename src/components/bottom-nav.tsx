@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, List, Plane, Receipt, Undo2 } from "lucide-react";
+import { Clock, List, Plane, Receipt, Undo2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,10 @@ import { cn } from "@/lib/utils";
  * Barre d'onglets BASSE — les cinq onglets de son AppSheet, dans le même
  * ordre : l'équipe retrouve ses gestes sans réapprendre. Voir `daydream-ui`.
  *
- *   Calendrier · Demain · Commandes · Pas rentrés · Frais
+ *   Pointage · Demain · Commandes · Pas rentrés · Frais
+ *
+ * Le pointage a pris la place du calendrier, à la demande du client : c'est
+ * le geste de chaque matin. Le calendrier passe dans le menu du compte.
  *
  * La création de commande n'est PLUS un onglet : c'est le bouton rond flottant
  * (`NewOrderFab`), au-dessus de la barre, comme le « + » rouge d'AppSheet.
@@ -25,7 +28,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   const items = [
-    { href: "/commandes/calendrier", icon: CalendarDays, label: t("calendarShort") },
+    { href: "/pointage", icon: Clock, label: t("pointage") },
     { href: "/commandes/demain", icon: Plane, label: t("tomorrowShort") },
     { href: "/commandes", icon: List, label: t("ordersShort") },
     { href: "/commandes/pas-rentres", icon: Undo2, label: t("notReturnedShort") },

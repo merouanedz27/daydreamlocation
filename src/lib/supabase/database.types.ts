@@ -165,18 +165,21 @@ export type Database = {
           day: string;
           marked_by: string | null;
           created_at: string;
+          shift: string;
         };
         Insert: {
           user_id: string;
           day: string;
           marked_by?: string | null;
           created_at?: string;
+          shift?: string;
         };
         Update: {
           user_id?: string;
           day?: string;
           marked_by?: string | null;
           created_at?: string;
+          shift?: string;
         };
         Relationships: [
           {
@@ -554,6 +557,9 @@ export type Database = {
           days_count: number;
           paid_by: string | null;
           created_at: string;
+          daily_rate: number | null;
+          amount: number | null;
+          expense_id: number | null;
         };
         Insert: {
           user_id: string;
@@ -561,6 +567,9 @@ export type Database = {
           days_count: number;
           paid_by?: string | null;
           created_at?: string;
+          daily_rate?: number | null;
+          amount?: number | null;
+          expense_id?: number | null;
         };
         Update: {
           user_id?: string;
@@ -568,8 +577,18 @@ export type Database = {
           days_count?: number;
           paid_by?: string | null;
           created_at?: string;
+          daily_rate?: number | null;
+          amount?: number | null;
+          expense_id?: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "pay_resets_expense_id_fkey";
+            columns: ["expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "pay_resets_paid_by_fkey";
             columns: ["paid_by"];
@@ -752,8 +771,11 @@ export type Database = {
         };
         Returns: Json;
       };
-      mark_today: {
-        Args: Record<PropertyKey, never>;
+      mark_day: {
+        Args: {
+          p_day: string;
+          p_shift: string;
+        };
         Returns: string;
       };
       order_item_suggestions: {
@@ -763,8 +785,10 @@ export type Database = {
       pay_worker: {
         Args: {
           p_user: string;
+          p_daily_rate: number;
+          p_description: string;
         };
-        Returns: number;
+        Returns: { days: number; amount: number }[];
       };
       save_ensemble: {
         Args: {
@@ -798,7 +822,9 @@ export type Database = {
         Returns: number;
       };
       unmark_today: {
-        Args: Record<PropertyKey, never>;
+        Args: {
+          p_shift: string;
+        };
         Returns: string;
       };
       update_order: {

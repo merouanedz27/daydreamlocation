@@ -73,7 +73,7 @@ export function AppHeader({
   // barre de défilement même sur grand écran. Ces pages passent dans le menu
   // du compte, comme sur téléphone.
   const items = [
-    { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendarShort") },
+    { href: "/pointage", icon: Clock, label: t("nav.pointage") },
     { href: "/commandes/demain", icon: Plane, label: t("nav.tomorrowShort") },
     { href: "/commandes", icon: ClipboardList, label: t("nav.orders") },
     { href: "/commandes/pas-rentres", icon: Undo2, label: t("nav.notReturnedShort") },
@@ -82,7 +82,7 @@ export function AppHeader({
 
   /** Pages hors onglets, rangées dans le menu du compte. */
   const moreLinks = [
-    { href: "/pointage", icon: Clock, label: t("nav.pointage") },
+    { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
     ...(showDashboard

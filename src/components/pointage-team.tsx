@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 import { Banknote, Check, ChevronRight, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,11 +12,10 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PointageCounter, PointageDays } from "@/components/pointage-days";
-import { payWorker } from "@/lib/actions/pointage";
-import { formatDayMonth } from "@/lib/format";
-import { noon, type WorkerPeriod } from "@/lib/pointage";
+import { PointagePay } from "@/components/pointage-pay";
+import { formatDayMonth, formatMoney } from "@/lib/format";
+import { SHIFTS, noon, slotKey, type WorkerPeriod } from "@/lib/pointage";
 import type { Locale } from "@/i18n/routing";
 
 function initials(name: string) {
@@ -34,9 +32,9 @@ function initials(name: string) {
  * jours depuis la dernière paie, et s'il a coché aujourd'hui.
  *
  * Toucher une carte ouvre son tableau (toutes les cases non payées se
- * corrigent) et le bouton « Payé » : un ConfirmDialog, puis le compteur
- * repart à zéro. La paie n'efface rien — elle reste dans « Derniers
- * paiements ».
+ * corrigent) et le bouton « Payer » : le prix d'une journée, le total, puis
+ * le compteur repart à zéro et le total entre dans les frais. La paie
+ * n'efface rien — elle reste dans « Derniers paiements ».
  */
 export function PointageTeam({ today, team }: { today: string; team: WorkerPeriod[] }) {
   const t = useTranslations();
@@ -56,19 +54,12 @@ export function PointageTeam({ today, team }: { today: string; team: WorkerPerio
   const worker = team.find((w) => w.id === openId) ?? null;
   const since = (w: WorkerPeriod) => formatDayMonth(noon(w.start), locale);
 
-  async function onPay() {
-    if (!worker) return;
-    const result = await payWorker(locale, worker.id);
-    if (!result.ok) return result;
-    toast.success(t("pointage.paid", { name: worker.full_name, count: result.days }));
-    return { ok: true };
-  }
-
   return (
     <>
       <ul className="space-y-1.5">
         {team.map((w) => {
-          const here = w.checked.includes(today);
+          // Les services cochés aujourd'hui : « Matin », « Matin · Après-midi ».
+          const todayShifts = SHIFTS.filter((s) => w.checked.includes(slotKey(today, s)));
           return (
             <li key={w.id}>
               <button
@@ -88,10 +79,10 @@ export function PointageTeam({ today, team }: { today: string; team: WorkerPerio
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{w.full_name}</span>
                   <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
-                    {here ? (
+                    {todayShifts.length ? (
                       <span className="text-success-foreground inline-flex items-center gap-1 font-medium">
                         <Check className="size-3.5" aria-hidden />
-                        {t("pointage.checkedToday")}
+                        {todayShifts.map((s) => t(`pointage.shifts.${s}`)).join(" · ")}
                       </span>
                     ) : (
                       <span className="text-muted-foreground inline-flex items-center gap-1">
@@ -158,8 +149,13 @@ export function PointageTeam({ today, team }: { today: string; team: WorkerPerio
                         <span>
                           {t("pointage.historyRow", { date: formatDayMonth(noon(r.paid_through), locale) })}
                         </span>
-                        <span className="tabular font-medium">
-                          {t("pointage.count", { count: r.days_count })}
+                        <span className="tabular text-end">
+                          <span className="text-muted-foreground">
+                            {t("pointage.count", { count: r.days_count })}
+                          </span>
+                          {r.amount !== null && (
+                            <span className="ms-2 font-medium">{formatMoney(Number(r.amount), locale)}</span>
+                          )}
                         </span>
                       </li>
                     ))}
@@ -171,20 +167,14 @@ export function PointageTeam({ today, team }: { today: string; team: WorkerPerio
         </DrawerContent>
       </Drawer>
 
-      <ConfirmDialog
-        open={payOpen}
-        onOpenChange={setPayOpen}
-        tone="default"
-        icon={<Banknote className="size-4" />}
-        title={worker ? t("pointage.payTitle", { name: worker.full_name }) : ""}
-        description={
-          worker
-            ? t("pointage.payBody", { count: worker.checked.length, date: since(worker) })
-            : undefined
-        }
-        confirmLabel={t("pointage.pay")}
-        onConfirm={onPay}
-      />
+      {worker && (
+        <PointagePay
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          worker={worker}
+          since={since(worker)}
+        />
+      )}
     </>
   );
 }

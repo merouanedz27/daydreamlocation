@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { periodStart, type PayReset, type WorkerPeriod } from "@/lib/pointage";
+import { isShift, periodStart, slotKey, type PayReset, type WorkerPeriod } from "@/lib/pointage";
 import type { IsoDate } from "@/lib/rental-range";
 
 /** Combien de paies passées on garde à l'écran. */
@@ -22,7 +22,7 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
 
   const { data: resets, error: resetsError } = await supabase
     .from("pay_resets")
-    .select("user_id, paid_through, days_count, created_at")
+    .select("user_id, paid_through, days_count, daily_rate, amount, created_at")
     .in("user_id", ids)
     .order("paid_through", { ascending: false })
     .order("created_at", { ascending: false });
@@ -38,7 +38,7 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
   const lastPaid = people.map((p) => byUser.get(p.id)?.[0]?.paid_through ?? null);
   const oldestPaid = lastPaid.includes(null) ? null : (lastPaid as IsoDate[]).sort()[0];
 
-  let request = supabase.from("attendance").select("user_id, day").in("user_id", ids);
+  let request = supabase.from("attendance").select("user_id, day, shift").in("user_id", ids);
   if (oldestPaid) request = request.gt("day", oldestPaid);
   const { data: days, error: daysError } = await request.order("day");
   if (daysError) throw daysError;
@@ -46,13 +46,14 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
   return people.map((person) => {
     const own = byUser.get(person.id) ?? [];
     const paidThrough = own[0]?.paid_through ?? null;
-    const checked = (days ?? [])
-      .filter((d) => d.user_id === person.id && (!paidThrough || d.day > paidThrough) && d.day <= today)
-      .map((d) => d.day);
+    const open = (days ?? []).filter(
+      (d) => d.user_id === person.id && (!paidThrough || d.day > paidThrough) && d.day <= today,
+    );
+    const checked = open.flatMap((d) => (isShift(d.shift) ? [slotKey(d.day, d.shift)] : []));
     return {
       id: person.id,
       full_name: person.full_name,
-      start: periodStart(paidThrough, checked[0] ?? null, today),
+      start: periodStart(paidThrough, open[0]?.day ?? null, today),
       checked,
       resets: own.slice(0, HISTORY),
     };

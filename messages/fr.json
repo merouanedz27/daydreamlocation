@@ -816,7 +816,7 @@
     "empty": "Aucun frais noté pour l'instant."
   },
   "pointage": {
-    "hint": "Cochez la case du jour en arrivant à la boutique.",
+    "hint": "Cochez le matin, l'après-midi, ou les deux si vous faites les deux services : chaque case compte un jour. Un jour oublié se coche aussi.",
     "hintTeam": "Les jours pointés par chacun depuis sa dernière paie. Touchez un employé pour voir son tableau et le payer.",
     "hintOwner": "Vous pouvez cocher un jour oublié. Après la paie, son tableau repart à zéro.",
     "day": "Jour",
@@ -827,18 +827,30 @@
     "count": "{count, plural, =0 {0 jour} =1 {1 jour} other {{count} jours}}",
     "countShort": "{count} j",
     "since": "depuis le {date}",
-    "checkedToday": "Pointé aujourd'hui",
     "notYet": "Pas encore pointé",
-    "pay": "Payé — remettre à zéro",
-    "payTitle": "Marquer {name} comme payé ?",
-    "payBody": "{count, plural, =0 {Aucun jour} =1 {1 jour} other {{count} jours}} depuis le {date}. Son tableau repart à zéro.",
-    "paid": "{name} : {count, plural, =0 {aucun jour payé} =1 {1 jour payé} other {{count} jours payés}}.",
+    "pay": "Payer",
+    "payTitle": "Payer {name}",
+    "payBody": "{count, plural, =0 {Aucun jour} =1 {1 jour} other {{count} jours}} depuis le {date}.",
+    "paid": "{name} : {count, plural, =0 {aucun jour} =1 {1 jour} other {{count} jours}} · {amount} ajoutés aux frais.",
     "history": "Derniers paiements",
     "historyRow": "Payé le {date}",
     "empty": "Aucun employé actif.",
     "errors": {
-      "alreadyPaid": "Ce jour est déjà payé : il ne se modifie plus."
-    }
+      "alreadyPaid": "Ce jour est déjà payé : il ne se modifie plus.",
+      "outOfPeriod": "Ce jour n'est pas dans votre période : demandez au responsable.",
+      "rateRequired": "Saisissez le prix d'une journée."
+    },
+    "shifts": {
+      "matin": "Matin",
+      "apres_midi": "Après-midi"
+    },
+    "payAmount": "Payer {amount}",
+    "rate": "Prix d'une journée",
+    "rateHint": "Matin ou après-midi : chaque case cochée vaut une journée.",
+    "daysLabel": "Jours pointés",
+    "total": "Total",
+    "toFrais": "Le total sera ajouté aux frais (Salaire), puis son tableau repartira à zéro.",
+    "expenseLabel": "Salaire — {name}"
   },
   "search": {
     "orders": "Chercher : nom, n°, téléphone, costume",

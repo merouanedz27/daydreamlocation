@@ -8,7 +8,7 @@
  * Un jour en trop ou en moins dans la période, c'est un jour payé en trop ou
  * oublié sur la paie de l'employé. Ces assertions le verrouillent.
  */
-import { isLocked, periodDays, periodStart } from "../src/lib/pointage.ts";
+import { isLocked, periodDays, periodStart, selfCanToggle } from "../src/lib/pointage.ts";
 
 let failed = 0;
 function eq(label, actual, expected) {
@@ -34,6 +34,14 @@ eq("mois complet", periodDays("2026-10-01", "2026-10-31").length, 31);
 eq("jour payé fermé", isLocked("2026-10-15", "2026-10-15"), true);
 eq("lendemain ouvert", isLocked("2026-10-16", "2026-10-15"), false);
 eq("jamais payé : tout ouvert", isLocked("2026-10-01", null), false);
+
+// Ce que l'employé peut toucher (mêmes bornes que mark_day en base).
+eq("cocher un jour oublié", selfCanToggle("2026-10-18", false, "2026-10-20", "2026-10-15"), true);
+eq("décocher un jour passé : non", selfCanToggle("2026-10-18", true, "2026-10-20", "2026-10-15"), false);
+eq("décocher aujourd'hui : oui", selfCanToggle("2026-10-20", true, "2026-10-20", "2026-10-15"), true);
+eq("jour payé : non", selfCanToggle("2026-10-15", false, "2026-10-20", "2026-10-15"), false);
+eq("demain : non", selfCanToggle("2026-10-21", false, "2026-10-20", null), false);
+eq("jamais payé, mois dernier : non", selfCanToggle("2026-09-30", false, "2026-10-20", null), false);
 
 if (failed) {
   console.error(`\n${failed} échec(s).`);
