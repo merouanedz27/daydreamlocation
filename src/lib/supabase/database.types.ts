@@ -722,7 +722,7 @@ export type Database = {
       };
       customer_suggestions: {
         Args: Record<PropertyKey, never>;
-        Returns: unknown;
+        Returns: { name: string; phone: string; orders: number }[];
       };
       dashboard_stats: {
         Args: {
@@ -732,7 +732,7 @@ export type Database = {
       };
       order_item_suggestions: {
         Args: Record<PropertyKey, never>;
-        Returns: unknown;
+        Returns: { label: string; uses: number; slot: number }[];
       };
       save_ensemble: {
         Args: {
