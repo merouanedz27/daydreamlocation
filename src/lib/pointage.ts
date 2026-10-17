@@ -1,6 +1,9 @@
 /**
  * Pointage — module PUR, partagé par le serveur et le navigateur : types,
  * durées, mois affiché, conversion heure locale ↔ instant. Aucune requête.
+ *
+ * Une ligne `work_shifts` = UNE journée d'une personne : son arrivée et son
+ * départ (index unique `work_shifts_one_per_day`).
  */
 import type { IsoDate } from "@/lib/rental-range";
 

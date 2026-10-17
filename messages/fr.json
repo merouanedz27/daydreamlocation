@@ -831,19 +831,16 @@
     "confirmOutTitle": "Pointer le départ ?",
     "confirmOutBody": "Vous avez travaillé {duration} depuis {time}.",
     "elapsed": "Temps de service",
-    "today": "Aujourd'hui",
     "week": "Cette semaine",
     "days": "{count, plural, =1 {1 jour} other {{count} jours}}",
     "ongoing": "en cours",
     "corrected": "corrigé",
-    "noShiftToday": "Pas encore de pointage aujourd'hui.",
     "startedOn": "Arrivée du {date}",
     "status": {
       "in": "En service",
       "out": "Parti",
       "none": "Pas pointé"
     },
-    "since": "depuis {time}",
     "teamToday": "L'équipe aujourd'hui",
     "presentCount": "{count, plural, =0 {Personne en service} =1 {1 en service} other {{count} en service}}",
     "teamEmpty": "Aucun membre actif.",
@@ -860,7 +857,7 @@
     "add": "Ajouter un pointage",
     "addTitle": "Ajouter un pointage",
     "editTitle": "Modifier le pointage",
-    "formHint": "Heures de la boutique. Un départ plus tôt que l'arrivée compte pour le lendemain.",
+    "formHint": "Heures de la boutique, un pointage par jour. Un départ plus tôt que l'arrivée compte pour le lendemain.",
     "member": "Employé",
     "date": "Date",
     "arrival": "Arrivée",
@@ -874,14 +871,17 @@
     "deleteTitle": "Supprimer le pointage du {date} ?",
     "deleteBody": "{start} → {end}. Ces heures disparaîtront du mois.",
     "detailHint": "{days} · {hours}",
-    "actionsFor": "Actions pour le pointage de {time}",
     "errors": {
       "alreadyIn": "Vous êtes déjà en service.",
       "notIn": "Vous n'êtes pas en service.",
       "overlap": "Ce créneau chevauche un autre pointage de cette personne.",
       "timeInvalid": "Heure attendue, ex. 08:30.",
-      "memberRequired": "Choisissez un employé."
-    }
+      "memberRequired": "Choisissez un employé.",
+      "dayDone": "Vous avez déjà pointé aujourd'hui. Demandez au responsable pour une correction.",
+      "dayTaken": "Cette personne a déjà un pointage ce jour-là : modifiez-le plutôt."
+    },
+    "dayDone": "Journée terminée",
+    "dayTotal": "Durée de la journée"
   },
   "search": {
     "orders": "Chercher : nom, n°, téléphone, costume",

@@ -1,6 +1,6 @@
 -- =============================================================================
--- Pointage : l'heure vient du serveur, un employé ne voit que ses périodes,
--- le propriétaire corrige tout, deux périodes ne se chevauchent jamais.
+-- Pointage : l'heure vient du serveur, une seule ligne par personne et par
+-- jour, un employé ne voit que la sienne, le propriétaire corrige tout.
 --
 --   node scripts/run-sql.mjs supabase/tests/pointage.sql
 --
@@ -75,15 +75,15 @@ begin
   perform set_config('role', 'postgres', true);
   insert into test_results values ('staff pointe son arrivée et ne voit que la sienne', '1', v_count::text, v_count = 1);
 
-  -- Deuxième arrivée sans départ : refusée.
+  -- Deuxième arrivée le même jour : refusée.
   v_state := 'aucune';
   perform pg_temp.act_as(v_staff);
   begin
     perform public.clock_in();
-  exception when exclusion_violation then v_state := '23P01';
+  exception when sqlstate 'P0001' then v_state := 'P0001';
   end;
   perform set_config('role', 'postgres', true);
-  insert into test_results values ('double arrivée refusée', '23P01', v_state, v_state = '23P01');
+  insert into test_results values ('double arrivée refusée', 'P0001', v_state, v_state = 'P0001');
 
   -- Écriture directe : aucune policy pour l'employé.
   v_state := 'acceptée';
@@ -100,7 +100,7 @@ begin
   insert into test_results values ('staff ne modifie pas ses heures', '0', v_count::text, v_count = 0);
 
   -- Départ (now() est figé dans la transaction : on recule l'arrivée).
-  update public.work_shifts set clock_in = clock_in - interval '4 hours'
+  update public.work_shifts set clock_in = clock_in - interval '1 minute'
    where user_id = v_staff and clock_out is null;
   perform pg_temp.act_as(v_staff);
   perform public.clock_out();
@@ -118,6 +118,16 @@ begin
   perform set_config('role', 'postgres', true);
   insert into test_results values ('départ sans arrivée refusé', 'P0002', v_state, v_state = 'P0002');
 
+  -- Journée finie : pas de nouvelle arrivée avant demain.
+  v_state := 'aucune';
+  perform pg_temp.act_as(v_staff);
+  begin
+    perform public.clock_in();
+  exception when sqlstate 'P0001' then v_state := 'P0001';
+  end;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('arrivée après le départ refusée', 'P0001', v_state, v_state = 'P0001');
+
   -- Le propriétaire voit tout et corrige.
   perform pg_temp.act_as(v_owner);
   select count(*) into v_count from public.work_shifts where user_id in (v_staff, v_other);
@@ -131,16 +141,29 @@ begin
   perform set_config('role', 'postgres', true);
   insert into test_results values ('owner ajoute un pointage oublié', '1', v_count::text, v_count = 1);
 
-  -- Chevauchement d'une correction : refusé, même pour le propriétaire.
+  -- Deuxième ligne le même jour : refusée, même pour le propriétaire.
   v_state := 'acceptée';
   perform pg_temp.act_as(v_owner);
   begin
     insert into public.work_shifts (user_id, clock_in, clock_out)
-    values (v_staff, now() - interval '3 days 2 hours', now() - interval '2 days 23 hours');
+    select v_staff, clock_out + interval '1 minute', clock_out + interval '2 minutes'
+      from public.work_shifts
+     where user_id = v_staff and corrected_by = v_owner;
+  exception when unique_violation then v_state := '23505';
+  end;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('un seul pointage par jour', '23505', v_state, v_state = '23505');
+
+  -- Départ oublié la veille : l'arrivée du jour est refusée (chevauchement).
+  insert into public.work_shifts (user_id, clock_in) values (v_owner, now() - interval '30 hours');
+  v_state := 'acceptée';
+  perform pg_temp.act_as(v_owner);
+  begin
+    perform public.clock_in();
   exception when exclusion_violation then v_state := '23P01';
   end;
   perform set_config('role', 'postgres', true);
-  insert into test_results values ('chevauchement refusé', '23P01', v_state, v_state = '23P01');
+  insert into test_results values ('période de la veille encore ouverte', '23P01', v_state, v_state = '23P01');
 
   -- Un autre employé ne voit rien du premier.
   perform pg_temp.act_as(v_other);

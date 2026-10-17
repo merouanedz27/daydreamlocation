@@ -39,8 +39,9 @@ function clockProps(mine: Shift[], today: string, weekFrom: string) {
  * Pointage de travail.
  *
  * OUVERT À TOUTE L'ÉQUIPE : chacun pointe son arrivée et son départ depuis
- * son téléphone, et ne relit que ses propres périodes (RLS). Le propriétaire
- * a, en plus, l'équipe du jour et le mois, avec la correction des oublis.
+ * son téléphone — une fois par jour — et ne relit que ses propres journées
+ * (RLS). Le propriétaire a, en plus, l'équipe du jour et le mois, avec la
+ * correction des oublis.
  * Pas de calcul de salaire : des jours et des heures, rien d'autre.
  *
  * Pas dans la barre basse : le titre reste donc visible (`daydream-ui`).

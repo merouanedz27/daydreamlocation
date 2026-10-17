@@ -24,11 +24,9 @@ import {
   formatDuration,
   formatMonthYear,
   formatTime,
-  formatWeekdayShort,
 } from "@/lib/format";
 import {
   addMonths,
-  closedMinutes,
   currentMonth,
   monthDate,
   summarize,
@@ -79,10 +77,10 @@ export function PointageMonth({
     { minutes: 0, open: 0 },
   );
   const detail = members.find((m) => m.id === detailId) ?? null;
-  const detailShifts = shifts.filter((s) => s.user_id === detailId);
-  const byDay = new Map<string, Shift[]>();
-  for (const s of detailShifts) byDay.set(s.work_date, [...(byDay.get(s.work_date) ?? []), s]);
-  const days = [...byDay.entries()].sort(([a], [b]) => b.localeCompare(a));
+  // Une ligne par jour (index unique en base), la plus récente en haut.
+  const days = shifts
+    .filter((s) => s.user_id === detailId)
+    .sort((a, b) => b.work_date.localeCompare(a.work_date));
 
   const label = formatMonthYear(monthDate(month), locale);
   const isCurrent = month >= currentMonth();
@@ -239,64 +237,47 @@ export function PointageMonth({
             {days.length === 0 ? (
               <p className="text-muted-foreground mt-4 text-center text-sm">{t("pointage.monthEmpty")}</p>
             ) : (
-              <div className="mt-4 space-y-4">
-                {days.map(([day, list]) => {
-                  const date = `${day}T12:00:00+01:00`;
-                  return (
-                    <div key={day}>
-                      <div className="text-muted-foreground mb-1.5 flex items-baseline justify-between gap-3 text-xs">
-                        <span className="tabular">
-                          {formatWeekdayShort(date, locale)} {formatDayMonth(date, locale)}
-                        </span>
-                        <span className="tabular">
-                          {formatDuration(closedMinutes(list), locale)}
-                        </span>
-                      </div>
-                      <ul className="border-border divide-border divide-y rounded-lg border">
-                        {list.map((shift) => (
-                          <ShiftLine
-                            key={shift.id}
-                            shift={shift}
-                            now={now}
-                            locale={locale}
-                            actions={
-                              <span className="-me-2 flex shrink-0">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="size-11"
-                                  onClick={() => openForm(shift, shift.user_id)}
-                                >
-                                  <Pencil className="size-4" aria-hidden />
-                                  <span className="sr-only">
-                                    {t("common.edit")} — {formatTime(shift.clock_in, locale)}
-                                  </span>
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive size-11"
-                                  onClick={() => {
-                                    setDeleting(shift);
-                                    setDeleteOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="size-4" aria-hidden />
-                                  <span className="sr-only">
-                                    {t("common.delete")} — {formatTime(shift.clock_in, locale)}
-                                  </span>
-                                </Button>
-                              </span>
-                            }
-                          />
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
+              <ul className="border-border divide-border mt-4 divide-y rounded-lg border">
+                {days.map((shift) => (
+                  <ShiftLine
+                    key={shift.id}
+                    shift={shift}
+                    now={now}
+                    locale={locale}
+                    actions={
+                      <span className="-me-2 flex shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-11"
+                          onClick={() => openForm(shift, shift.user_id)}
+                        >
+                          <Pencil className="size-4" aria-hidden />
+                          <span className="sr-only">
+                            {t("common.edit")} — {formatDayMonth(shift.clock_in, locale)}
+                          </span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive size-11"
+                          onClick={() => {
+                            setDeleting(shift);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                          <span className="sr-only">
+                            {t("common.delete")} — {formatDayMonth(shift.clock_in, locale)}
+                          </span>
+                        </Button>
+                      </span>
+                    }
+                  />
+                ))}
+              </ul>
             )}
           </div>
         </DrawerContent>

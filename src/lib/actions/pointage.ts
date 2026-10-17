@@ -31,8 +31,15 @@ export async function clockIn(localeValue: string): Promise<ClockResult> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("clock_in");
   if (error) {
-    // 23P01 : une période est déjà ouverte (double toucher, deux appareils).
-    return { ok: false, error: error.code === "23P01" ? "pointage.errors.alreadyIn" : "errors.generic" };
+    // P0001 : la journée est déjà pointée (une arrivée par jour).
+    // 23P01 : une période est encore ouverte (double toucher, deux appareils).
+    const key =
+      error.code === "P0001"
+        ? "pointage.errors.dayDone"
+        : error.code === "23P01"
+          ? "pointage.errors.alreadyIn"
+          : "errors.generic";
+    return { ok: false, error: key };
   }
 
   revalidatePath(`/${locale}/pointage`);
@@ -86,7 +93,9 @@ export async function saveShift(formData: FormData): Promise<ActionResult> {
     : await supabase.from("work_shifts").insert(row);
 
   if (error) {
+    // 23505 : cette personne a déjà son pointage ce jour-là.
     // 23P01 : chevauche une autre période de la même personne.
+    if (error.code === "23505") return { ok: false, error: "pointage.errors.dayTaken" };
     if (error.code === "23P01") return { ok: false, error: "pointage.errors.overlap" };
     return { ok: false, error: "errors.generic" };
   }
