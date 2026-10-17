@@ -83,7 +83,9 @@ export async function sendPushForNotification(input: PushInput): Promise<void> {
               keys: { p256dh: subscription.p256dh, auth: subscription.auth },
             },
             JSON.stringify(message),
-            { TTL: TTL_SECONDS, urgency: "normal", topic: tag.slice(0, 32) },
+            // `high` : sinon iOS retient le push tant que le téléphone dort
+            // (économie d'énergie) et ne le livre qu'au réveil de l'écran.
+            { TTL: TTL_SECONDS, urgency: "high", topic: tag.slice(0, 32) },
           );
         } catch (sendError) {
           const statusCode = (sendError as { statusCode?: number }).statusCode;
