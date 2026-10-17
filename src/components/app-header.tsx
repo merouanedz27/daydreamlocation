@@ -3,6 +3,7 @@
 import {
   CalendarDays,
   ClipboardList,
+  Clock,
   Download,
   KeyRound,
   LayoutGrid,
@@ -81,6 +82,7 @@ export function AppHeader({
 
   /** Pages hors onglets, rangées dans le menu du compte. */
   const moreLinks = [
+    { href: "/pointage", icon: Clock, label: t("nav.pointage") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
     ...(showDashboard

@@ -640,6 +640,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      work_shifts: {
+        Row: {
+          id: number;
+          user_id: string;
+          clock_in: string;
+          clock_out: string | null;
+          work_date: string | null;
+          note: string | null;
+          corrected_by: string | null;
+          corrected_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          clock_in?: string;
+          clock_out?: string | null;
+          note?: string | null;
+          corrected_by?: string | null;
+          corrected_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          clock_in?: string;
+          clock_out?: string | null;
+          note?: string | null;
+          corrected_by?: string | null;
+          corrected_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "work_shifts_corrected_by_fkey";
+            columns: ["corrected_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "work_shifts_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -649,6 +696,14 @@ export type Database = {
           p_amount: number;
         };
         Returns: number;
+      };
+      clock_in: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
+      clock_out: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
       };
       create_order: {
         Args: {
@@ -667,7 +722,7 @@ export type Database = {
       };
       customer_suggestions: {
         Args: Record<PropertyKey, never>;
-        Returns: { name: string; phone: string | null }[];
+        Returns: { name: string; phone: string; orders: number }[];
       };
       dashboard_stats: {
         Args: {
@@ -677,7 +732,7 @@ export type Database = {
       };
       order_item_suggestions: {
         Args: Record<PropertyKey, never>;
-        Returns: { label: string; slot: number }[];
+        Returns: { label: string; uses: number; slot: number }[];
       };
       save_ensemble: {
         Args: {

@@ -149,6 +149,26 @@ function sqlToTs(sql) {
   return "unknown" + arr;
 }
 
+/**
+ * Type de retour d'une fonction. `returns table (name text, phone text)` —
+ * que `pg_get_function_result` écrit `TABLE(name text, phone text)` — devient
+ * un tableau d'objets ; sans ce cas, `customer_suggestions` et
+ * `order_item_suggestions` sortaient en `unknown` et cassaient le build.
+ *
+ * Les colonnes sont typées non nulles, comme le fait le générateur officiel de
+ * Supabase : Postgres ne permet pas de déclarer `not null` sur une colonne de
+ * `returns table`.
+ */
+function resultToTs(result) {
+  const table = result.match(/^TABLE\((.*)\)$/is);
+  if (table) {
+    const columns = parseArgs(table[1]).map((c) => `${c.name}: ${c.type}`);
+    return `{ ${columns.join("; ")} }[]`;
+  }
+  if (/^SETOF /i.test(result)) return `${sqlToTs(result.replace(/^SETOF /i, ""))}[]`;
+  return sqlToTs(result);
+}
+
 try {
   await client.connect();
   const { rows: cols } = await client.query(COLUMNS_SQL);
@@ -272,9 +292,7 @@ try {
         }
         out.push("        };");
       }
-      out.push(`        Returns: ${sqlToTs(fn.result.replace(/^SETOF /i, ""))}${
-        /^SETOF /i.test(fn.result) ? "[]" : ""
-      };`);
+      out.push(`        Returns: ${resultToTs(fn.result)};`);
       out.push("      };");
     }
     out.push("    };");

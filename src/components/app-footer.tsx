@@ -41,6 +41,7 @@ export async function AppFooter({
     { href: "/commandes/nouvelle", label: t("orders.new") },
     { href: "/stock", label: t("nav.stock") },
     { href: "/pressing", label: t("nav.pressing") },
+    { href: "/pointage", label: t("nav.pointage") },
     ...(showStockLinks ? [{ href: "/stock/nouveau", label: t("stock.newModel") }] : []),
     ...(showOwnerLinks
       ? [
