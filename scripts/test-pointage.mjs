@@ -1,24 +1,14 @@
 #!/usr/bin/env node
 /**
- * Tests du pointage : saisie des heures, conversion heure d'Alger ↔ instant,
- * durées affichées, bilan du mois.
+ * Tests du pointage par cases : la période ouverte depuis la dernière paie,
+ * les jours affichés, les jours fermés.
  *
  *   node --experimental-strip-types scripts/test-pointage.mjs
  *
- * Une heure mal convertie décale TOUTE une période d'une heure — et le mois
- * entier de l'employé avec. Ces assertions le verrouillent.
+ * Un jour en trop ou en moins dans la période, c'est un jour payé en trop ou
+ * oublié sur la paie de l'employé. Ces assertions le verrouillent.
  */
-import {
-  addMonths,
-  currentMonth,
-  instantToLocalTime,
-  localToInstant,
-  monthBounds,
-  normalizeTime,
-  parseMonth,
-  summarize,
-} from "../src/lib/pointage.ts";
-import { formatDuration, formatTime } from "../src/lib/format.ts";
+import { isLocked, periodDays, periodStart } from "../src/lib/pointage.ts";
 
 let failed = 0;
 function eq(label, actual, expected) {
@@ -27,45 +17,23 @@ function eq(label, actual, expected) {
   console.log(`${ok ? "OK   " : "ECHEC"} ${label}${ok ? "" : ` — attendu ${JSON.stringify(expected)}, obtenu ${JSON.stringify(actual)}`}`);
 }
 
-// Saisie au pavé numérique.
-eq("830 → 08:30", normalizeTime("830"), "08:30");
-eq("8 → 08:00", normalizeTime("8"), "08:00");
-eq("8h → 08:00", normalizeTime("8h"), "08:00");
-eq("8h5 → 08:05", normalizeTime("8h5"), "08:05");
-eq("1730 → 17:30", normalizeTime("1730"), "17:30");
-eq("17:02 inchangé", normalizeTime("17:02"), "17:02");
-eq("25:00 refusé", normalizeTime("25:00"), null);
-eq("12:60 refusé", normalizeTime("12:60"), null);
-eq("texte refusé", normalizeTime("abc"), null);
+// Début de période.
+eq("après une paie : le lendemain", periodStart("2026-10-15", "2026-10-02", "2026-10-20"), "2026-10-16");
+eq("paie le 31 : le 1er du mois suivant", periodStart("2026-10-31", null, "2026-11-05"), "2026-11-01");
+eq("jamais payé : le premier jour coché", periodStart(null, "2026-09-28", "2026-10-20"), "2026-09-28");
+eq("nouvel employé : le 1er du mois", periodStart(null, null, "2026-10-20"), "2026-10-01");
+eq("payé aujourd'hui : la ligne du jour reste", periodStart("2026-10-20", null, "2026-10-20"), "2026-10-20");
 
-// Alger = UTC+1, sans heure d'été.
-eq("08:30 Alger → 07:30 UTC", localToInstant("2026-10-17", "08:30"), "2026-10-17T07:30:00.000Z");
-eq("été comme hiver", localToInstant("2026-07-01", "08:30"), "2026-07-01T07:30:00.000Z");
-eq("aller-retour", instantToLocalTime(localToInstant("2026-10-17", "00:15")), "00:15");
-eq("affichage 24 h fr", formatTime("2026-10-17T19:05:00Z", "fr"), "20:05");
-eq("affichage 24 h ar, chiffres latins", formatTime("2026-10-17T19:05:00Z", "ar"), "20:05");
+// Jours affichés : aujourd'hui en tête, bornes incluses.
+eq("jours, aujourd'hui en tête", periodDays("2026-10-18", "2026-10-20"), ["2026-10-20", "2026-10-19", "2026-10-18"]);
+eq("à cheval sur deux mois", periodDays("2026-02-27", "2026-03-01"), ["2026-03-01", "2026-02-28", "2026-02-27"]);
+eq("un seul jour", periodDays("2026-10-20", "2026-10-20"), ["2026-10-20"]);
+eq("mois complet", periodDays("2026-10-01", "2026-10-31").length, 31);
 
-// Durées.
-eq("fr 7 h 52", formatDuration(472, "fr"), "7 h 52");
-eq("fr 7 h 05", formatDuration(425, "fr"), "7 h 05");
-eq("fr 8 h", formatDuration(480, "fr"), "8 h");
-eq("fr 45 min", formatDuration(45, "fr"), "45 min");
-eq("ar 7 س 52 د", formatDuration(472, "ar"), "7 س 52 د");
-eq("négatif → 0", formatDuration(-5, "fr"), "0 min");
-
-// Mois.
-eq("mois invalide → mois courant", parseMonth("2026-13"), currentMonth());
-eq("mois courant à Alger", currentMonth(new Date("2026-10-31T23:30:00Z")), "2026-11");
-eq("mois précédent de janvier", addMonths("2026-01", -1), "2025-12");
-eq("bornes de février", monthBounds("2028-02"), { from: "2028-02-01", to: "2028-02-29" });
-
-// Bilan : un oubli de départ ne compte pas d'heures, mais il est signalé.
-const s = summarize([
-  { id: 1, user_id: "a", clock_in: "2026-10-01T07:00:00Z", clock_out: "2026-10-01T11:00:00Z", work_date: "2026-10-01", note: null, corrected_at: null },
-  { id: 2, user_id: "a", clock_in: "2026-10-01T12:00:00Z", clock_out: "2026-10-01T15:30:00Z", work_date: "2026-10-01", note: null, corrected_at: null },
-  { id: 3, user_id: "a", clock_in: "2026-10-02T07:00:00Z", clock_out: null, work_date: "2026-10-02", note: null, corrected_at: null },
-]);
-eq("bilan : 2 jours, 7 h 30 closes, 1 ouvert", s.get("a"), { days: 2, minutes: 450, open: 1 });
+// Jours fermés par la paie.
+eq("jour payé fermé", isLocked("2026-10-15", "2026-10-15"), true);
+eq("lendemain ouvert", isLocked("2026-10-16", "2026-10-15"), false);
+eq("jamais payé : tout ouvert", isLocked("2026-10-01", null), false);
 
 if (failed) {
   console.error(`\n${failed} échec(s).`);

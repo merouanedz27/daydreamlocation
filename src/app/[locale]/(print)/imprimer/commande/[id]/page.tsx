@@ -84,6 +84,9 @@ export default async function OrderSlipPage({
     {
       slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
       categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
+      // Le bon ne porte que les NOMS des pièces : la référence reste à
+      // l'écran et dans l'e-mail de l'équipe.
+      withRefs: false,
     },
   );
 

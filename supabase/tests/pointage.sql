@@ -1,6 +1,6 @@
 -- =============================================================================
--- Pointage : l'heure vient du serveur, une seule ligne par personne et par
--- jour, un employé ne voit que la sienne, le propriétaire corrige tout.
+-- Pointage par cases : l'employé ne coche que le jour même, ne voit que ses
+-- cases ; le propriétaire coche tout jour non payé et remet à zéro à la paie.
 --
 --   node scripts/run-sql.mjs supabase/tests/pointage.sql
 --
@@ -42,9 +42,9 @@ begin
   create temp table test_ids (owner_id uuid, staff_id uuid, other_id uuid) on commit drop;
   insert into test_ids values (v_owner, v_staff, v_other);
 
-  -- Une période close de la veille pour l'autre employé.
-  insert into public.work_shifts (user_id, clock_in, clock_out)
-  values (v_other, now() - interval '1 day 8 hours', now() - interval '1 day');
+  -- L'autre employé a coché hier.
+  insert into public.attendance (user_id, day)
+  values (v_other, (now() at time zone 'Africa/Algiers')::date - 1);
 end $$;
 
 create or replace function pg_temp.act_as(p_user uuid)
@@ -63,120 +63,102 @@ declare
   v_owner uuid;
   v_staff uuid;
   v_other uuid;
+  v_today date := (now() at time zone 'Africa/Algiers')::date;
   v_count integer;
   v_state text;
 begin
   select owner_id, staff_id, other_id into v_owner, v_staff, v_other from test_ids;
 
-  -- Arrivée par la fonction : acceptée.
+  -- L'employé coche aujourd'hui (deux fois : sans effet la seconde).
   perform pg_temp.act_as(v_staff);
-  perform public.clock_in();
-  select count(*) into v_count from public.work_shifts;
+  perform public.mark_today();
+  perform public.mark_today();
+  select count(*) into v_count from public.attendance;
   perform set_config('role', 'postgres', true);
-  insert into test_results values ('staff pointe son arrivée et ne voit que la sienne', '1', v_count::text, v_count = 1);
+  insert into test_results values ('staff coche le jour et ne voit que sa case', '1', v_count::text, v_count = 1);
 
-  -- Deuxième arrivée le même jour : refusée.
-  v_state := 'aucune';
+  -- Il décoche (erreur de toucher), puis recoche.
   perform pg_temp.act_as(v_staff);
-  begin
-    perform public.clock_in();
-  exception when sqlstate 'P0001' then v_state := 'P0001';
-  end;
+  perform public.unmark_today();
+  select count(*) into v_count from public.attendance;
+  perform public.mark_today();
   perform set_config('role', 'postgres', true);
-  insert into test_results values ('double arrivée refusée', 'P0001', v_state, v_state = 'P0001');
+  insert into test_results values ('staff décoche le jour', '0', v_count::text, v_count = 0);
 
-  -- Écriture directe : aucune policy pour l'employé.
+  -- Un autre jour, à la main : aucune policy pour l'employé.
   v_state := 'acceptée';
   perform pg_temp.act_as(v_staff);
   begin
-    insert into public.work_shifts (user_id, clock_in, clock_out)
-    values (v_staff, now() - interval '3 days', now() - interval '2 days');
+    insert into public.attendance (user_id, day) values (v_staff, v_today - 3);
   exception when insufficient_privilege then v_state := 'refusée';
   end;
-  update public.work_shifts set clock_in = clock_in - interval '5 hours' where user_id = v_staff;
-  get diagnostics v_count = row_count;
   perform set_config('role', 'postgres', true);
-  insert into test_results values ('staff n''insère pas à la main', 'refusée', v_state, v_state = 'refusée');
-  insert into test_results values ('staff ne modifie pas ses heures', '0', v_count::text, v_count = 0);
+  insert into test_results values ('staff ne coche pas un autre jour', 'refusée', v_state, v_state = 'refusée');
 
-  -- Départ (now() est figé dans la transaction : on recule l'arrivée).
-  update public.work_shifts set clock_in = clock_in - interval '1 minute'
-   where user_id = v_staff and clock_out is null;
+  -- Il ne voit pas les cases des autres.
   perform pg_temp.act_as(v_staff);
-  perform public.clock_out();
-  perform set_config('role', 'postgres', true);
-  select count(*) into v_count from public.work_shifts where user_id = v_staff and clock_out is not null;
-  insert into test_results values ('staff pointe son départ', '1', v_count::text, v_count = 1);
-
-  -- Départ sans arrivée : refusé.
-  v_state := 'aucune';
-  perform pg_temp.act_as(v_staff);
-  begin
-    perform public.clock_out();
-  exception when sqlstate 'P0002' then v_state := 'P0002';
-  end;
-  perform set_config('role', 'postgres', true);
-  insert into test_results values ('départ sans arrivée refusé', 'P0002', v_state, v_state = 'P0002');
-
-  -- Journée finie : pas de nouvelle arrivée avant demain.
-  v_state := 'aucune';
-  perform pg_temp.act_as(v_staff);
-  begin
-    perform public.clock_in();
-  exception when sqlstate 'P0001' then v_state := 'P0001';
-  end;
-  perform set_config('role', 'postgres', true);
-  insert into test_results values ('arrivée après le départ refusée', 'P0001', v_state, v_state = 'P0001');
-
-  -- Le propriétaire voit tout et corrige.
-  perform pg_temp.act_as(v_owner);
-  select count(*) into v_count from public.work_shifts where user_id in (v_staff, v_other);
-  perform set_config('role', 'postgres', true);
-  insert into test_results values ('owner voit toute l''équipe', '2', v_count::text, v_count = 2);
-
-  perform pg_temp.act_as(v_owner);
-  insert into public.work_shifts (user_id, clock_in, clock_out, corrected_by, corrected_at)
-  values (v_staff, now() - interval '3 days 8 hours', now() - interval '3 days', v_owner, now());
-  get diagnostics v_count = row_count;
-  perform set_config('role', 'postgres', true);
-  insert into test_results values ('owner ajoute un pointage oublié', '1', v_count::text, v_count = 1);
-
-  -- Deuxième ligne le même jour : refusée, même pour le propriétaire.
-  v_state := 'acceptée';
-  perform pg_temp.act_as(v_owner);
-  begin
-    insert into public.work_shifts (user_id, clock_in, clock_out)
-    select v_staff, clock_out + interval '1 minute', clock_out + interval '2 minutes'
-      from public.work_shifts
-     where user_id = v_staff and corrected_by = v_owner;
-  exception when unique_violation then v_state := '23505';
-  end;
-  perform set_config('role', 'postgres', true);
-  insert into test_results values ('un seul pointage par jour', '23505', v_state, v_state = '23505');
-
-  -- Départ oublié la veille : l'arrivée du jour est refusée (chevauchement).
-  insert into public.work_shifts (user_id, clock_in) values (v_owner, now() - interval '30 hours');
-  v_state := 'acceptée';
-  perform pg_temp.act_as(v_owner);
-  begin
-    perform public.clock_in();
-  exception when exclusion_violation then v_state := '23P01';
-  end;
-  perform set_config('role', 'postgres', true);
-  insert into test_results values ('période de la veille encore ouverte', '23P01', v_state, v_state = '23P01');
-
-  -- Un autre employé ne voit rien du premier.
-  perform pg_temp.act_as(v_other);
-  select count(*) into v_count from public.work_shifts where user_id = v_staff;
+  select count(*) into v_count from public.attendance where user_id = v_other;
   perform set_config('role', 'postgres', true);
   insert into test_results values ('staff ne voit pas les autres', '0', v_count::text, v_count = 0);
 
-  -- Le jour compte à l'heure d'Alger.
-  insert into public.work_shifts (user_id, clock_in, clock_out)
-  values (v_other, '2026-01-14 23:30:00+00', '2026-01-15 07:00:00+00');
-  select count(*) into v_count from public.work_shifts
-   where user_id = v_other and work_date = date '2026-01-15';
-  insert into test_results values ('work_date à l''heure d''Alger', '1', v_count::text, v_count = 1);
+  -- Le propriétaire coche deux jours oubliés.
+  perform pg_temp.act_as(v_owner);
+  insert into public.attendance (user_id, day, marked_by)
+  values (v_staff, v_today - 1, v_owner), (v_staff, v_today - 2, v_owner);
+  select count(*) into v_count from public.attendance where user_id in (v_staff, v_other);
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('owner coche et voit toute l''équipe', '4', v_count::text, v_count = 4);
+
+  -- L'employé ne peut pas se payer.
+  v_state := 'acceptée';
+  perform pg_temp.act_as(v_staff);
+  begin
+    perform public.pay_worker(v_staff);
+  exception when insufficient_privilege then v_state := '42501';
+  end;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('staff ne paie pas', '42501', v_state, v_state = '42501');
+
+  -- Paie : 3 jours, puis compteur à zéro.
+  perform pg_temp.act_as(v_owner);
+  v_count := public.pay_worker(v_staff);
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('paie : jours comptés', '3', v_count::text, v_count = 3);
+
+  select count(*) into v_count from public.attendance
+   where user_id = v_staff
+     and day > (select max(paid_through) from public.pay_resets where user_id = v_staff);
+  insert into test_results values ('compteur remis à zéro', '0', v_count::text, v_count = 0);
+
+  -- Le jour payé est fermé : ni l'employé ni le propriétaire n'y touchent.
+  v_state := 'acceptée';
+  perform pg_temp.act_as(v_staff);
+  begin
+    perform public.unmark_today();
+  exception when sqlstate 'P0001' then v_state := 'P0001';
+  end;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('jour payé : staff bloqué', 'P0001', v_state, v_state = 'P0001');
+
+  v_state := 'acceptée';
+  perform pg_temp.act_as(v_owner);
+  begin
+    insert into public.attendance (user_id, day) values (v_staff, v_today - 5);
+  exception when sqlstate 'P0001' then v_state := 'P0001';
+  end;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('jour payé : owner bloqué', 'P0001', v_state, v_state = 'P0001');
+
+  -- L'historique de paie : visible par l'employé, pas par les autres.
+  perform pg_temp.act_as(v_staff);
+  select count(*) into v_count from public.pay_resets;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('staff voit sa paie', '1', v_count::text, v_count = 1);
+
+  perform pg_temp.act_as(v_other);
+  select count(*) into v_count from public.pay_resets;
+  perform set_config('role', 'postgres', true);
+  insert into test_results values ('autre employé ne la voit pas', '0', v_count::text, v_count = 0);
 end $$;
 
 select case when ok then 'OK  ' else 'ECHEC' end as resultat, step, attendu, obtenu

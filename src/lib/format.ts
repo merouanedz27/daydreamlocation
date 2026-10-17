@@ -146,39 +146,3 @@ export function formatWeekdayShort(date: Date | string, locale: Locale): string 
     timeZone: "Africa/Algiers",
   }).format(d);
 }
-
-/**
- * « 08:58 » — heure de pointage, toujours sur 24 h et à l'heure d'Alger,
- * dans les deux langues : « 8:58 PM » ne se lit pas dans une boutique.
- */
-export function formatTime(date: Date | string, locale: Locale): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat(NUMBER_LOCALE[locale], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "Africa/Algiers",
-  }).format(d);
-}
-
-/** Unités d'une durée, comme `CURRENCY_SUFFIX` : le nombre, puis l'unité. */
-const DURATION_UNITS: Record<Locale, { h: string; min: string }> = {
-  fr: { h: "h", min: "min" },
-  ar: { h: "س", min: "د" },
-};
-
-/**
- * « 7 h 52 », « 45 min », « 8 h » — durée de travail, en minutes entières.
- * Les minutes gardent deux chiffres (« 7 h 05 ») : une colonne d'heures se
- * relit d'un coup d'œil.
- */
-export function formatDuration(minutes: number, locale: Locale): string {
-  const total = Math.max(0, Math.round(minutes));
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  const u = DURATION_UNITS[locale];
-  if (h === 0) return `${m} ${u.min}`;
-  if (m === 0) return `${formatGrouped(h, locale)} ${u.h}`;
-  const mm = String(m).padStart(2, "0");
-  return locale === "fr" ? `${formatGrouped(h, locale)} ${u.h} ${mm}` : `${h} ${u.h} ${mm} ${u.min}`;
-}

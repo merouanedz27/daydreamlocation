@@ -3,121 +3,89 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
-import { shiftSchema } from "@/lib/validation/pointage";
 import { routing, type Locale } from "@/i18n/routing";
 
-export type ActionResult =
-  | { ok: true }
-  | { ok: false; error: string; field?: string };
-
-export type ClockResult = { ok: true; at: string } | { ok: false; error: string };
+export type ActionResult = { ok: true } | { ok: false; error: string };
 
 function resolveLocale(value: unknown): Locale {
   return routing.locales.includes(value as Locale) ? (value as Locale) : routing.defaultLocale;
 }
 
+/** P0001 = jour déjà payé (fonctions et trigger de la migration `pointage_cases`). */
+function failure(code: string | undefined): ActionResult {
+  return { ok: false, error: code === "P0001" ? "pointage.errors.alreadyPaid" : "errors.generic" };
+}
+
 /**
- * Arrivée et départ de l'utilisateur connecté.
+ * L'employé coche (ou décoche, après un mauvais toucher) la case du JOUR.
  *
- * L'heure est celle du SERVEUR Postgres (`now()` dans `clock_in()` /
- * `clock_out()`), jamais celle du téléphone : une horloge de téléphone se
- * règle à la main. L'employé n'a d'ailleurs aucun droit d'écriture direct sur
- * `work_shifts`.
+ * La date est celle du SERVEUR, à l'heure d'Alger (`mark_today()`), jamais
+ * celle du téléphone : l'employé n'a aucun droit d'écriture direct sur
+ * `attendance`, et ne peut donc pas cocher hier ou demain.
  */
-export async function clockIn(localeValue: string): Promise<ClockResult> {
+export async function setToday(localeValue: string, checked: boolean): Promise<ActionResult> {
   const locale = resolveLocale(localeValue);
   if (!(await getProfile())) return { ok: false, error: "errors.forbidden" };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("clock_in");
-  if (error) {
-    // P0001 : la journée est déjà pointée (une arrivée par jour).
-    // 23P01 : une période est encore ouverte (double toucher, deux appareils).
-    const key =
-      error.code === "P0001"
-        ? "pointage.errors.dayDone"
-        : error.code === "23P01"
-          ? "pointage.errors.alreadyIn"
-          : "errors.generic";
-    return { ok: false, error: key };
-  }
-
-  revalidatePath(`/${locale}/pointage`);
-  return { ok: true, at: data };
-}
-
-export async function clockOut(localeValue: string): Promise<ClockResult> {
-  const locale = resolveLocale(localeValue);
-  if (!(await getProfile())) return { ok: false, error: "errors.forbidden" };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("clock_out");
-  if (error) {
-    return { ok: false, error: error.code === "P0002" ? "pointage.errors.notIn" : "errors.generic" };
-  }
-
-  revalidatePath(`/${locale}/pointage`);
-  return { ok: true, at: data };
-}
-
-/**
- * Ajout ou correction d'une période par le propriétaire (oubli de pointage,
- * départ jamais pointé). La correction est signée : l'employé voit « corrigé »
- * sur sa ligne.
- */
-export async function saveShift(formData: FormData): Promise<ActionResult> {
-  const locale = resolveLocale(formData.get("locale"));
-
-  const profile = await getProfile();
-  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
-
-  const parsed = shiftSchema.safeParse({
-    id: formData.get("id") ?? "",
-    user_id: formData.get("user_id"),
-    work_date: formData.get("work_date"),
-    clock_in: formData.get("clock_in") ?? "",
-    clock_out: formData.get("clock_out") ?? "",
-    note: formData.get("note") ?? "",
-  });
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return { ok: false, error: issue.message, field: String(issue.path[0] ?? "") };
-  }
-
-  const { id, ...values } = parsed.data;
-  const row = { ...values, corrected_by: profile.id, corrected_at: new Date().toISOString() };
-
-  const supabase = await createClient();
-  const { error } = id
-    ? await supabase.from("work_shifts").update(row).eq("id", id)
-    : await supabase.from("work_shifts").insert(row);
-
-  if (error) {
-    // 23505 : cette personne a déjà son pointage ce jour-là.
-    // 23P01 : chevauche une autre période de la même personne.
-    if (error.code === "23505") return { ok: false, error: "pointage.errors.dayTaken" };
-    if (error.code === "23P01") return { ok: false, error: "pointage.errors.overlap" };
-    return { ok: false, error: "errors.generic" };
-  }
+  const { error } = await supabase.rpc(checked ? "mark_today" : "unmark_today");
+  if (error) return failure(error.code);
 
   revalidatePath(`/${locale}/pointage`);
   return { ok: true };
 }
 
-/** Suppression d'une période (doublon, pointage par erreur). Propriétaire seul. */
-export async function deleteShift(formData: FormData): Promise<ActionResult> {
-  const locale = resolveLocale(formData.get("locale"));
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Le propriétaire coche ou décoche N'IMPORTE QUEL jour non payé — un oubli,
+ * une erreur. Un jour déjà payé est refusé par la base (trigger).
+ */
+export async function setDay(
+  localeValue: string,
+  userId: string,
+  day: string,
+  checked: boolean,
+): Promise<ActionResult> {
+  const locale = resolveLocale(localeValue);
   const profile = await getProfile();
-  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
-
-  const id = Number(formData.get("id"));
-  if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
+  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!UUID.test(userId) || !DAY.test(day)) return { ok: false, error: "errors.generic" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("work_shifts").delete().eq("id", id);
+  const { error } = checked
+    ? await supabase
+        .from("attendance")
+        .upsert(
+          { user_id: userId, day, marked_by: profile.id },
+          { onConflict: "user_id,day", ignoreDuplicates: true },
+        )
+    : await supabase.from("attendance").delete().eq("user_id", userId).eq("day", day);
+  if (error) return failure(error.code);
+
+  revalidatePath(`/${locale}/pointage`);
+  return { ok: true };
+}
+
+/**
+ * Paie d'un employé : compte ses jours depuis la dernière paie et remet son
+ * compteur à zéro, en une transaction (`pay_worker()`). Rend le nombre de
+ * jours payés, pour le message de confirmation.
+ */
+export async function payWorker(
+  localeValue: string,
+  userId: string,
+): Promise<{ ok: true; days: number } | { ok: false; error: string }> {
+  const locale = resolveLocale(localeValue);
+  const profile = await getProfile();
+  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!UUID.test(userId)) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("pay_worker", { p_user: userId });
   if (error) return { ok: false, error: "errors.generic" };
 
   revalidatePath(`/${locale}/pointage`);
-  return { ok: true };
+  return { ok: true, days: data };
 }

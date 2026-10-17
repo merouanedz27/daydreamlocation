@@ -31,10 +31,16 @@ export function ticketFields(
   {
     slotOf,
     categoryOfUnit,
+    withRefs = true,
     hideRefs = {},
   }: {
     slotOf: (label: string) => number | null;
     categoryOfUnit: (unitId: number) => string | null;
+    /**
+     * `false` : aucune référence, sur aucune pièce — le bon de location, où
+     * le client ne veut lire que les noms (« Gio-079 », pas « Gio-079-01 »).
+     */
+    withRefs?: boolean;
     /** Colonnes affichées SANS la référence — la liste des commandes. */
     hideRefs?: { costume?: boolean; shoes?: boolean };
   },
@@ -69,7 +75,7 @@ export function ticketFields(
 
   const piece = (slot: Slot | undefined, withSize = true, withRef = true) => {
     if (!slot?.name) return null;
-    const name = withRef && slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
+    const name = withRefs && withRef && slot.ref ? `${slot.name} · ${slot.ref}` : slot.name;
     return withSize && slot.size ? `${name} (${slot.size})` : name;
   };
   const costume = [jacket, vest, pants].map((s) => piece(s, false, !hideRefs.costume)).filter(Boolean).join(" · ");
