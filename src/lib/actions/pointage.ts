@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
-import { isShift } from "@/lib/pointage";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -31,28 +30,26 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * L'employé coche un service (matin / après-midi) d'un jour de SA période —
- * aujourd'hui, ou un jour oublié. Décocher n'est permis que pour aujourd'hui
- * (mauvais toucher) : une case passée ne s'efface que par le propriétaire.
+ * L'employé coche une absence d'un jour de SA période — aujourd'hui, ou un
+ * jour oublié — et la décoche tant que ce jour n'est pas payé (mauvais
+ * toucher).
  *
- * Les bornes sont tenues par la base (`mark_day()`, à la date d'Alger du
- * serveur) : jamais le futur, jamais un jour payé, jamais avant la période.
- * L'employé n'a aucun droit d'écriture direct sur `attendance`.
+ * Les bornes sont tenues par la base (`mark_absent()`, à la date d'Alger du
+ * serveur). L'employé n'a aucun droit d'écriture direct sur `absences`.
  */
-export async function setMyDay(
+export async function setMyAbsence(
   localeValue: string,
   day: string,
-  shift: string,
-  checked: boolean,
+  absent: boolean,
 ): Promise<ActionResult> {
   const locale = resolveLocale(localeValue);
   if (!(await getProfile())) return { ok: false, error: "errors.forbidden" };
-  if (!DAY.test(day) || !isShift(shift)) return { ok: false, error: "errors.generic" };
+  if (!DAY.test(day)) return { ok: false, error: "errors.generic" };
 
   const supabase = await createClient();
-  const { error } = checked
-    ? await supabase.rpc("mark_day", { p_day: day, p_shift: shift })
-    : await supabase.rpc("unmark_today", { p_shift: shift });
+  const { error } = absent
+    ? await supabase.rpc("mark_absent", { p_day: day })
+    : await supabase.rpc("unmark_absent", { p_day: day });
   if (error) return failure(error.code);
 
   revalidatePath(`/${locale}/pointage`);
@@ -60,37 +57,29 @@ export async function setMyDay(
 }
 
 /**
- * Le propriétaire coche ou décoche N'IMPORTE QUELLE case d'un jour non payé
+ * Le propriétaire coche ou décoche l'absence de n'importe quel jour non payé
  * — un oubli, une erreur. Un jour déjà payé est refusé par la base (trigger).
  */
-export async function setDay(
+export async function setAbsence(
   localeValue: string,
   userId: string,
   day: string,
-  shift: string,
-  checked: boolean,
+  absent: boolean,
 ): Promise<ActionResult> {
   const locale = resolveLocale(localeValue);
   const profile = await getProfile();
   if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
-  if (!UUID.test(userId) || !DAY.test(day) || !isShift(shift)) {
-    return { ok: false, error: "errors.generic" };
-  }
+  if (!UUID.test(userId) || !DAY.test(day)) return { ok: false, error: "errors.generic" };
 
   const supabase = await createClient();
-  const { error } = checked
+  const { error } = absent
     ? await supabase
-        .from("attendance")
+        .from("absences")
         .upsert(
-          { user_id: userId, day, shift, marked_by: profile.id },
-          { onConflict: "user_id,day,shift", ignoreDuplicates: true },
+          { user_id: userId, day, marked_by: profile.id },
+          { onConflict: "user_id,day", ignoreDuplicates: true },
         )
-    : await supabase
-        .from("attendance")
-        .delete()
-        .eq("user_id", userId)
-        .eq("day", day)
-        .eq("shift", shift);
+    : await supabase.from("absences").delete().eq("user_id", userId).eq("day", day);
   if (error) return failure(error.code);
 
   revalidatePath(`/${locale}/pointage`);
@@ -98,10 +87,54 @@ export async function setDay(
 }
 
 /**
- * Paie d'un employé : jours cochés depuis la dernière paie (un service = un
- * jour) × prix d'une journée. En UNE transaction (`pay_worker()`), la base
- * compte, ajoute la dépense « Salaire » aux frais et remet le compteur à
- * zéro. Rend les jours et le total réellement payés, pour le message.
+ * Premier jour de travail d'un employé : la paie ne compte rien avant. Sert
+ * surtout aux employés déjà en poste quand l'application arrive. Vide = aucun.
+ */
+export async function setWorkStartDate(
+  localeValue: string,
+  userId: string,
+  day: string | null,
+): Promise<ActionResult> {
+  const locale = resolveLocale(localeValue);
+  const profile = await getProfile();
+  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!UUID.test(userId) || (day !== null && !DAY.test(day))) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ work_start_date: day })
+    .eq("id", userId);
+  if (error) return failure(error.code);
+
+  revalidatePath(`/${locale}/pointage`);
+  return { ok: true };
+}
+
+/** Jours d'un mois de paie complet (30, 28…) — réglage de toute l'équipe. */
+export async function setPayMonthDays(localeValue: string, days: number): Promise<ActionResult> {
+  const locale = resolveLocale(localeValue);
+  const profile = await getProfile();
+  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!Number.isInteger(days) || days < 20 || days > 31) {
+    return { ok: false, error: "pointage.errors.monthDays" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("settings").update({ pay_month_days: days }).eq("id", true);
+  if (error) return failure(error.code);
+
+  revalidatePath(`/${locale}/pointage`);
+  return { ok: true };
+}
+
+/**
+ * Paie d'un employé : salaire mensuel ÷ N × (jours dus − absences). En UNE
+ * transaction (`pay_worker()`), la base compte, ajoute la dépense « Salaire »
+ * aux frais et remet le compteur à zéro. Rend les jours, les absences et le
+ * total réellement payés, pour le message.
  *
  * Le libellé de la dépense s'écrit dans la langue du propriétaire : c'est lui
  * qui relit ses frais.
@@ -109,14 +142,16 @@ export async function setDay(
 export async function payWorker(
   localeValue: string,
   userId: string,
-  dailyRate: number,
-): Promise<{ ok: true; days: number; amount: number } | { ok: false; error: string }> {
+  monthlySalary: number,
+): Promise<
+  { ok: true; days: number; absences: number; amount: number } | { ok: false; error: string }
+> {
   const locale = resolveLocale(localeValue);
   const profile = await getProfile();
   if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
   if (!UUID.test(userId)) return { ok: false, error: "errors.generic" };
-  if (!Number.isFinite(dailyRate) || dailyRate <= 0 || dailyRate > 10_000_000) {
-    return { ok: false, error: "pointage.errors.rateRequired" };
+  if (!Number.isFinite(monthlySalary) || monthlySalary <= 0 || monthlySalary > 100_000_000) {
+    return { ok: false, error: "pointage.errors.salaryRequired" };
   }
 
   const supabase = await createClient();
@@ -130,7 +165,7 @@ export async function payWorker(
 
   const { data, error } = await supabase.rpc("pay_worker", {
     p_user: userId,
-    p_daily_rate: Math.round(dailyRate),
+    p_monthly_salary: Math.round(monthlySalary),
     p_description: description,
   });
   const paid = data?.[0];
@@ -139,5 +174,5 @@ export async function payWorker(
   revalidatePath(`/${locale}/pointage`);
   revalidatePath(`/${locale}/frais`);
   revalidatePath(`/${locale}/tableau-de-bord`);
-  return { ok: true, days: paid.days, amount: Number(paid.amount) };
+  return { ok: true, days: paid.days, absences: paid.absences, amount: Number(paid.amount) };
 }

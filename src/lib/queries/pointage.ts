@@ -1,15 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
-import { isShift, periodStart, slotKey, type PayReset, type WorkerPeriod } from "@/lib/pointage";
+import { daysDue, periodStart, type PayReset, type WorkerPeriod } from "@/lib/pointage";
 import type { IsoDate } from "@/lib/rental-range";
 
 /** Combien de paies passées on garde à l'écran. */
 const HISTORY = 3;
 
-type Person = { id: string; full_name: string };
+type Person = { id: string; full_name: string; work_start_date: IsoDate | null };
+
+/** Jours d'un mois de paie complet (`settings.pay_month_days`). */
+export async function getPayMonthDays(): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("settings").select("pay_month_days").maybeSingle();
+  if (error) throw error;
+  return data?.pay_month_days ?? 30;
+}
 
 /**
- * La période ouverte de chaque personne : ses cases depuis sa dernière paie,
- * et ses dernières paies.
+ * La période ouverte de chaque personne : ses absences depuis sa dernière
+ * paie, ses jours dus et payables, et ses dernières paies.
  *
  * Aucun filtre de personne pour la sécurité : la RLS ne rend à un employé que
  * SES lignes, au propriétaire celles de toute l'équipe. Deux requêtes pour
@@ -20,48 +28,69 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
   const supabase = await createClient();
   const ids = people.map((p) => p.id);
 
-  const { data: resets, error: resetsError } = await supabase
-    .from("pay_resets")
-    .select("user_id, paid_through, days_count, daily_rate, amount, created_at")
-    .in("user_id", ids)
-    .order("paid_through", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (resetsError) throw resetsError;
+  const [monthDays, resetsResult] = await Promise.all([
+    getPayMonthDays(),
+    supabase
+      .from("pay_resets")
+      .select(
+        "user_id, paid_through, days_count, daily_rate, amount, monthly_salary, month_days, absences_count, created_at",
+      )
+      .in("user_id", ids)
+      .order("paid_through", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ]);
+  if (resetsResult.error) throw resetsResult.error;
 
   const byUser = new Map<string, PayReset[]>();
-  for (const r of resets ?? []) {
+  for (const r of resetsResult.data ?? []) {
     byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), r]);
   }
 
-  // Les cases postérieures à la paie la plus ancienne encore utile : on
-  // filtre ensuite par personne. Sans paie, tout (la table reste petite).
-  const lastPaid = people.map((p) => byUser.get(p.id)?.[0]?.paid_through ?? null);
-  const oldestPaid = lastPaid.includes(null) ? null : (lastPaid as IsoDate[]).sort()[0];
+  const starts = new Map(
+    people.map((p) => [
+      p.id,
+      periodStart(byUser.get(p.id)?.[0]?.paid_through ?? null, p.work_start_date, today),
+    ]),
+  );
+  const earliest = [...starts.values()].sort()[0];
 
-  let request = supabase.from("attendance").select("user_id, day, shift").in("user_id", ids);
-  if (oldestPaid) request = request.gt("day", oldestPaid);
-  const { data: days, error: daysError } = await request.order("day");
-  if (daysError) throw daysError;
+  const { data: absences, error: absencesError } = await supabase
+    .from("absences")
+    .select("user_id, day")
+    .in("user_id", ids)
+    .gte("day", earliest)
+    .lte("day", today)
+    .order("day");
+  if (absencesError) throw absencesError;
 
   return people.map((person) => {
-    const own = byUser.get(person.id) ?? [];
-    const paidThrough = own[0]?.paid_through ?? null;
-    const open = (days ?? []).filter(
-      (d) => d.user_id === person.id && (!paidThrough || d.day > paidThrough) && d.day <= today,
-    );
-    const checked = open.flatMap((d) => (isShift(d.shift) ? [slotKey(d.day, d.shift)] : []));
+    const start = starts.get(person.id)!;
+    const own = (absences ?? [])
+      .filter((a) => a.user_id === person.id && a.day >= start)
+      .map((a) => a.day);
+    const due = daysDue(start, today, monthDays);
     return {
       id: person.id,
       full_name: person.full_name,
-      start: periodStart(paidThrough, open[0]?.day ?? null, today),
-      checked,
-      resets: own.slice(0, HISTORY),
+      start,
+      workStartDate: person.work_start_date,
+      absences: own,
+      due,
+      worked: Math.max(due - own.length, 0),
+      resets: (byUser.get(person.id) ?? []).slice(0, HISTORY),
     };
   });
 }
 
-export async function getMyPeriod(person: Person, today: IsoDate): Promise<WorkerPeriod> {
-  const [period] = await periodsFor([person], today);
+export async function getMyPeriod(personId: string, today: IsoDate): Promise<WorkerPeriod> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, work_start_date")
+    .eq("id", personId)
+    .single();
+  if (error) throw error;
+  const [period] = await periodsFor([data], today);
   return period;
 }
 
@@ -74,7 +103,7 @@ export async function getTeamPeriods(today: IsoDate): Promise<WorkerPeriod[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, work_start_date")
     .eq("is_active", true)
     .neq("role", "owner")
     .order("full_name");

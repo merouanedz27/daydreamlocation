@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PointageCounter, PointageDays } from "@/components/pointage-days";
 import { PointageTeam } from "@/components/pointage-team";
 import { isOwner, requireProfile } from "@/lib/auth";
-import { getMyPeriod, getTeamPeriods } from "@/lib/queries/pointage";
+import { getMyPeriod, getPayMonthDays, getTeamPeriods } from "@/lib/queries/pointage";
 import { todayIso } from "@/lib/rental-range";
 import type { Locale } from "@/i18n/routing";
 
@@ -16,12 +16,12 @@ export async function generateMetadata(props: {
 }
 
 /**
- * Pointage — la version du client : une case par jour.
+ * Pointage — la version du client : on coche les ABSENCES.
  *
- *   - L'EMPLOYÉ voit son tableau (jour | case) depuis sa dernière paie, et
- *     coche la case du jour en arrivant. Il ne relit que ses cases (RLS).
- *   - Le PROPRIÉTAIRE voit chaque employé et son nombre de jours ; quand il le
- *     paie, un bouton remet ce compteur à zéro.
+ *   - L'EMPLOYÉ voit son tableau (jour | absent) depuis sa dernière paie, et
+ *     ne coche que le jour où il ne vient pas. Il ne relit que ses cases (RLS).
+ *   - Le PROPRIÉTAIRE voit chaque employé et ses jours travaillés (jours dus
+ *     − absences) ; quand il le paie, le compteur repart à zéro.
  *
  * Pas dans la barre basse : le titre reste donc visible (`daydream-ui`).
  */
@@ -48,7 +48,11 @@ export default async function PointagePage({
       </div>
 
       {owner ? (
-        <PointageTeam today={today} team={await getTeamPeriods(today)} />
+        <PointageTeam
+          today={today}
+          team={await getTeamPeriods(today)}
+          monthDays={await getPayMonthDays()}
+        />
       ) : (
         <WorkerSheet profile={profile} today={today} />
       )}
@@ -60,19 +64,23 @@ async function WorkerSheet({
   profile,
   today,
 }: {
-  profile: { id: string; full_name: string };
+  profile: { id: string };
   today: string;
 }) {
-  const period = await getMyPeriod(profile, today);
+  const period = await getMyPeriod(profile.id, today);
   return (
     <>
-      <PointageCounter count={period.checked.length} start={period.start} />
+      <PointageCounter
+        worked={period.worked}
+        absences={period.absences}
+        start={period.start}
+      />
       <PointageDays
         mode="self"
         userId={period.id}
         start={period.start}
         today={today}
-        checked={period.checked}
+        absences={period.absences}
         lockedThrough={period.resets[0]?.paid_through ?? null}
       />
     </>

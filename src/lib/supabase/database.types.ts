@@ -15,6 +15,43 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      absences: {
+        Row: {
+          id: number;
+          user_id: string;
+          day: string;
+          marked_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          marked_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          marked_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "absences_marked_by_fkey";
+            columns: ["marked_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "absences_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       article_model_parts: {
         Row: {
           model_id: number;
@@ -154,46 +191,6 @@ export type Database = {
             columns: ["model_id"];
             isOneToOne: false;
             referencedRelation: "article_models";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      attendance: {
-        Row: {
-          id: number;
-          user_id: string;
-          day: string;
-          marked_by: string | null;
-          created_at: string;
-          shift: string;
-        };
-        Insert: {
-          user_id: string;
-          day: string;
-          marked_by?: string | null;
-          created_at?: string;
-          shift?: string;
-        };
-        Update: {
-          user_id?: string;
-          day?: string;
-          marked_by?: string | null;
-          created_at?: string;
-          shift?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "attendance_marked_by_fkey";
-            columns: ["marked_by"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "attendance_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
             referencedColumns: ["id"];
           },
         ];
@@ -560,6 +557,9 @@ export type Database = {
           daily_rate: number | null;
           amount: number | null;
           expense_id: number | null;
+          monthly_salary: number | null;
+          month_days: number | null;
+          absences_count: number | null;
         };
         Insert: {
           user_id: string;
@@ -570,6 +570,9 @@ export type Database = {
           daily_rate?: number | null;
           amount?: number | null;
           expense_id?: number | null;
+          monthly_salary?: number | null;
+          month_days?: number | null;
+          absences_count?: number | null;
         };
         Update: {
           user_id?: string;
@@ -580,6 +583,9 @@ export type Database = {
           daily_rate?: number | null;
           amount?: number | null;
           expense_id?: number | null;
+          monthly_salary?: number | null;
+          month_days?: number | null;
+          absences_count?: number | null;
         };
         Relationships: [
           {
@@ -616,6 +622,7 @@ export type Database = {
           notify_new_order: boolean;
           notify_daily: boolean;
           email_locale: string;
+          work_start_date: string | null;
         };
         Insert: {
           id: string;
@@ -627,6 +634,7 @@ export type Database = {
           notify_new_order?: boolean;
           notify_daily?: boolean;
           email_locale?: string;
+          work_start_date?: string | null;
         };
         Update: {
           id?: string;
@@ -638,6 +646,7 @@ export type Database = {
           notify_new_order?: boolean;
           notify_daily?: boolean;
           email_locale?: string;
+          work_start_date?: string | null;
         };
         Relationships: [
           {
@@ -705,6 +714,7 @@ export type Database = {
           customer_message: string | null;
           notification_rules: Json;
           email_texts: Json;
+          pay_month_days: number;
         };
         Insert: {
           id?: boolean;
@@ -719,6 +729,7 @@ export type Database = {
           customer_message?: string | null;
           notification_rules?: Json;
           email_texts?: Json;
+          pay_month_days?: number;
         };
         Update: {
           id?: boolean;
@@ -733,6 +744,7 @@ export type Database = {
           customer_message?: string | null;
           notification_rules?: Json;
           email_texts?: Json;
+          pay_month_days?: number;
         };
         Relationships: [];
       };
@@ -771,10 +783,9 @@ export type Database = {
         };
         Returns: Json;
       };
-      mark_day: {
+      mark_absent: {
         Args: {
           p_day: string;
-          p_shift: string;
         };
         Returns: string;
       };
@@ -785,10 +796,10 @@ export type Database = {
       pay_worker: {
         Args: {
           p_user: string;
-          p_daily_rate: number;
+          p_monthly_salary: number;
           p_description: string;
         };
-        Returns: { days: number; amount: number }[];
+        Returns: { days: number; absences: number; amount: number }[];
       };
       save_ensemble: {
         Args: {
@@ -821,9 +832,9 @@ export type Database = {
         };
         Returns: number;
       };
-      unmark_today: {
+      unmark_absent: {
         Args: {
-          p_shift: string;
+          p_day: string;
         };
         Returns: string;
       };

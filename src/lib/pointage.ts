@@ -3,43 +3,47 @@
  * requête, aucune valeur importée : `scripts/test-pointage.mjs` le charge sans
  * résolveur d'alias.
  *
- * Le modèle du client : DEUX cases par jour, matin et après-midi. D'habitude
- * l'employé n'en coche qu'une ; s'il fait les deux services, le jour compte
- * double. Le compteur = ses cases cochées depuis sa dernière paie ; payer le
- * remet à zéro (`pay_resets`), sans rien effacer.
+ * Le modèle du client : on coche les ABSENCES, pas les présences — l'équipe
+ * vient presque tous les jours. À la paie :
+ *   jours dus   = un mois entier vaut N jours (réglage, 30 par défaut), un
+ *                 mois partiel ses jours réels (au plus N) ;
+ *   jours payés = jours dus − absences ;
+ *   montant     = salaire mensuel × jours payés ÷ N.
+ * Payer remet le compteur à zéro (`pay_resets`), sans rien effacer.
+ *
+ * La base fait le même calcul (`private.days_due`, `pay_worker()`) : c'est
+ * elle qui fait foi. Ce module ne sert qu'à l'affichage.
  */
 import type { IsoDate } from "@/lib/rental-range";
 
-/** Doit rester aligné sur la contrainte `attendance_shift_valid`. */
-export const SHIFTS = ["matin", "apres_midi"] as const;
-export type ShiftKind = (typeof SHIFTS)[number];
-
-export function isShift(value: unknown): value is ShiftKind {
-  return SHIFTS.includes(value as ShiftKind);
-}
-
-/** « 2026-10-20|matin » — une case cochée. */
-export function slotKey(day: IsoDate, shift: ShiftKind): string {
-  return `${day}|${shift}`;
-}
-
 export type PayReset = {
   paid_through: IsoDate;
+  /** Jours payés. */
   days_count: number;
   /** Prix d'une journée — `null` pour les paies d'avant les montants. */
   daily_rate: number | null;
   amount: number | null;
+  /** `null` pour les paies d'avant le salaire mensuel. */
+  monthly_salary: number | null;
+  month_days: number | null;
+  absences_count: number | null;
   created_at: string;
 };
 
-/** La période ouverte d'un employé : ses cases cochées depuis la dernière paie. */
+/** La période ouverte d'un employé, depuis sa dernière paie. */
 export type WorkerPeriod = {
   id: string;
   full_name: string;
-  /** Premier jour de la période affichée. */
+  /** Premier jour de la période (peut être après aujourd'hui : rien n'est dû). */
   start: IsoDate;
-  /** Cases cochées de la période (`slotKey`), dans l'ordre des jours. */
-  checked: string[];
+  /** Premier jour de travail saisi par l'administrateur. */
+  workStartDate: IsoDate | null;
+  /** Jours d'absence de la période, dans l'ordre. */
+  absences: IsoDate[];
+  /** Jours dus sur la période, avant les absences. */
+  due: number;
+  /** Jours payables : `due − absences`, jamais négatif. */
+  worked: number;
   /** Les dernières paies, la plus récente d'abord. */
   resets: PayReset[];
 };
@@ -50,23 +54,49 @@ function shift(date: IsoDate, days: number): IsoDate {
   return d.toISOString().slice(0, 10);
 }
 
+function lastDayOfMonth(monthStart: IsoDate): IsoDate {
+  const d = new Date(`${monthStart}T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + 1, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(from: IsoDate, to: IsoDate): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+}
+
 /**
- * Premier jour de la période ouverte :
- *   - le lendemain de la dernière paie ;
- *   - sinon le premier jour coché ;
- *   - sinon le 1er du mois — un nouvel employé voit le mois en cours.
- * Jamais après aujourd'hui : payé ce soir, la ligne du jour reste visible
- * (fermée) jusqu'à demain.
+ * Premier jour de la période ouverte : le plus tard du lendemain de la
+ * dernière paie et de la date de début de travail ; sans l'un ni l'autre, le
+ * 1er du mois. Même règle que `private.period_start()`.
  */
 export function periodStart(
   lastPaidThrough: IsoDate | null,
-  firstChecked: IsoDate | null,
+  workStartDate: IsoDate | null,
   today: IsoDate,
 ): IsoDate {
-  const start = lastPaidThrough
-    ? shift(lastPaidThrough, 1)
-    : (firstChecked ?? `${today.slice(0, 7)}-01`);
-  return start > today ? today : start;
+  const candidates = [lastPaidThrough ? shift(lastPaidThrough, 1) : null, workStartDate].filter(
+    (d): d is IsoDate => d !== null,
+  );
+  return candidates.length ? candidates.sort().at(-1)! : `${today.slice(0, 7)}-01`;
+}
+
+/**
+ * Jours dus de `from` à `to` inclus, mois par mois : un mois entier vaut `n`,
+ * un mois partiel ses jours réels, au plus `n`. Miroir de `private.days_due`.
+ */
+export function daysDue(from: IsoDate, to: IsoDate, n: number): number {
+  let total = 0;
+  for (let month = `${from.slice(0, 7)}-01`; month <= to; month = shift(lastDayOfMonth(month), 1)) {
+    const last = lastDayOfMonth(month);
+    if (month >= from && last <= to) total += n;
+    else total += Math.min(daysBetween(month < from ? from : month, last > to ? to : last), n);
+  }
+  return from > to ? 0 : total;
+}
+
+/** Montant d'une paie, arrondi au dinar — même arrondi que `pay_worker()`. */
+export function payAmount(monthlySalary: number, worked: number, n: number): number {
+  return Math.round((monthlySalary * worked) / n);
 }
 
 /** Les jours de `start` à `today` inclus, AUJOURD'HUI EN TÊTE : la case du pouce. */
@@ -77,23 +107,24 @@ export function periodDays(start: IsoDate, today: IsoDate): IsoDate[] {
 }
 
 /**
- * Ce que l'EMPLOYÉ peut toucher (mêmes bornes que `mark_day()` en base) :
- *   - cocher un jour non payé, pas dans le futur, et — s'il n'a jamais été
- *     payé — pas avant le 1er du mois ;
- *   - décocher seulement aujourd'hui.
+ * Ce que l'EMPLOYÉ peut toucher (mêmes bornes que `mark_absent()` /
+ * `unmark_absent()` en base) : cocher une absence d'un jour de sa période,
+ * jamais dans le futur ; la décocher tant que le jour n'est pas payé.
  */
 export function selfCanToggle(
   day: IsoDate,
-  checked: boolean,
+  absent: boolean,
   today: IsoDate,
+  start: IsoDate,
   lastPaidThrough: IsoDate | null,
 ): boolean {
-  if (day > today || isLocked(day, lastPaidThrough)) return false;
-  if (checked) return day === today;
-  return lastPaidThrough !== null || day >= `${today.slice(0, 7)}-01`;
+  if (isLocked(day, lastPaidThrough)) return false;
+  // Une absence déjà cochée se retire toujours (mauvais toucher).
+  if (absent) return true;
+  return day <= today && day >= start;
 }
 
-/** Un jour déjà payé ne se coche plus (même règle que le trigger en base). */
+/** Un jour déjà payé ne se modifie plus (même règle que le trigger en base). */
 export function isLocked(day: IsoDate, lastPaidThrough: IsoDate | null): boolean {
   return lastPaidThrough !== null && day <= lastPaidThrough;
 }

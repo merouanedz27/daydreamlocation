@@ -21,15 +21,16 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { payWorker } from "@/lib/actions/pointage";
 import { formatMoney } from "@/lib/format";
-import type { WorkerPeriod } from "@/lib/pointage";
+import { payAmount, type WorkerPeriod } from "@/lib/pointage";
 import type { Locale } from "@/i18n/routing";
 
 /**
- * La paie d'un employé : le prix d'une journée, le total sous les yeux, puis
- * un seul geste — le compteur repart à zéro ET le total entre dans les frais
- * (catégorie « Salaire »), dans la même transaction.
+ * La paie d'un employé : son salaire mensuel, le calcul sous les yeux —
+ * jours dus − absences, × salaire ÷ N — puis un seul geste : le compteur
+ * repart à zéro ET le total entre dans les frais (catégorie « Salaire »),
+ * dans la même transaction. La base refait le calcul : c'est elle qui fait foi.
  *
- * Le prix se préremplit avec celui de la dernière paie : d'un mois sur
+ * Le salaire se préremplit avec celui de la dernière paie : d'un mois sur
  * l'autre, le propriétaire n'a qu'à vérifier le total.
  *
  * Tiroir et non `ConfirmDialog` : il faut un champ. Mêmes règles pourtant —
@@ -40,18 +41,21 @@ export function PointagePay({
   open,
   onOpenChange,
   worker,
+  monthDays,
   since,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   worker: WorkerPeriod;
+  /** N : jours d'un mois de paie complet. */
+  monthDays: number;
   /** « 01/10 » — début de la période payée. */
   since: string;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const [isPending, startTransition] = useTransition();
-  const lastRate = worker.resets.find((r) => r.daily_rate !== null)?.daily_rate ?? null;
+  const lastRate = worker.resets.find((r) => r.monthly_salary !== null)?.monthly_salary ?? null;
   const [rate, setRate] = useState(lastRate ? String(lastRate) : "");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -67,15 +71,15 @@ export function PointagePay({
     }
   }
 
-  const days = worker.checked.length;
+  const days = worker.worked;
   const price = Number(rate);
   const valid = rate.trim() !== "" && Number.isFinite(price) && price > 0;
-  const total = valid ? Math.round(price) * days : 0;
+  const total = valid ? payAmount(Math.round(price), days, monthDays) : 0;
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid) {
-      setError("pointage.errors.rateRequired");
+      setError("pointage.errors.salaryRequired");
       inputRef.current?.focus();
       return;
     }
@@ -90,6 +94,7 @@ export function PointagePay({
         t("pointage.paid", {
           name: worker.full_name,
           count: result.days,
+          absences: result.absences,
           amount: formatMoney(result.amount, locale),
         }),
       );
@@ -110,14 +115,14 @@ export function PointagePay({
         <DrawerHeader className="text-start">
           <DrawerTitle>{t("pointage.payTitle", { name: worker.full_name })}</DrawerTitle>
           <DrawerDescription>
-            {t("pointage.payBody", { count: days, date: since })}
+            {t("pointage.payBody", { count: days, absences: worker.absences.length, date: since })}
           </DrawerDescription>
         </DrawerHeader>
 
         <form onSubmit={onSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto px-4">
-            <Field data-invalid={error === "pointage.errors.rateRequired" || undefined}>
-              <FieldLabel htmlFor="pay-rate">{t("pointage.rate")}</FieldLabel>
+            <Field data-invalid={error === "pointage.errors.salaryRequired" || undefined}>
+              <FieldLabel htmlFor="pay-rate">{t("pointage.salary")}</FieldLabel>
               <Input
                 ref={inputRef}
                 id="pay-rate"
@@ -129,22 +134,32 @@ export function PointagePay({
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 disabled={isPending}
-                aria-invalid={error === "pointage.errors.rateRequired" || undefined}
+                aria-invalid={error === "pointage.errors.salaryRequired" || undefined}
                 className="tabular h-14 text-xl"
               />
-              <FieldDescription>{t("pointage.rateHint")}</FieldDescription>
+              <FieldDescription>{t("pointage.salaryHint", { count: monthDays })}</FieldDescription>
             </Field>
 
             {/* Le calcul en clair : c'est exactement ce que le propriétaire
                 va compter en billets. */}
             <dl className="border-border bg-muted/40 mt-4 space-y-2 rounded-lg border p-3 text-sm">
               <div className="flex items-baseline justify-between gap-4">
-                <dt className="text-muted-foreground">{t("pointage.daysLabel")}</dt>
-                <dd className="tabular">{t("pointage.count", { count: days })}</dd>
+                <dt className="text-muted-foreground">{t("pointage.daysDue")}</dt>
+                <dd className="tabular">{t("pointage.count", { count: worker.due })}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-4">
-                <dt className="text-muted-foreground">{t("pointage.rate")}</dt>
-                <dd className="tabular">{valid ? formatMoney(Math.round(price), locale) : "—"}</dd>
+                <dt className="text-muted-foreground">{t("pointage.absencesLabel")}</dt>
+                <dd className="tabular">− {t("pointage.count", { count: worker.absences.length })}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-muted-foreground">{t("pointage.daysLabel")}</dt>
+                <dd className="tabular font-medium">{t("pointage.count", { count: days })}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="text-muted-foreground">{t("pointage.perDay", { count: monthDays })}</dt>
+                <dd className="tabular">
+                  {valid ? formatMoney(Math.round(price) / monthDays, locale) : "—"}
+                </dd>
               </div>
               <div className="border-border flex items-baseline justify-between gap-4 border-t pt-2">
                 <dt className="font-medium">{t("pointage.total")}</dt>
