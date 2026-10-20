@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { daysDue, periodStart, type PayReset, type WorkerPeriod } from "@/lib/pointage";
 import type { IsoDate } from "@/lib/rental-range";
@@ -7,13 +8,16 @@ const HISTORY = 3;
 
 type Person = { id: string; full_name: string; work_start_date: IsoDate | null };
 
-/** Jours d'un mois de paie complet (`settings.pay_month_days`). */
-export async function getPayMonthDays(): Promise<number> {
+/**
+ * Jours d'un mois de paie complet (`settings.pay_month_days`). `cache()` : la
+ * page et le calcul des périodes le demandent tous deux — une seule requête.
+ */
+export const getPayMonthDays = cache(async (): Promise<number> => {
   const supabase = await createClient();
   const { data, error } = await supabase.from("settings").select("pay_month_days").maybeSingle();
   if (error) throw error;
   return data?.pay_month_days ?? 30;
-}
+});
 
 /**
  * La période ouverte de chaque personne : ses absences depuis sa dernière
@@ -82,15 +86,12 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
   });
 }
 
-export async function getMyPeriod(personId: string, today: IsoDate): Promise<WorkerPeriod> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, work_start_date")
-    .eq("id", personId)
-    .single();
-  if (error) throw error;
-  const [period] = await periodsFor([data], today);
+/**
+ * La période de l'utilisateur connecté. Reçoit son profil, déjà lu par le
+ * layout (`getProfile`) : pas de second aller-retour vers `profiles`.
+ */
+export async function getMyPeriod(person: Person, today: IsoDate): Promise<WorkerPeriod> {
+  const [period] = await periodsFor([person], today);
   return period;
 }
 

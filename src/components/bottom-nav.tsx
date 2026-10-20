@@ -59,6 +59,10 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              // Page ENTIÈRE préchargée dès l'affichage de la barre (gardée
+              // 30 s par `staleTimes`) : changer d'onglet s'affiche aussitôt,
+              // sans squelette — comme une appli native.
+              prefetch
               aria-current={active ? "page" : undefined}
               className={cn(
                 "press relative flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[11px] active:text-nav-foreground",

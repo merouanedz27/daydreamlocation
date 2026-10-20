@@ -48,11 +48,7 @@ export default async function PointagePage({
       </div>
 
       {owner ? (
-        <PointageTeam
-          today={today}
-          team={await getTeamPeriods(today)}
-          monthDays={await getPayMonthDays()}
-        />
+        <TeamSheet today={today} />
       ) : (
         <WorkerSheet profile={profile} today={today} />
       )}
@@ -60,14 +56,20 @@ export default async function PointagePage({
   );
 }
 
+/** Les deux lectures en parallèle : chaque attente en série retarde la page. */
+async function TeamSheet({ today }: { today: string }) {
+  const [team, monthDays] = await Promise.all([getTeamPeriods(today), getPayMonthDays()]);
+  return <PointageTeam today={today} team={team} monthDays={monthDays} />;
+}
+
 async function WorkerSheet({
   profile,
   today,
 }: {
-  profile: { id: string };
+  profile: { id: string; full_name: string; work_start_date: string | null };
   today: string;
 }) {
-  const period = await getMyPeriod(profile.id, today);
+  const period = await getMyPeriod(profile, today);
   return (
     <>
       <PointageCounter
