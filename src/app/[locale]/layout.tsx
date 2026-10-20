@@ -4,6 +4,7 @@ import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Cairo, Inter } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { DirectionProvider } from "@/components/ui/direction";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -127,6 +128,9 @@ export default async function LocaleLayout({
           <Toaster position="top-center" dir={dir} />
         </DirectionProvider>
         </ThemeProvider>
+        {/* Temps de chargement réels des téléphones de l'équipe, page par
+            page (Vercel → Speed Insights). Aucune donnée de commande. */}
+        <SpeedInsights />
       </body>
     </html>
   );
