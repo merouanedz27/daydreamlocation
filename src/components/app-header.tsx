@@ -38,6 +38,7 @@ import {
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { signOut } from "@/lib/actions/auth";
 import { clearOfflineData } from "@/lib/offline/outbox";
+import { OfflineBadge } from "@/components/offline-sync";
 import { detachPush } from "@/lib/notifications/browser";
 import { ThemeChoice } from "@/components/theme-choice";
 import { cn } from "@/lib/utils";
@@ -134,6 +135,9 @@ export function AppHeader({
             className="h-5 w-auto brightness-0 invert sm:h-6"
           />
         </Link>
+
+        {/* Hors ligne : une petite pastille rouge, et c'est tout. */}
+        <OfflineBadge />
 
         {/* Pas de défilement : les cinq onglets tiennent toujours. Entre 768
             et 1024 px, icônes seules (le nom reste en infobulle et pour les

@@ -101,7 +101,7 @@ export function PointageCounter({
  * Aujourd'hui en tête, sur fond doré. Le toucher est optimiste : la case
  * change tout de suite, l'erreur la remet en place et s'affiche en toast.
  * Sans réseau, le geste attend dans la file hors ligne et la case reste
- * cochée, marquée « en attente ». Une
+ * cochée ; il part de lui-même au retour du réseau. Une
  * case en lecture seule porte une icône et son nom accessible : jamais la
  * couleur seule.
  */
@@ -198,7 +198,6 @@ export function PointageDays({
           {days.map((day) => {
             const isToday = day === today;
             const locked = isLocked(day, lockedThrough);
-            const waiting = queued.has(day) || inQueue.has(day);
             const on = queued.has(day)
               ? queued.get(day)!
               : inQueue.has(day)
@@ -229,9 +228,6 @@ export function PointageDays({
                     <span className="bg-primary text-primary-foreground ms-2 inline-block rounded-full px-1.5 text-[11px] leading-5 font-medium">
                       {t("pointage.today")}
                     </span>
-                  )}
-                  {waiting && (
-                    <span className="text-warning-foreground ms-2 text-xs">{t("offline.pendingBadge")}</span>
                   )}
                 </th>
                 <td className={cn(sheet.td, "py-0 text-center md:py-0")}>

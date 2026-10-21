@@ -62,7 +62,6 @@ import {
   unitIdsIn,
   type DraftLine,
 } from "@/lib/order-draft";
-import { useOnline } from "@/components/offline-sync";
 import { isNetworkError, localAvailability, queueOp } from "@/lib/offline/outbox";
 import { fieldErrorsOf, orderSchema } from "@/lib/validation/orders";
 import { defaultWindow } from "@/lib/rental-range";
@@ -369,7 +368,6 @@ export function OrderQuickForm({
   // Pendant l'envoi d'une nouvelle commande, la saisie affichée est figée
   // (voir `onSubmit`) : le brouillon stocké est déjà vidé.
   const [frozen, setFrozen] = useState<QuickDraft | null>(null);
-  const online = useOnline();
 
   // Modification REPRISE : refusée à l'envoi hors ligne, l'employé l'a rouverte
   // depuis la liste des gestes. Sa saisie revient sur la dernière version —
@@ -1084,7 +1082,7 @@ export function OrderQuickForm({
           },
           t("offline.orderEditTitle", { no: edit.orderNo, name }),
         );
-        toast.warning(t("offline.orderEditQueued", { name }), { duration: 8000 });
+        toast(t("offline.queuedToast"));
         // Navigation complète : sans réseau, le service worker sert la fiche
         // hors ligne.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- navigation COMPLÈTE voulue : sans réseau, seul le service worker peut servir la page hors ligne.
@@ -1097,7 +1095,7 @@ export function OrderQuickForm({
       );
       setFrozen(null);
       reset(another);
-      toast.warning(t("offline.orderQueued", { name }), { duration: 8000 });
+      toast(t("offline.queuedToast"));
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -1219,17 +1217,6 @@ export function OrderQuickForm({
           </Button>
         )}
       </div>
-
-      {!online && (
-        // Sans réseau : la commande sera PROVISOIRE. Dit AVANT la saisie, pour
-        // que personne ne promette la tenue au client.
-        <Alert className="border-warning-foreground/30 bg-warning-soft text-warning-foreground mb-4">
-          <AlertTriangle />
-          <AlertDescription className="text-warning-foreground">
-            {edit ? t("offline.formEditHint") : t("offline.formHint")}
-          </AlertDescription>
-        </Alert>
-      )}
 
       {resumed && (
         <Alert className="mb-4">

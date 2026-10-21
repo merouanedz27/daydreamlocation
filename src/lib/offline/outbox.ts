@@ -210,7 +210,8 @@ export async function sendOrQueue(op: OutboxOp, title: string): Promise<SendResu
   return { ok: true, queued: true };
 }
 
-let flushing: Promise<{ sent: number; rejected: number }> | null = null;
+type FlushResult = { sent: number; rejected: OutboxItem[] };
+let flushing: Promise<FlushResult> | null = null;
 
 /**
  * Renvoie la file, dans l'ordre où les gestes ont été faits. S'arrête au
@@ -218,11 +219,11 @@ let flushing: Promise<{ sent: number; rejected: number }> | null = null;
  * déclencheurs simultanés (retour du réseau + retour sur l'onglet) partagent
  * le même.
  */
-export function flushOutbox(): Promise<{ sent: number; rejected: number }> {
+export function flushOutbox(): Promise<FlushResult> {
   if (flushing) return flushing;
   flushing = (async () => {
     let sent = 0;
-    let rejected = 0;
+    const rejected: OutboxItem[] = [];
     if (!context || !navigator.onLine) return { sent, rejected };
     const { userId, locale } = context;
     const queue = (await getOutbox()).filter((i) => i.status === "pending" && i.userId === userId);
@@ -239,8 +240,8 @@ export function flushOutbox(): Promise<{ sent: number; rejected: number }> {
         sent++;
         await idbUpdate<OutboxItem[]>(OUTBOX, (items = []) => items.filter((i) => i.id !== item.id));
       } else {
-        rejected++;
         const { error, values } = result;
+        rejected.push({ ...item, status: "rejected", error, errorValues: values });
         await idbUpdate<OutboxItem[]>(OUTBOX, (items = []) =>
           items.map((i) =>
             i.id === item.id ? { ...i, status: "rejected", error, errorValues: values } : i,
@@ -266,6 +267,53 @@ export async function dropOtherUsers(userId: string): Promise<void> {
   if (catalog && catalog.userId !== userId) await idbSet(CATALOG, undefined);
   await idbUpdate<OutboxItem[]>(OUTBOX, (items = []) => items.filter((i) => i.userId === userId));
   emit(OUTBOX_EVENT);
+}
+
+/** Une saisie de nouvelle commande est-elle en cours dans ce téléphone ? */
+function quickDraftInProgress(): boolean {
+  try {
+    const d = JSON.parse(localStorage.getItem("dd.quickOrder") ?? "null") as {
+      customerName?: string;
+      slots?: { name?: string }[];
+    } | null;
+    return Boolean(d && (d.customerName?.trim() || d.slots?.some((slot) => slot.name?.trim())));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * « Corriger » une commande provisoire REFUSÉE (pièce déjà louée, commande
+ * changée entre-temps) : la saisie revient dans le formulaire, toute remplie,
+ * et quitte la file. Rend `false` si une autre saisie est en cours — on ne
+ * l'écrase pas.
+ */
+export async function reopenOrder(item: OutboxItem, locale: string): Promise<boolean> {
+  const op = item.op;
+  if (op.kind === "order") {
+    if (quickDraftInProgress()) return false;
+    try {
+      localStorage.setItem("dd.quickOrder", JSON.stringify(op.draft));
+    } catch {
+      return false;
+    }
+    await removeOutboxItem(item.id);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- navigation COMPLÈTE voulue : sans réseau, seul le service worker peut servir l'écran gardé.
+    window.location.assign(`/${locale}/commandes/nouvelle`);
+    return true;
+  }
+  if (op.kind === "orderEdit") {
+    try {
+      sessionStorage.setItem(`dd.editDraft.${op.orderId}`, JSON.stringify(op.draft));
+    } catch {
+      return false;
+    }
+    await removeOutboxItem(item.id);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- navigation COMPLÈTE voulue : sans réseau, seul le service worker peut servir l'écran gardé.
+    window.location.assign(`/${locale}/commandes/${op.orderId}/modifier`);
+    return true;
+  }
+  return false;
 }
 
 // --- Catalogue du formulaire de commande ----------------------------------

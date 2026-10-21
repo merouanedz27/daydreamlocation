@@ -6,7 +6,7 @@ import { AppFooter } from "@/components/app-footer";
 import { UpdateNotifier } from "@/components/update-notifier";
 import { CustomerMessageProvider } from "@/components/customer-message";
 import { NotificationsBell } from "@/components/notifications-bell";
-import { ConnectionBanner, OfflineSync } from "@/components/offline-sync";
+import { OfflineSync } from "@/components/offline-sync";
 import { canManageStock, requireProfile, isOwner } from "@/lib/auth";
 import { getSettings } from "@/lib/queries/orders";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
@@ -57,9 +57,6 @@ export default async function AppLayout({
         }
       />
 
-      {/* Hors ligne / de nouveau en ligne, collé sous la barre du haut. */}
-      <ConnectionBanner />
-
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         {/* `?? ""` : tant que la migration n'est pas appliquée, la colonne
             n'existe pas et `select *` ne la renvoie pas. */}
@@ -73,7 +70,7 @@ export default async function AppLayout({
 
       <BottomNav />
 
-      {/* Cliché hors ligne, file des gestes faits sans réseau, et sa pastille. */}
+      {/* Hors ligne : écrans gardés, catalogue, envoi de la file. Rien à l'écran. */}
       <OfflineSync userId={profile.id} locale={locale as Locale} />
 
       {/* Pas en développement : chaque rechargement à chaud changerait la version. */}

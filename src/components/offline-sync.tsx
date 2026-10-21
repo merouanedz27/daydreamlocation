@@ -1,20 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
-import { usePathname, useRouter } from "@/i18n/navigation";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { AlertCircle, CloudUpload, RotateCw, Trash2, Wifi, WifiOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import { Spinner } from "@/components/ui/spinner";
-import { useParams } from "next/navigation";
+import { WifiOff } from "lucide-react";
+import { usePathname, useRouter } from "@/i18n/navigation";
 import {
   dropOtherUsers,
   flushOutbox,
@@ -22,13 +12,11 @@ import {
   OUTBOX_EVENT,
   refreshCatalog,
   removeOutboxItem,
-  retryOutboxItem,
+  reopenOrder,
   setOfflineContext,
 } from "@/lib/offline/outbox";
+import { keepPage, keepPages, rememberLocale } from "@/lib/offline/pages";
 import type { OutboxItem } from "@/lib/offline/types";
-import { keepPage, keepPages, pageCachedAt, rememberLocale } from "@/lib/offline/pages";
-import { formatDayMonth, formatTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
 /** La file part, et les écrans gardés sont revus, toutes les 5 minutes (onglet visible). */
@@ -79,93 +67,24 @@ export function useOnline(): boolean {
   );
 }
 
-/** Combien de temps « De nouveau en ligne » reste affiché. */
-const BACK_ONLINE_MS = 4000;
-
 /**
- * Le bandeau de connexion, collé sous la barre du haut.
- *
- *   - hors ligne : bandeau ambre, tant que dure la coupure — l'équipe doit
- *     savoir AVANT de toucher que ses gestes partiront plus tard, et DE QUAND
- *     date l'écran qu'elle regarde (« page de 14:32 ») ;
- *   - retour du réseau : bandeau vert « De nouveau en ligne », 4 secondes.
- *   - en ligne : rien. Un badge « en ligne » permanent serait du bruit sur
- *     chaque écran.
- *
- * `role="status"` : un lecteur d'écran annonce le changement sans voler le
- * focus.
+ * Le SEUL signe du hors ligne : une petite pastille rouge dans la barre du
+ * haut, à côté du logo. Rien ne s'affiche en ligne. L'icône porte le sens
+ * (jamais la couleur seule), le nom accessible le dit en toutes lettres.
  */
-export function ConnectionBanner() {
+export function OfflineBadge() {
   const t = useTranslations("offline");
-  const { locale } = useParams<{ locale: Locale }>();
   const online = useOnline();
-  const pathname = usePathname();
-  const [back, setBack] = useState(false);
-  const [cachedAt, setCachedAt] = useState<string | null>(null);
-
-  // L'heure de l'écran affiché, telle que le cache des écrans la connaît.
-  useEffect(() => {
-    if (online) return;
-    let alive = true;
-    void pageCachedAt(window.location.pathname + window.location.search).then((at) => {
-      if (alive) setCachedAt(at);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [online, pathname]);
-
-  useEffect(() => {
-    let timer: number | undefined;
-    const onOnline = () => {
-      setBack(true);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setBack(false), BACK_ONLINE_MS);
-    };
-    const onOffline = () => {
-      window.clearTimeout(timer);
-      setBack(false);
-    };
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
-  }, []);
-
-  const show = !online || back;
-
+  if (online) return null;
   return (
-    <div role="status" className="sticky top-14 z-30">
-      {show && (
-        <div
-          className={cn(
-            "flex min-h-9 items-center justify-center gap-2 border-b px-4 py-1.5 text-center text-sm font-medium",
-            online
-              ? "border-success/30 bg-success-soft text-success-foreground"
-              : "border-warning-foreground/30 bg-warning-soft text-warning-foreground",
-          )}
-        >
-          {online ? (
-            <Wifi className="size-4 shrink-0" aria-hidden />
-          ) : (
-            <WifiOff className="size-4 shrink-0" aria-hidden />
-          )}
-          <span>
-            {online
-              ? t("bannerBack")
-              : cachedAt
-                ? t("bannerOfflineAt", {
-                    date: formatDayMonth(cachedAt, locale),
-                    time: formatTime(cachedAt, locale),
-                  })
-                : t("bannerOffline")}
-          </span>
-        </div>
-      )}
-    </div>
+    <span
+      role="status"
+      title={t("badge")}
+      className="bg-destructive text-destructive-foreground flex size-6 shrink-0 items-center justify-center rounded-full"
+    >
+      <WifiOff className="size-3.5" aria-hidden />
+      <span className="sr-only">{t("badge")}</span>
+    </span>
   );
 }
 
@@ -202,47 +121,81 @@ export function useOutbox(): OutboxItem[] {
 
 /**
  * Le mode hors ligne de l'application, monté une fois dans le layout `(app)`.
+ * Il ne montre RIEN — la pastille de la barre du haut suffit à dire qu'on est
+ * hors ligne. En coulisse :
  *
- *   1. Il GARDE LES ÉCRANS pour le hors ligne (`lib/offline/pages.ts`) :
+ *   1. il GARDE LES ÉCRANS pour le hors ligne (`lib/offline/pages.ts`) :
  *      l'écran affiché, les écrans du quotidien et les fiches des commandes en
- *      cours. Sans réseau, l'application reste la même — le service worker
- *      ressert ces écrans.
- *   2. Il garde le CATALOGUE du formulaire de commande (stock, clients,
- *      réservations) : sans réseau, la saisie avertit des pièces prises.
- *   3. Il RENVOIE la file des gestes faits sans réseau (✈ / ✓, encaissements,
- *      frais, pointage, commandes provisoires) dès que le réseau revient ou
- *      que l'onglet reprend la main, puis rafraîchit l'écran.
- *   4. Il le DIT : une pastille au-dessus de la barre basse — « Hors ligne ·
- *      2 en attente », « Envoi… », « 1 refusé » — qui ouvre la liste.
+ *      cours — sans réseau, l'application reste la même ;
+ *   2. il garde le CATALOGUE du formulaire de commande (stock, clients,
+ *      réservations) : sans réseau, la saisie grise les pièces prises ;
+ *   3. il ENVOIE la file des gestes faits sans réseau (✈ / ✓, encaissements,
+ *      frais, pointage, commandes) dès que le réseau revient, puis rafraîchit
+ *      l'écran.
+ *
+ * Seul un REFUS de la base se dit, par un message : un geste perdu en silence
+ * serait pire que du bruit. Une commande refusée (pièce déjà louée) propose
+ * « Corriger » — la saisie revient dans le formulaire — ou « Abandonner » ;
+ * tant qu'on n'a pas choisi, le message revient à chaque ouverture.
  */
 export function OfflineSync({ userId, locale }: { userId: string; locale: Locale }) {
-  const t = useTranslations("offline");
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
-  const online = useOnline();
-  const items = useOutbox();
-  const [open, setOpen] = useState(false);
-  const [sending, setSending] = useState(false);
+  /** Les refus déjà annoncés pendant cette visite : pas deux fois le même. */
+  const announced = useRef(new Set<string>());
+
+  const announce = useCallback(
+    (item: OutboxItem) => {
+      if (announced.current.has(item.id)) return;
+      announced.current.add(item.id);
+      const message = t("offline.rejectedToast", {
+        title: item.title,
+        reason: t(item.error ?? "errors.generic", item.errorValues),
+      });
+      const isOrder = item.op.kind === "order" || item.op.kind === "orderEdit";
+      if (!isOrder) {
+        // Un ✈, un frais, un pointage refusé : dit une fois, puis oublié.
+        toast.error(message, { duration: 15_000 });
+        void removeOutboxItem(item.id);
+        return;
+      }
+      toast.error(message, {
+        duration: Infinity,
+        action: {
+          label: t("offline.fix"),
+          onClick: () => {
+            void reopenOrder(item, locale).then((opened) => {
+              if (!opened) toast.error(t("offline.finishCurrentDraft"));
+            });
+          },
+        },
+        cancel: {
+          label: t("offline.dropOrder"),
+          onClick: () => void removeOutboxItem(item.id),
+        },
+      });
+    },
+    [t, locale],
+  );
+
+  /** Envoie la file ; un refus se dit, un envoi rafraîchit l'écran. */
+  const flush = useCallback(async () => {
+    const { sent, rejected } = await flushOutbox();
+    if (sent > 0) router.refresh();
+    for (const item of rejected) announce(item);
+    return sent;
+  }, [router, announce]);
 
   const sync = useCallback(async () => {
     if (!navigator.onLine) return;
-    setSending(true);
-    try {
-      const { sent, rejected } = await flushOutbox();
-      if (sent > 0) {
-        toast.success(t("sent", { count: sent }));
-        router.refresh();
-      }
-      if (rejected > 0) toast.error(t("rejectedToast", { count: rejected }));
-      // Une commande envoyée a changé les réservations : catalogue relu tout de suite.
-      await refreshCatalog(sent > 0);
-      // Les listes que les gestes envoyés ont changées, regardées tout de suite.
-      if (sent > 0) await keepPages(LISTS_AFTER_SEND.map((path) => `/${locale}${path}`), 0);
-    } finally {
-      setSending(false);
-    }
+    const sent = await flush();
+    // Une commande envoyée a changé les réservations : catalogue relu tout de suite.
+    await refreshCatalog(sent > 0);
+    // Les listes que les gestes envoyés ont changées, regardées tout de suite.
+    if (sent > 0) await keepPages(LISTS_AFTER_SEND.map((path) => `/${locale}${path}`), 0);
     await keepAppPages(locale);
-  }, [router, t, locale]);
+  }, [flush, locale]);
 
   // L'écran affiché entre dans le cache — un peu après, pour ne pas gêner son
   // chargement. Navigation dans l'application : le service worker ne le voit
@@ -262,14 +215,23 @@ export function OfflineSync({ userId, locale }: { userId: string; locale: Locale
       last = Date.now();
       void sync();
     };
-    // Un autre compte sur ce téléphone : ses gestes ne partiront pas sous celui-ci.
-    void dropOtherUsers(userId).then(run);
+    // Un autre compte sur ce téléphone : ses gestes ne partiront pas sous
+    // celui-ci. Puis les commandes refusées d'une visite précédente, encore
+    // en attente d'une décision.
+    void dropOtherUsers(userId)
+      .then(getOutbox)
+      .then((items) => {
+        for (const item of items) {
+          if (item.status === "rejected" && item.userId === userId) announce(item);
+        }
+        run();
+      });
 
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       // La file part toujours ; les écrans, seulement s'ils ont vieilli.
       if (Date.now() - last > REFRESH_MS) run();
-      else void flushOutbox();
+      else void flush();
     };
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") run();
@@ -282,127 +244,7 @@ export function OfflineSync({ userId, locale }: { userId: string; locale: Locale
       window.removeEventListener("online", run);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [userId, locale, sync]);
+  }, [userId, locale, sync, flush, announce]);
 
-  const mine = items.filter((i) => i.userId === userId);
-  const pending = mine.filter((i) => i.status === "pending").length;
-  const rejected = mine.filter((i) => i.status === "rejected").length;
-
-  if (online && mine.length === 0) return null;
-
-  const label = !online
-    ? pending
-      ? t("offlinePending", { count: pending })
-      : t("offlineShort")
-    : rejected
-      ? t("rejectedCount", { count: rejected })
-      : t("sending", { count: pending });
-
-  return (
-    <>
-      {/* Au-dessus de la barre basse, centrée : le bouton « + » occupe le coin. */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-live="polite"
-        className={cn(
-          "press fixed inset-x-0 z-40 mx-auto flex min-h-11 w-fit max-w-[calc(100%-10rem)] items-center gap-2 rounded-full border px-4 text-sm font-medium shadow-md",
-          "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+1.25rem)] md:bottom-4",
-          rejected && online
-            ? "border-destructive/40 bg-card text-destructive"
-            : !online
-              ? "border-warning-foreground/30 bg-warning-soft text-warning-foreground"
-              : "border-border bg-card",
-        )}
-      >
-        {!online ? (
-          <WifiOff className="size-4 shrink-0" aria-hidden />
-        ) : rejected ? (
-          <AlertCircle className="size-4 shrink-0" aria-hidden />
-        ) : (
-          <Spinner className="size-4 shrink-0" />
-        )}
-        <span className="truncate">{label}</span>
-      </button>
-
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="max-h-[85svh]">
-          <DrawerHeader className="text-start">
-            <DrawerTitle>{t("queueTitle")}</DrawerTitle>
-            <DrawerDescription>{online ? t("queueHintOnline") : t("queueHintOffline")}</DrawerDescription>
-          </DrawerHeader>
-
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-6">
-            {mine.length === 0 ? (
-              <p className="text-muted-foreground py-6 text-center text-sm">{t("queueEmpty")}</p>
-            ) : (
-              <ul className="border-border divide-border divide-y rounded-lg border">
-                {mine.map((item) => (
-                  <QueueRow key={item.id} item={item} locale={locale} />
-                ))}
-              </ul>
-            )}
-
-            {online && pending > 0 && (
-              <Button
-                type="button"
-                className="h-12 w-full text-base"
-                disabled={sending}
-                onClick={() => void sync()}
-              >
-                {sending ? <Spinner /> : <CloudUpload className="size-4" aria-hidden />}
-                {t("sendNow")}
-              </Button>
-            )}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    </>
-  );
-}
-
-function QueueRow({ item, locale }: { item: OutboxItem; locale: Locale }) {
-  const t = useTranslations();
-  const [isPending, startTransition] = useTransition();
-  const rejected = item.status === "rejected";
-
-  return (
-    <li className="flex items-center gap-2 py-2 ps-3 pe-1">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{item.title}</p>
-        <p className={cn("text-xs", rejected ? "text-destructive" : "text-muted-foreground")}>
-          {rejected
-            ? t("offline.rejectedBecause", { reason: t(item.error ?? "errors.generic", item.errorValues) })
-            : t("offline.pendingSince", {
-                date: formatDayMonth(item.createdAt, locale),
-                time: formatTime(item.createdAt, locale),
-              })}
-        </p>
-      </div>
-      {rejected && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-11 shrink-0"
-          disabled={isPending}
-          onClick={() => startTransition(() => retryOutboxItem(item.id))}
-        >
-          <RotateCw className="size-4" aria-hidden />
-          <span className="sr-only">{t("offline.retryItem", { title: item.title })}</span>
-        </Button>
-      )}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="text-muted-foreground size-11 shrink-0"
-        disabled={isPending}
-        onClick={() => startTransition(() => removeOutboxItem(item.id))}
-      >
-        <Trash2 className="size-4" aria-hidden />
-        <span className="sr-only">{t("offline.removeItem", { title: item.title })}</span>
-      </Button>
-    </li>
-  );
+  return null;
 }

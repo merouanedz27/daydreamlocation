@@ -137,9 +137,6 @@ function CheckRow({
         </span>
 
         <span className={cn("flex-1 text-sm", shown && "font-medium")}>{label}</span>
-        {waiting !== null && !isPending && (
-          <span className="text-warning-foreground shrink-0 text-xs">{t("offline.pendingBadge")}</span>
-        )}
       </button>
 
       {error && (
