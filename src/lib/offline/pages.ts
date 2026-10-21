@@ -75,6 +75,32 @@ export async function keepPages(urls: string[], maxAgeMs: number): Promise<void>
   }
 }
 
+/** La version de l'application dont viennent les écrans gardés. */
+const VERSION_KEY = "/__dd/version";
+
+/**
+ * Les écrans gardés par une AUTRE version de l'application s'en vont.
+ *
+ * Sans ça, après une mise à jour, le hors ligne ressortait des écrans de
+ * l'ancienne version — avec des bandeaux et des boutons qui n'existent plus.
+ * Appelé au démarrage de l'application : la première ouverture d'une nouvelle
+ * version (forcément avec du réseau, puisque son code vient d'arriver) vide
+ * le cache, et les écrans sont regardés de nouveau dans la foulée.
+ */
+export async function forgetOtherVersions(build: string | undefined): Promise<void> {
+  if (!available() || !build) return;
+  try {
+    const cache = await caches.open(PAGES_CACHE);
+    const stored = await cache.match(VERSION_KEY);
+    if (stored && (await stored.text()) === build) return;
+    await caches.delete(PAGES_CACHE);
+    const fresh = await caches.open(PAGES_CACHE);
+    await fresh.put(VERSION_KEY, new Response(build, { headers: { "Content-Type": "text/plain" } }));
+  } catch {
+    /* stockage indisponible : rien à garder, rien à jeter */
+  }
+}
+
 /** La langue de l'application, pour rouvrir `/` sans réseau sur la bonne liste. */
 export async function rememberLocale(locale: string): Promise<void> {
   if (!available()) return;

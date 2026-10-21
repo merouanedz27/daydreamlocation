@@ -15,9 +15,12 @@ import {
   reopenOrder,
   setOfflineContext,
 } from "@/lib/offline/outbox";
-import { keepPage, keepPages, rememberLocale } from "@/lib/offline/pages";
+import { forgetOtherVersions, keepPage, keepPages, rememberLocale } from "@/lib/offline/pages";
 import type { OutboxItem } from "@/lib/offline/types";
 import type { Locale } from "@/i18n/routing";
+
+/** La version de CE code, figée au build (`next.config.ts`). */
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID;
 
 /** La file part, et les écrans gardés sont revus, toutes les 5 minutes (onglet visible). */
 const REFRESH_MS = 5 * 60_000;
@@ -209,16 +212,19 @@ export function OfflineSync({ userId, locale }: { userId: string; locale: Locale
 
   useEffect(() => {
     setOfflineContext({ userId, locale });
-    void rememberLocale(locale);
     let last = 0;
     const run = () => {
       last = Date.now();
       void sync();
     };
-    // Un autre compte sur ce téléphone : ses gestes ne partiront pas sous
-    // celui-ci. Puis les commandes refusées d'une visite précédente, encore
-    // en attente d'une décision.
-    void dropOtherUsers(userId)
+    // D'abord : les écrans gardés par une autre version de l'application s'en
+    // vont (ils montreraient, hors ligne, ce qui n'existe plus). Puis un autre
+    // compte sur ce téléphone : ses gestes ne partiront pas sous celui-ci.
+    // Enfin les commandes refusées d'une visite précédente, encore en attente
+    // d'une décision.
+    void forgetOtherVersions(BUILD_ID)
+      .then(() => rememberLocale(locale))
+      .then(() => dropOtherUsers(userId))
       .then(getOutbox)
       .then((items) => {
         for (const item of items) {
