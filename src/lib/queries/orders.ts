@@ -35,7 +35,6 @@ async function fetchSettings(): Promise<Settings> {
       customer_message: null,
       notification_rules: {},
       email_texts: {},
-      pay_month_days: 30,
     }
   );
 }

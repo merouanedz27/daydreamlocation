@@ -88,6 +88,7 @@ export async function createMember(formData: FormData): Promise<ActionResult> {
     email: formData.get("email"),
     password: formData.get("password"),
     role: formData.get("role"),
+    pay_type: formData.get("pay_type") ?? "permanent",
   });
 
   if (!parsed.success) {
@@ -132,6 +133,7 @@ export async function createMember(formData: FormData): Promise<ActionResult> {
     .update({
       full_name: parsed.data.full_name,
       role: parsed.data.role,
+      pay_type: parsed.data.pay_type,
       is_active: true,
     })
     .eq("id", userId)

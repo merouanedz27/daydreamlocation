@@ -10,6 +10,8 @@ export type ActionResult =
   | { ok: true }
   | { ok: false; error: string; field?: string };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function resolveLocale(value: FormDataEntryValue | null): Locale {
   return routing.locales.includes(value as Locale)
     ? (value as Locale)
@@ -46,13 +48,21 @@ export async function createExpense(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: issue.message, field: String(issue.path[0] ?? "") };
   }
 
+  // Geste venu de la file hors ligne : un renvoi bute sur l'index unique
+  // `expenses_client_op_id_key`, et c'est un succès — le frais est déjà noté.
+  const rawOpId = String(formData.get("client_op_id") ?? "");
+  const clientOpId = UUID.test(rawOpId) ? rawOpId : null;
+
   const supabase = await createClient();
   const { error } = await supabase.from("expenses").insert({
     ...parsed.data,
     created_by: profile.id,
+    ...(clientOpId ? { client_op_id: clientOpId } : {}),
   });
 
-  if (error) return { ok: false, error: "errors.generic" };
+  if (error && !(error.code === "23505" && clientOpId)) {
+    return { ok: false, error: "errors.generic" };
+  }
 
   revalidatePath(`/${locale}/frais`);
   revalidatePath(`/${locale}/tableau-de-bord`);

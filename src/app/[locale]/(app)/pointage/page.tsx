@@ -3,7 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PointageCounter, PointageDays } from "@/components/pointage-days";
 import { PointageTeam } from "@/components/pointage-team";
 import { isOwner, requireProfile } from "@/lib/auth";
-import { getMyPeriod, getPayMonthDays, getTeamPeriods } from "@/lib/queries/pointage";
+import { asPayType, markKind } from "@/lib/pointage";
+import { getMyPeriod, getTeamPeriods } from "@/lib/queries/pointage";
 import { todayIso } from "@/lib/rental-range";
 import type { Locale } from "@/i18n/routing";
 
@@ -16,12 +17,13 @@ export async function generateMetadata(props: {
 }
 
 /**
- * Pointage — la version du client : on coche les ABSENCES.
+ * Pointage — la version du client : payé à la journée.
  *
- *   - L'EMPLOYÉ voit son tableau (jour | absent) depuis sa dernière paie, et
- *     ne coche que le jour où il ne vient pas. Il ne relit que ses cases (RLS).
- *   - Le PROPRIÉTAIRE voit chaque employé et ses jours travaillés (jours dus
- *     − absences) ; quand il le paie, le compteur repart à zéro.
+ *   - L'EMPLOYÉ voit son tableau depuis sa dernière paie. Permanent, il coche
+ *     le jour où il ne vient pas (jour | absent) ; remplaçant, le jour où il
+ *     vient (jour | présent). Il ne relit que ses cases (RLS).
+ *   - Le PROPRIÉTAIRE voit chaque employé et ses jours payables ; il le paie
+ *     au prix d'une journée et le compteur repart à zéro.
  *
  * Pas dans la barre basse : le titre reste donc visible (`daydream-ui`).
  */
@@ -37,13 +39,18 @@ export default async function PointagePage({
   const t = await getTranslations();
   const today = todayIso();
   const owner = isOwner(profile);
+  const payType = asPayType(profile.pay_type);
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-xl">{t("nav.pointage")}</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          {owner ? t("pointage.hintTeam") : t("pointage.hint")}
+          {owner
+            ? t("pointage.hintTeam")
+            : payType === "remplacant"
+              ? t("pointage.hintRemplacant")
+              : t("pointage.hint")}
         </p>
       </div>
 
@@ -56,33 +63,41 @@ export default async function PointagePage({
   );
 }
 
-/** Les deux lectures en parallèle : chaque attente en série retarde la page. */
 async function TeamSheet({ today }: { today: string }) {
-  const [team, monthDays] = await Promise.all([getTeamPeriods(today), getPayMonthDays()]);
-  return <PointageTeam today={today} team={team} monthDays={monthDays} />;
+  const team = await getTeamPeriods(today);
+  return <PointageTeam today={today} team={team} />;
 }
 
 async function WorkerSheet({
   profile,
   today,
 }: {
-  profile: { id: string; full_name: string; work_start_date: string | null };
+  profile: {
+    id: string;
+    full_name: string;
+    work_start_date: string | null;
+    pay_type: string;
+    daily_rate: number | null;
+  };
   today: string;
 }) {
   const period = await getMyPeriod(profile, today);
+  const kind = markKind(period.payType);
   return (
     <>
       <PointageCounter
+        kind={kind}
         worked={period.worked}
-        absences={period.absences}
+        marks={period.marks}
         start={period.start}
       />
       <PointageDays
+        kind={kind}
         mode="self"
         userId={period.id}
         start={period.start}
         today={today}
-        absences={period.absences}
+        marks={period.marks}
         lockedThrough={period.resets[0]?.paid_through ?? null}
       />
     </>

@@ -3,18 +3,33 @@
  * requête, aucune valeur importée : `scripts/test-pointage.mjs` le charge sans
  * résolveur d'alias.
  *
- * Le modèle du client : on coche les ABSENCES, pas les présences — l'équipe
- * vient presque tous les jours. À la paie :
- *   jours dus   = un mois entier vaut N jours (réglage, 30 par défaut), un
- *                 mois partiel ses jours réels (au plus N) ;
- *   jours payés = jours dus − absences ;
- *   montant     = salaire mensuel × jours payés ÷ N.
+ * Deux façons d'être payé (`profiles.pay_type`) :
+ *   permanent  — il vient presque tous les jours : on coche ses ABSENCES ;
+ *                jours payés = jours du calendrier de la période − absences.
+ *   remplacant — il ne vient que pour remplacer : on coche ses PRÉSENCES ;
+ *                jours payés = présences.
+ *   montant = jours payés × prix d'une journée, arrondi au dinar.
  * Payer remet le compteur à zéro (`pay_resets`), sans rien effacer.
  *
- * La base fait le même calcul (`private.days_due`, `pay_worker()`) : c'est
- * elle qui fait foi. Ce module ne sert qu'à l'affichage.
+ * La base fait le même calcul (`pay_worker()`) : c'est elle qui fait foi. Ce
+ * module ne sert qu'à l'affichage.
  */
 import type { IsoDate } from "@/lib/rental-range";
+
+export const PAY_TYPES = ["permanent", "remplacant"] as const;
+/** Les deux valeurs de la contrainte `profiles_pay_type_valid`. */
+export type PayType = (typeof PAY_TYPES)[number];
+
+/** Ce que coche la personne : la case de son tableau. */
+export type MarkKind = "absence" | "presence";
+
+export function markKind(payType: PayType): MarkKind {
+  return payType === "remplacant" ? "presence" : "absence";
+}
+
+export function asPayType(value: string | null | undefined): PayType {
+  return value === "remplacant" ? "remplacant" : "permanent";
+}
 
 export type PayReset = {
   paid_through: IsoDate;
@@ -23,10 +38,10 @@ export type PayReset = {
   /** Prix d'une journée — `null` pour les paies d'avant les montants. */
   daily_rate: number | null;
   amount: number | null;
-  /** `null` pour les paies d'avant le salaire mensuel. */
-  monthly_salary: number | null;
-  month_days: number | null;
   absences_count: number | null;
+  presences_count: number | null;
+  /** `null` pour les paies d'avant les remplaçants. */
+  pay_type: string | null;
   created_at: string;
 };
 
@@ -34,15 +49,18 @@ export type PayReset = {
 export type WorkerPeriod = {
   id: string;
   full_name: string;
+  payType: PayType;
+  /** Prix d'une journée fixé par l'administrateur (`null` : jamais saisi). */
+  dailyRate: number | null;
   /** Premier jour de la période (peut être après aujourd'hui : rien n'est dû). */
   start: IsoDate;
   /** Premier jour de travail saisi par l'administrateur. */
   workStartDate: IsoDate | null;
-  /** Jours d'absence de la période, dans l'ordre. */
-  absences: IsoDate[];
-  /** Jours dus sur la période, avant les absences. */
+  /** Jours cochés de la période, dans l'ordre : absences ou présences selon le type. */
+  marks: IsoDate[];
+  /** Jours du calendrier de la période (permanent : avant les absences). */
   due: number;
-  /** Jours payables : `due − absences`, jamais négatif. */
+  /** Jours payables. */
   worked: number;
   /** Les dernières paies, la plus récente d'abord. */
   resets: PayReset[];
@@ -51,12 +69,6 @@ export type WorkerPeriod = {
 function shift(date: IsoDate, days: number): IsoDate {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function lastDayOfMonth(monthStart: IsoDate): IsoDate {
-  const d = new Date(`${monthStart}T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + 1, 0);
   return d.toISOString().slice(0, 10);
 }
 
@@ -80,23 +92,22 @@ export function periodStart(
   return candidates.length ? candidates.sort().at(-1)! : `${today.slice(0, 7)}-01`;
 }
 
+/** Jours du calendrier de `from` à `to` inclus ; 0 si `from` est après `to`. */
+export function calendarDays(from: IsoDate, to: IsoDate): number {
+  return from > to ? 0 : daysBetween(from, to);
+}
+
 /**
- * Jours dus de `from` à `to` inclus, mois par mois : un mois entier vaut `n`,
- * un mois partiel ses jours réels, au plus `n`. Miroir de `private.days_due`.
+ * Jours payables de la période — même règle que `pay_worker()` :
+ * permanent = calendrier − absences (jamais négatif), remplaçant = présences.
  */
-export function daysDue(from: IsoDate, to: IsoDate, n: number): number {
-  let total = 0;
-  for (let month = `${from.slice(0, 7)}-01`; month <= to; month = shift(lastDayOfMonth(month), 1)) {
-    const last = lastDayOfMonth(month);
-    if (month >= from && last <= to) total += n;
-    else total += Math.min(daysBetween(month < from ? from : month, last > to ? to : last), n);
-  }
-  return from > to ? 0 : total;
+export function workedDays(payType: PayType, start: IsoDate, today: IsoDate, marks: number): number {
+  return payType === "remplacant" ? marks : Math.max(calendarDays(start, today) - marks, 0);
 }
 
 /** Montant d'une paie, arrondi au dinar — même arrondi que `pay_worker()`. */
-export function payAmount(monthlySalary: number, worked: number, n: number): number {
-  return Math.round((monthlySalary * worked) / n);
+export function payAmount(dailyRate: number, worked: number): number {
+  return Math.round(dailyRate * worked);
 }
 
 /** Les jours de `start` à `today` inclus, AUJOURD'HUI EN TÊTE : la case du pouce. */
@@ -108,19 +119,19 @@ export function periodDays(start: IsoDate, today: IsoDate): IsoDate[] {
 
 /**
  * Ce que l'EMPLOYÉ peut toucher (mêmes bornes que `mark_absent()` /
- * `unmark_absent()` en base) : cocher une absence d'un jour de sa période,
- * jamais dans le futur ; la décocher tant que le jour n'est pas payé.
+ * `mark_present()` et leurs « unmark » en base) : cocher un jour de sa
+ * période, jamais dans le futur ; le décocher tant que le jour n'est pas payé.
  */
 export function selfCanToggle(
   day: IsoDate,
-  absent: boolean,
+  marked: boolean,
   today: IsoDate,
   start: IsoDate,
   lastPaidThrough: IsoDate | null,
 ): boolean {
   if (isLocked(day, lastPaidThrough)) return false;
-  // Une absence déjà cochée se retire toujours (mauvais toucher).
-  if (absent) return true;
+  // Une case déjà cochée se retire toujours (mauvais toucher).
+  if (marked) return true;
   return day <= today && day >= start;
 }
 

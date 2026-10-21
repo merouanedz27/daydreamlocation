@@ -109,7 +109,7 @@ export default async function EditOrderPage({
         items={items}
         customers={customers}
         settings={settings}
-        edit={{ orderId: order.id, orderNo: order.order_no, initial }}
+        edit={{ orderId: order.id, orderNo: order.order_no, initial, version: order.version }}
       />
     </div>
   );

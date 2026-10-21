@@ -15,12 +15,12 @@ import {
 } from "@/components/ui/drawer";
 import { DatePicker } from "@/components/date-picker";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { PointageCounter, PointageDays } from "@/components/pointage-days";
 import { PointagePay } from "@/components/pointage-pay";
-import { setPayMonthDays, setWorkStartDate } from "@/lib/actions/pointage";
+import { setPayType, setWorkStartDate } from "@/lib/actions/pointage";
 import { formatDate, formatDayMonth, formatMoney } from "@/lib/format";
-import { noon, type WorkerPeriod } from "@/lib/pointage";
+import { markKind, noon, PAY_TYPES, type WorkerPeriod } from "@/lib/pointage";
+import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
 function initials(name: string) {
@@ -33,22 +33,21 @@ function initials(name: string) {
 }
 
 /**
- * L'équipe vue par le propriétaire : le réglage « mois de paie », puis une
- * carte par employé — ses jours travaillés depuis la dernière paie, et s'il
- * est absent aujourd'hui.
+ * L'équipe vue par le propriétaire : une carte par employé — ses jours
+ * payables depuis la dernière paie, et s'il est là aujourd'hui. Un remplaçant
+ * porte son étiquette : on le compte à ses présences, pas à ses absences.
  *
- * Toucher une carte ouvre sa fiche : sa date de début de travail, son tableau
- * d'absences (toutes les cases non payées se corrigent) et le bouton
- * « Payer ». La paie n'efface rien — elle reste dans « Derniers paiements ».
+ * Toucher une carte ouvre sa fiche : permanent ou remplaçant, sa date de
+ * début de travail, son tableau (toutes les cases non payées se corrigent) et
+ * le bouton « Payer ». La paie n'efface rien — elle reste dans « Derniers
+ * paiements ».
  */
 export function PointageTeam({
   today,
   team,
-  monthDays,
 }: {
   today: string;
   team: WorkerPeriod[];
-  monthDays: number;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
@@ -63,8 +62,6 @@ export function PointageTeam({
 
   return (
     <>
-      <MonthDaysSetting value={monthDays} />
-
       {team.length === 0 ? (
         <p className="text-muted-foreground border-border rounded-lg border border-dashed py-8 text-center text-sm">
           {t("pointage.empty")}
@@ -72,7 +69,8 @@ export function PointageTeam({
       ) : (
         <ul className="space-y-1.5">
           {team.map((w) => {
-            const absentToday = w.absences.includes(today);
+            const presence = w.payType === "remplacant";
+            const markedToday = w.marks.includes(today);
             return (
               <li key={w.id}>
                 <button
@@ -90,9 +88,25 @@ export function PointageTeam({
                     {initials(w.full_name)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{w.full_name}</span>
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-sm font-medium">{w.full_name}</span>
+                      {presence && (
+                        <span className="bg-warning-soft text-warning-foreground shrink-0 rounded-full px-1.5 text-[11px] leading-5">
+                          {t("pointage.payType.remplacant")}
+                        </span>
+                      )}
+                    </span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
-                      {absentToday ? (
+                      {presence ? (
+                        markedToday ? (
+                          <span className="text-success-foreground inline-flex items-center gap-1">
+                            <Check className="size-3.5" aria-hidden />
+                            {t("pointage.present")}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">{t("pointage.notCameToday")}</span>
+                        )
+                      ) : markedToday ? (
                         <span className="text-destructive inline-flex items-center gap-1 font-medium">
                           <X className="size-3.5" aria-hidden />
                           {t("pointage.absentToday")}
@@ -129,8 +143,9 @@ export function PointageTeam({
           {worker && (
             <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
               <PointageCounter
+                kind={markKind(worker.payType)}
                 worked={worker.worked}
-                absences={worker.absences}
+                marks={worker.marks}
                 start={shownStart(worker)}
               />
 
@@ -143,15 +158,18 @@ export function PointageTeam({
                 {t("pointage.pay")}
               </Button>
 
+              <PayTypeField worker={worker} />
+
               <StartDateField key={`${worker.id}-${worker.workStartDate}`} worker={worker} />
 
               <PointageDays
-                key={`${worker.id}-${worker.start}`}
+                key={`${worker.id}-${worker.start}-${worker.payType}`}
+                kind={markKind(worker.payType)}
                 mode="owner"
                 userId={worker.id}
                 start={worker.start}
                 today={today}
-                absences={worker.absences}
+                marks={worker.marks}
                 lockedThrough={worker.resets[0]?.paid_through ?? null}
               />
 
@@ -175,6 +193,9 @@ export function PointageTeam({
                             {r.absences_count
                               ? ` · ${t("pointage.absences", { count: r.absences_count })}`
                               : ""}
+                            {r.daily_rate !== null && r.pay_type !== null
+                              ? ` × ${formatMoney(Number(r.daily_rate), locale)}`
+                              : ""}
                           </span>
                           {r.amount !== null && (
                             <span className="ms-2 font-medium">{formatMoney(Number(r.amount), locale)}</span>
@@ -195,7 +216,6 @@ export function PointageTeam({
           open={payOpen}
           onOpenChange={setPayOpen}
           worker={worker}
-          monthDays={monthDays}
           since={since(worker)}
         />
       )}
@@ -204,50 +224,54 @@ export function PointageTeam({
 }
 
 /**
- * « Mois de paie : 30 jours » — ce que vaut un mois complet. Salaire ÷ ce
- * nombre = prix d'une journée. Enregistré dès qu'on quitte le champ.
+ * Permanent ou remplaçant : deux boutons côte à côte, 44 px, le choix actif
+ * plein. Ce n'est pas un rôle — les droits dans l'app ne bougent pas.
+ * Changer en cours de période fait compter l'autre tableau : on le dit.
  */
-function MonthDaysSetting({ value }: { value: number }) {
+function PayTypeField({ worker }: { worker: WorkerPeriod }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const [isPending, startTransition] = useTransition();
-  const [draft, setDraft] = useState(String(value));
 
-  function save() {
-    const days = Number(draft);
-    if (days === value) return;
+  function choose(next: (typeof PAY_TYPES)[number]) {
+    if (next === worker.payType) return;
     startTransition(async () => {
-      const result = await setPayMonthDays(locale, days);
+      const result = await setPayType(locale, worker.id, next);
       if (!result.ok) {
         toast.error(t(result.error));
-        setDraft(String(value));
         return;
       }
-      toast.success(t("pointage.monthDaysSaved", { count: days }));
+      toast.success(t(`pointage.payTypeChanged.${next}`, { name: worker.full_name }));
     });
   }
 
   return (
-    <Field className="border-border bg-card rounded-lg border p-3">
-      <div className="flex items-center justify-between gap-3">
-        <FieldLabel htmlFor="pay-month-days">{t("pointage.monthDays")}</FieldLabel>
-        <Input
-          id="pay-month-days"
-          type="number"
-          inputMode="numeric"
-          min={20}
-          max={31}
-          value={draft}
-          disabled={isPending}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={save}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-          className="tabular h-11 w-20 text-center text-base"
-        />
+    <Field>
+      <FieldLabel id="pay-type-label">{t("pointage.payTypeLabel")}</FieldLabel>
+      <div role="radiogroup" aria-labelledby="pay-type-label" className="grid grid-cols-2 gap-1.5">
+        {PAY_TYPES.map((type) => {
+          const active = worker.payType === type;
+          return (
+            <Button
+              key={type}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              variant={active ? "default" : "outline"}
+              disabled={isPending}
+              onClick={() => choose(type)}
+              className={cn("h-11 text-sm", active && "pointer-events-none")}
+            >
+              {t(`pointage.payType.${type}`)}
+            </Button>
+          );
+        })}
       </div>
-      <FieldDescription>{t("pointage.monthDaysHint")}</FieldDescription>
+      <FieldDescription>
+        {worker.payType === "remplacant"
+          ? t("pointage.payTypeHintRemplacant")
+          : t("pointage.payTypeHintPermanent")}
+      </FieldDescription>
     </Field>
   );
 }

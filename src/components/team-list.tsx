@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
+  CalendarCheck,
   KeyRound,
   MoreVertical,
   ShieldCheck,
@@ -37,6 +38,7 @@ import {
   setMemberActive,
   setMemberRole,
 } from "@/lib/actions/team";
+import { setPayType } from "@/lib/actions/pointage";
 import { cn } from "@/lib/utils";
 import { Highlight } from "@/components/highlight";
 import { MEMBER_ROLES, type MemberRole } from "@/lib/validation/team";
@@ -73,6 +75,20 @@ export function TeamList({
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const [pending, setPending] = useState<Pending>(null);
+  const [, startTransition] = useTransition();
+
+  /** Permanent ⇄ remplaçant : sans confirmation, le geste se refait d'un toucher. */
+  function togglePayType(member: Member) {
+    const next = member.pay_type === "remplacant" ? "permanent" : "remplacant";
+    startTransition(async () => {
+      const result = await setPayType(locale, member.id, next);
+      if (!result.ok) {
+        toast.error(t(result.error));
+        return;
+      }
+      toast.success(t(`pointage.payTypeChanged.${next}`, { name: member.full_name }));
+    });
+  }
 
   /**
    * Chaque élément du menu ouvre un tiroir. En se fermant, le menu rendrait le
@@ -143,6 +159,11 @@ export function TeamList({
                   >
                     {t(`roles.${member.role}`)}
                   </span>
+                  {member.pay_type === "remplacant" && !admin && (
+                    <span className="bg-warning-soft text-warning-foreground shrink-0 rounded-full px-1.5 text-[11px] leading-5">
+                      {t("pointage.payType.remplacant")}
+                    </span>
+                  )}
                   {/* Jamais la couleur seule : le mot porte l'information. */}
                   {!member.is_active && (
                     <span className="bg-muted text-muted-foreground shrink-0 rounded-full px-1.5 text-[11px] leading-5">
@@ -199,6 +220,17 @@ export function TeamList({
                         {t(`team.roleTo.${role}`)}
                       </DropdownMenuItem>
                     ))}
+
+                    {!admin && (
+                      <DropdownMenuItem className="min-h-11" onSelect={() => togglePayType(member)}>
+                        <CalendarCheck className="size-4" aria-hidden />
+                        {t(
+                          member.pay_type === "remplacant"
+                            ? "pointage.payTypeTo.permanent"
+                            : "pointage.payTypeTo.remplacant",
+                        )}
+                      </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuItem
                       className="min-h-11"

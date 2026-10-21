@@ -285,6 +285,7 @@ export type Database = {
           order_id: number | null;
           created_by: string | null;
           created_at: string;
+          client_op_id: string | null;
         };
         Insert: {
           spent_on?: string;
@@ -294,6 +295,7 @@ export type Database = {
           order_id?: number | null;
           created_by?: string | null;
           created_at?: string;
+          client_op_id?: string | null;
         };
         Update: {
           spent_on?: string;
@@ -303,6 +305,7 @@ export type Database = {
           order_id?: number | null;
           created_by?: string | null;
           created_at?: string;
+          client_op_id?: string | null;
         };
         Relationships: [
           {
@@ -440,6 +443,7 @@ export type Database = {
           paid_on: string;
           created_by: string | null;
           created_at: string;
+          client_op_id: string | null;
         };
         Insert: {
           order_id: number;
@@ -448,6 +452,7 @@ export type Database = {
           paid_on?: string;
           created_by?: string | null;
           created_at?: string;
+          client_op_id?: string | null;
         };
         Update: {
           order_id?: number;
@@ -456,6 +461,7 @@ export type Database = {
           paid_on?: string;
           created_by?: string | null;
           created_at?: string;
+          client_op_id?: string | null;
         };
         Relationships: [
           {
@@ -491,6 +497,8 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          client_op_id: string | null;
+          version: number;
         };
         Insert: {
           order_no?: string;
@@ -513,6 +521,8 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          client_op_id?: string | null;
+          version?: number;
         };
         Update: {
           order_no?: string;
@@ -535,6 +545,8 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          client_op_id?: string | null;
+          version?: number;
         };
         Relationships: [
           {
@@ -560,6 +572,8 @@ export type Database = {
           monthly_salary: number | null;
           month_days: number | null;
           absences_count: number | null;
+          pay_type: string | null;
+          presences_count: number | null;
         };
         Insert: {
           user_id: string;
@@ -573,6 +587,8 @@ export type Database = {
           monthly_salary?: number | null;
           month_days?: number | null;
           absences_count?: number | null;
+          pay_type?: string | null;
+          presences_count?: number | null;
         };
         Update: {
           user_id?: string;
@@ -586,6 +602,8 @@ export type Database = {
           monthly_salary?: number | null;
           month_days?: number | null;
           absences_count?: number | null;
+          pay_type?: string | null;
+          presences_count?: number | null;
         };
         Relationships: [
           {
@@ -611,6 +629,43 @@ export type Database = {
           },
         ];
       };
+      presences: {
+        Row: {
+          id: number;
+          user_id: string;
+          day: string;
+          marked_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          day: string;
+          marked_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          marked_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "presences_marked_by_fkey";
+            columns: ["marked_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "presences_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           id: string;
@@ -623,6 +678,8 @@ export type Database = {
           notify_daily: boolean;
           email_locale: string;
           work_start_date: string | null;
+          pay_type: string;
+          daily_rate: number | null;
         };
         Insert: {
           id: string;
@@ -635,6 +692,8 @@ export type Database = {
           notify_daily?: boolean;
           email_locale?: string;
           work_start_date?: string | null;
+          pay_type?: string;
+          daily_rate?: number | null;
         };
         Update: {
           id?: string;
@@ -647,6 +706,8 @@ export type Database = {
           notify_daily?: boolean;
           email_locale?: string;
           work_start_date?: string | null;
+          pay_type?: string;
+          daily_rate?: number | null;
         };
         Relationships: [
           {
@@ -714,7 +775,6 @@ export type Database = {
           customer_message: string | null;
           notification_rules: Json;
           email_texts: Json;
-          pay_month_days: number;
         };
         Insert: {
           id?: boolean;
@@ -729,7 +789,6 @@ export type Database = {
           customer_message?: string | null;
           notification_rules?: Json;
           email_texts?: Json;
-          pay_month_days?: number;
         };
         Update: {
           id?: boolean;
@@ -744,7 +803,6 @@ export type Database = {
           customer_message?: string | null;
           notification_rules?: Json;
           email_texts?: Json;
-          pay_month_days?: number;
         };
         Relationships: [];
       };
@@ -755,11 +813,28 @@ export type Database = {
         Args: {
           p_order_id: number;
           p_amount: number;
+          p_client_op_id?: string;
         };
         Returns: number;
       };
       create_order: {
         Args: {
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_event_date: string;
+          p_pickup_date?: string;
+          p_return_due_date?: string;
+          p_discount?: number;
+          p_amount_paid?: number;
+          p_caution_amount?: number;
+          p_notes?: string;
+          p_lines?: Json;
+        };
+        Returns: number;
+      };
+      create_order_once: {
+        Args: {
+          p_client_op_id: string;
           p_customer_name: string;
           p_customer_phone: string;
           p_event_date: string;
@@ -789,6 +864,12 @@ export type Database = {
         };
         Returns: string;
       };
+      mark_present: {
+        Args: {
+          p_day: string;
+        };
+        Returns: string;
+      };
       order_item_suggestions: {
         Args: Record<PropertyKey, never>;
         Returns: { label: string; uses: number; slot: number }[];
@@ -796,7 +877,7 @@ export type Database = {
       pay_worker: {
         Args: {
           p_user: string;
-          p_monthly_salary: number;
+          p_daily_rate: number;
           p_description: string;
         };
         Returns: { days: number; absences: number; amount: number }[];
@@ -838,8 +919,32 @@ export type Database = {
         };
         Returns: string;
       };
+      unmark_present: {
+        Args: {
+          p_day: string;
+        };
+        Returns: string;
+      };
       update_order: {
         Args: {
+          p_order_id: number;
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_event_date: string;
+          p_pickup_date: string;
+          p_return_due_date: string;
+          p_amount_paid?: number;
+          p_caution_amount?: number;
+          p_notes?: string;
+          p_picked_up?: boolean;
+          p_returned?: boolean;
+          p_lines?: Json;
+        };
+        Returns: number;
+      };
+      update_order_checked: {
+        Args: {
+          p_expected_version: number;
           p_order_id: number;
           p_customer_name: string;
           p_customer_phone: string;

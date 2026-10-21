@@ -347,6 +347,7 @@ export default async function OrderPage({
                 <div className="border-border mt-5 border-t pt-4">
                   <OrderChecks
                     orderId={order.id}
+                    name={order.customer_name}
                     pickedUp={order.picked_up}
                     returned={order.returned}
                   />
@@ -445,6 +446,7 @@ export default async function OrderPage({
               {order.status !== "annulee" && (
                 <OrderPaymentDrawer
                   orderId={order.id}
+                  name={order.customer_name}
                   balance={balance}
                   amountPaid={order.amount_paid}
                 />

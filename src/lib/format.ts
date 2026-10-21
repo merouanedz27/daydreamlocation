@@ -138,6 +138,20 @@ export function formatMonthYear(date: Date | string, locale: Locale): string {
   }).format(d);
 }
 
+/**
+ * « 14:32 » — heure d'Alger, sur 24 heures dans les deux langues. Sert à dater
+ * une donnée gardée hors ligne (« données de 14:32 »).
+ */
+export function formatTime(date: Date | string, locale: Locale): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat(NUMBER_LOCALE[locale], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Africa/Algiers",
+  }).format(d);
+}
+
 /** Initiale du jour de la semaine (« lun. », « ن ») — en-tête de colonnes. */
 export function formatWeekdayShort(date: Date | string, locale: Locale): string {
   const d = typeof date === "string" ? new Date(date) : date;

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Tests du pointage par absences : la période ouverte, les jours dus mois par
- * mois, le montant, les jours que l'employé peut toucher.
+ * Tests du pointage : la période ouverte, les jours payables d'un permanent
+ * (calendrier − absences) et d'un remplaçant (présences), le montant à la
+ * journée, les jours que l'employé peut toucher.
  *
  *   node --experimental-strip-types scripts/test-pointage.mjs
  *
@@ -10,12 +11,14 @@
  * sont rejoués côté base dans `supabase/tests/pointage.sql`.
  */
 import {
-  daysDue,
+  calendarDays,
   isLocked,
+  markKind,
   payAmount,
   periodDays,
   periodStart,
   selfCanToggle,
+  workedDays,
 } from "../src/lib/pointage.ts";
 
 let failed = 0;
@@ -34,24 +37,27 @@ eq("paie après le début : la paie gagne", periodStart("2026-09-30", "2026-01-0
 eq("ni paie ni début : le 1er du mois", periodStart(null, null, "2026-10-20"), "2026-10-01");
 eq("payé aujourd'hui : demain (rien dû)", periodStart("2026-10-20", null, "2026-10-20"), "2026-10-21");
 
-// Jours dus, N = 30.
-eq("octobre entier (31 j) → 30", daysDue("2026-10-01", "2026-10-31", 30), 30);
-eq("février entier (28 j) → 30", daysDue("2026-02-01", "2026-02-28", 30), 30);
-eq("15 → 31 octobre → 17", daysDue("2026-10-15", "2026-10-31", 30), 17);
-eq("15 sept → 31 oct → 16 + 30", daysDue("2026-09-15", "2026-10-31", 30), 46);
-eq("1er → 20 octobre → 20", daysDue("2026-10-01", "2026-10-20", 30), 20);
-eq("un seul jour → 1", daysDue("2026-10-20", "2026-10-20", 30), 1);
-eq("début après la fin → 0", daysDue("2026-10-21", "2026-10-20", 30), 0);
-eq("à cheval sur l'année", daysDue("2026-12-20", "2027-01-10", 30), 12 + 10);
-// N = 28.
-eq("N=28 : octobre entier → 28", daysDue("2026-10-01", "2026-10-31", 28), 28);
-eq("N=28 : 1er → 30 octobre plafonné → 28", daysDue("2026-10-01", "2026-10-30", 28), 28);
-eq("N=28 : trois mois entiers → 84", daysDue("2026-08-01", "2026-10-31", 28), 84);
+// Jours du calendrier.
+eq("octobre entier → 31", calendarDays("2026-10-01", "2026-10-31"), 31);
+eq("février entier → 28", calendarDays("2026-02-01", "2026-02-28"), 28);
+eq("15 → 31 octobre → 17", calendarDays("2026-10-15", "2026-10-31"), 17);
+eq("un seul jour → 1", calendarDays("2026-10-20", "2026-10-20"), 1);
+eq("début après la fin → 0", calendarDays("2026-10-21", "2026-10-20"), 0);
+eq("à cheval sur l'année", calendarDays("2026-12-20", "2027-01-10"), 12 + 10);
+
+// Jours payables — mêmes règles que pay_worker() (supabase/tests/pointage.sql).
+eq("permanent : 10 jours − 3 absences → 7", workedDays("permanent", "2026-10-11", "2026-10-20", 3), 7);
+eq("permanent : jamais négatif", workedDays("permanent", "2026-10-19", "2026-10-20", 5), 0);
+eq("permanent payé ce soir → 0", workedDays("permanent", "2026-10-21", "2026-10-20", 0), 0);
+eq("remplaçant : ses présences seules", workedDays("remplacant", "2026-10-01", "2026-10-20", 4), 4);
+eq("permanent coche ses absences", markKind("permanent"), "absence");
+eq("remplaçant coche ses présences", markKind("remplacant"), "presence");
 
 // Montant.
-eq("mois complet sans absence : le salaire", payAmount(30000, 30, 30), 30000);
-eq("2 absences sur 30", payAmount(30000, 28, 30), 28000);
-eq("arrondi au dinar", payAmount(25000, 17, 30), 14167);
+eq("7 jours × 1 500", payAmount(1500, 7), 10500);
+eq("4 présences × 2 000", payAmount(2000, 4), 8000);
+eq("arrondi au dinar", payAmount(833.335, 3), 2500);
+eq("aucun jour → 0", payAmount(1500, 0), 0);
 
 // Jours affichés : aujourd'hui en tête, bornes incluses.
 eq("jours, aujourd'hui en tête", periodDays("2026-10-18", "2026-10-20"), ["2026-10-20", "2026-10-19", "2026-10-18"]);

@@ -1,30 +1,32 @@
-import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { daysDue, periodStart, type PayReset, type WorkerPeriod } from "@/lib/pointage";
+import {
+  asPayType,
+  calendarDays,
+  periodStart,
+  workedDays,
+  type PayReset,
+  type WorkerPeriod,
+} from "@/lib/pointage";
 import type { IsoDate } from "@/lib/rental-range";
 
 /** Combien de paies passées on garde à l'écran. */
 const HISTORY = 3;
 
-type Person = { id: string; full_name: string; work_start_date: IsoDate | null };
+type Person = {
+  id: string;
+  full_name: string;
+  work_start_date: IsoDate | null;
+  pay_type: string;
+  daily_rate: number | null;
+};
 
 /**
- * Jours d'un mois de paie complet (`settings.pay_month_days`). `cache()` : la
- * page et le calcul des périodes le demandent tous deux — une seule requête.
- */
-export const getPayMonthDays = cache(async (): Promise<number> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("settings").select("pay_month_days").maybeSingle();
-  if (error) throw error;
-  return data?.pay_month_days ?? 30;
-});
-
-/**
- * La période ouverte de chaque personne : ses absences depuis sa dernière
- * paie, ses jours dus et payables, et ses dernières paies.
+ * La période ouverte de chaque personne : ses cases cochées depuis sa
+ * dernière paie — absences d'un permanent, présences d'un remplaçant —, ses
+ * jours payables et ses dernières paies.
  *
  * Aucun filtre de personne pour la sécurité : la RLS ne rend à un employé que
- * SES lignes, au propriétaire celles de toute l'équipe. Deux requêtes pour
+ * SES lignes, au propriétaire celles de toute l'équipe. Trois requêtes pour
  * toute l'équipe, pas une par personne.
  */
 async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPeriod[]> {
@@ -32,21 +34,18 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
   const supabase = await createClient();
   const ids = people.map((p) => p.id);
 
-  const [monthDays, resetsResult] = await Promise.all([
-    getPayMonthDays(),
-    supabase
-      .from("pay_resets")
-      .select(
-        "user_id, paid_through, days_count, daily_rate, amount, monthly_salary, month_days, absences_count, created_at",
-      )
-      .in("user_id", ids)
-      .order("paid_through", { ascending: false })
-      .order("created_at", { ascending: false }),
-  ]);
-  if (resetsResult.error) throw resetsResult.error;
+  const { data: resets, error: resetsError } = await supabase
+    .from("pay_resets")
+    .select(
+      "user_id, paid_through, days_count, daily_rate, amount, absences_count, presences_count, pay_type, created_at",
+    )
+    .in("user_id", ids)
+    .order("paid_through", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (resetsError) throw resetsError;
 
   const byUser = new Map<string, PayReset[]>();
-  for (const r of resetsResult.data ?? []) {
+  for (const r of resets ?? []) {
     byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), r]);
   }
 
@@ -58,29 +57,41 @@ async function periodsFor(people: Person[], today: IsoDate): Promise<WorkerPerio
   );
   const earliest = [...starts.values()].sort()[0];
 
-  const { data: absences, error: absencesError } = await supabase
-    .from("absences")
-    .select("user_id, day")
-    .in("user_id", ids)
-    .gte("day", earliest)
-    .lte("day", today)
-    .order("day");
-  if (absencesError) throw absencesError;
+  // Les deux tables en parallèle : chaque personne ne lit que celle de son type.
+  const [absences, presences] = await Promise.all([
+    supabase
+      .from("absences")
+      .select("user_id, day")
+      .in("user_id", ids)
+      .gte("day", earliest)
+      .lte("day", today)
+      .order("day"),
+    supabase
+      .from("presences")
+      .select("user_id, day")
+      .in("user_id", ids)
+      .gte("day", earliest)
+      .lte("day", today)
+      .order("day"),
+  ]);
+  if (absences.error) throw absences.error;
+  if (presences.error) throw presences.error;
 
   return people.map((person) => {
+    const payType = asPayType(person.pay_type);
     const start = starts.get(person.id)!;
-    const own = (absences ?? [])
-      .filter((a) => a.user_id === person.id && a.day >= start)
-      .map((a) => a.day);
-    const due = daysDue(start, today, monthDays);
+    const rows = (payType === "remplacant" ? presences.data : absences.data) ?? [];
+    const marks = rows.filter((m) => m.user_id === person.id && m.day >= start).map((m) => m.day);
     return {
       id: person.id,
       full_name: person.full_name,
+      payType,
+      dailyRate: person.daily_rate === null ? null : Number(person.daily_rate),
       start,
       workStartDate: person.work_start_date,
-      absences: own,
-      due,
-      worked: Math.max(due - own.length, 0),
+      marks,
+      due: calendarDays(start, today),
+      worked: workedDays(payType, start, today, marks.length),
       resets: (byUser.get(person.id) ?? []).slice(0, HISTORY),
     };
   });
@@ -104,7 +115,7 @@ export async function getTeamPeriods(today: IsoDate): Promise<WorkerPeriod[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, full_name, work_start_date")
+    .select("id, full_name, work_start_date, pay_type, daily_rate")
     .eq("is_active", true)
     .neq("role", "owner")
     .order("full_name");

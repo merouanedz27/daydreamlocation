@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { WifiOff } from "lucide-react";
+import { OfflineViewer } from "@/components/offline-viewer";
 import { RetryButton } from "@/components/retry-button";
-import { routing } from "@/i18n/routing";
+import { routing, type Locale } from "@/i18n/routing";
 import suit from "../../../../public/logo-suit.png";
 import wordmark from "../../../../public/logo-wordmark.png";
 
@@ -29,6 +30,10 @@ export async function generateMetadata(props: {
  *
  * Logo `unoptimized` : servi tel quel depuis `/_next/static`, que le worker
  * garde. Via `/_next/image`, jamais mis en cache, il manquerait hors ligne.
+ *
+ * Sous le message, le DERNIER CLICHÉ des commandes gardé sur le téléphone
+ * (`OfflineViewer`, lu dans IndexedDB côté navigateur) : demain, pas
+ * rentrés, recherche — et ✈ / ✓ mis en attente jusqu'au retour du réseau.
  */
 export default async function OfflinePage({
   params,
@@ -40,28 +45,30 @@ export default async function OfflinePage({
   const t = await getTranslations();
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-5 py-10">
-      <div className="w-full max-w-sm text-center">
-        <Image src={suit} alt="" unoptimized priority className="mx-auto h-auto w-16" />
+    <main className="flex min-h-dvh flex-col items-center px-4 py-8">
+      <div className="w-full max-w-md text-center">
+        <Image src={suit} alt="" unoptimized priority className="mx-auto h-auto w-10" />
         <Image
           src={wordmark}
           alt={t("app.name")}
           unoptimized
           priority
-          className="mx-auto mt-3 h-auto w-52"
+          className="mx-auto mt-2 h-auto w-36"
         />
 
-        <div className="ornament my-8" aria-hidden>
+        <div className="ornament my-5" aria-hidden>
           <span className="ornament-diamond" />
         </div>
 
-        <WifiOff className="text-muted-foreground mx-auto size-8" aria-hidden />
-        <h1 className="font-heading mt-4 text-xl font-medium">{t("offline.title")}</h1>
+        <WifiOff className="text-muted-foreground mx-auto size-7" aria-hidden />
+        <h1 className="font-heading mt-3 text-xl font-medium">{t("offline.title")}</h1>
         <p className="text-muted-foreground mt-2 text-sm">{t("offline.body")}</p>
 
-        <div className="mt-8">
+        <div className="mt-5">
           <RetryButton />
         </div>
+
+        <OfflineViewer locale={locale as Locale} />
       </div>
     </main>
   );

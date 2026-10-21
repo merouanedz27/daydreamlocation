@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Receipt } from "lucide-react";
-import { FraisQuickForm } from "@/components/frais-quick-form";
+import { FraisAddDrawer } from "@/components/frais-quick-form";
+import { Button } from "@/components/ui/button";
+import { Link } from "@/i18n/navigation";
 import { ExpensesList } from "@/components/expenses-list";
 import { isOwner, requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +39,7 @@ export default async function FraisPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; tout?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -47,33 +49,52 @@ export default async function FraisPage({
   const t = await getTranslations();
 
   // Recherche de l'en-tête : sur le libellé du frais (« pressing », « Med »).
-  const { q = "" } = await searchParams;
-  const term = q.replace(/[%_\\]/g, " ").trim().slice(0, 80);
+  const { q = "", tout } = await searchParams;
+  const term = q
+    .replace(/[%_\\]/g, " ")
+    .trim()
+    .slice(0, 80);
+  // « Voir tout » : la liste entière, sur demande. La RLS limite toujours un
+  // employé à SES frais.
+  const showAll = tout === "1";
 
   const supabase = await createClient();
   let request = supabase
     .from("expenses")
     .select("*, orders ( order_no, customer_name )");
   if (term) request = request.ilike("description", `%${term}%`);
-  const { data } = await request
+  request = request
     .order("spent_on", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(RECENT);
-  const recent = (data ?? []) as unknown as ExpenseRow[];
+    .order("created_at", { ascending: false });
+  // Une ligne de plus que l'affichage : elle dit s'il en reste, sans requête
+  // de comptage.
+  const { data } = await (showAll ? request : request.limit(RECENT + 1));
+  const rows = (data ?? []) as unknown as ExpenseRow[];
+  const hasMore = !showAll && rows.length > RECENT;
+  const recent = showAll ? rows : rows.slice(0, RECENT);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl">{t("nav.frais")}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">{t("frais.hint")}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl">{t("nav.frais")}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t("frais.hint")}
+          </p>
+        </div>
+        <FraisAddDrawer />
       </div>
-
-      <FraisQuickForm />
 
       <section aria-labelledby="frais-recent">
         <div className="mb-2 flex items-center justify-between gap-3">
           <h2 id="frais-recent" className="text-base font-medium">
-            {owner ? t("frais.recentAll") : t("frais.recentMine")}
+            {showAll
+              ? owner
+                ? t("frais.allAll")
+                : t("frais.allMine")
+              : owner
+                ? t("frais.recentAll")
+                : t("frais.recentMine")}
           </h2>
         </div>
 
@@ -90,7 +111,12 @@ export default async function FraisPage({
                   {formatDayMonth(row.spent_on, l)}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm">
-                  <Highlight text={row.description || t(`expenses.categories.${row.category}`)} />
+                  <Highlight
+                    text={
+                      row.description ||
+                      t(`expenses.categories.${row.category}`)
+                    }
+                  />
                 </span>
                 <span className="tabular shrink-0 text-sm font-medium">
                   {formatMoney(Number(row.amount), l)}
@@ -106,7 +132,23 @@ export default async function FraisPage({
             </p>
           </div>
         )}
+
+        {hasMore && (
+          <Button asChild variant="outline" className="mt-3 h-11 w-full">
+            <Link
+              href={{
+                pathname: "/frais",
+                query: { ...(term && { q: term }), tout: "1" },
+              }}
+            >
+              {t("frais.seeAll")}
+            </Link>
+          </Button>
+        )}
       </section>
+
+      {/* La place du bouton rond « + » (téléphone), sous la dernière ligne. */}
+      <div className="h-14 md:hidden" aria-hidden />
     </div>
   );
 }

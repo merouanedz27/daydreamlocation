@@ -59,8 +59,11 @@ import {
   resolveUnitPrice,
   spreadOutfitPrice,
   toPayload,
+  unitIdsIn,
   type DraftLine,
 } from "@/lib/order-draft";
+import { useOnline } from "@/components/offline-sync";
+import { isNetworkError, localAvailability, queueOp } from "@/lib/offline/outbox";
 import { fieldErrorsOf, orderSchema } from "@/lib/validation/orders";
 import { defaultWindow } from "@/lib/rental-range";
 import { createMemoryStore } from "@/lib/device-setting";
@@ -312,8 +315,12 @@ export function OrderQuickForm({
   /**
    * MODIFICATION d'une commande existante : même écran, mêmes gestes que la
    * saisie — c'est ce que fait son AppSheet en rouvrant une ligne.
+   *
+   * `version` : celle de la commande au chargement (`orders.version`). La
+   * base refuse l'enregistrement si un collègue l'a changée entre-temps — en
+   * ligne comme hors ligne — au lieu d'écraser son ✈ ou son encaissement.
    */
-  edit?: { orderId: number; orderNo: string; initial: QuickDraft };
+  edit?: { orderId: number; orderNo: string; initial: QuickDraft; version: number };
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
@@ -362,6 +369,38 @@ export function OrderQuickForm({
   // Pendant l'envoi d'une nouvelle commande, la saisie affichée est figée
   // (voir `onSubmit`) : le brouillon stocké est déjà vidé.
   const [frozen, setFrozen] = useState<QuickDraft | null>(null);
+  const online = useOnline();
+
+  // Modification REPRISE : refusée à l'envoi hors ligne, l'employé l'a rouverte
+  // depuis la liste des gestes. Sa saisie revient sur la dernière version —
+  // sauf l'argent versé et ✈ / ✓, qui restent ceux de la base : ils ont pu
+  // bouger entre-temps, et c'est souvent la raison du refus.
+  const [resumed, setResumed] = useState(false);
+  useEffect(() => {
+    if (!edit) return;
+    const key = `dd.editDraft.${edit.orderId}`;
+    let saved: QuickDraft | null = null;
+    try {
+      saved = sanitizeQuickDraft(JSON.parse(sessionStorage.getItem(key) ?? "null"));
+      sessionStorage.removeItem(key);
+    } catch {
+      saved = null;
+    }
+    if (!saved) return;
+    store.set({
+      ...saved,
+      paid: edit.initial.paid,
+      pickedUp: edit.initial.pickedUp,
+      returned: edit.initial.returned,
+    });
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setResumed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [edit, store]);
   const live = store.useValue();
   const draft = frozen ?? (localReady ? live : EMPTY_DRAFT);
 
@@ -396,7 +435,14 @@ export function OrderQuickForm({
     let cancelled = false;
     const [from, to] = windowKey.split("|"); // le 3e morceau est `recheck`
     // En modification, les pièces de CETTE commande ne sont pas « prises ».
-    checkAvailability(from, to, edit?.orderId).then((busy) => {
+    // Sans réseau : ce que sait le téléphone (dernières réservations connues +
+    // commandes provisoires en file) — un avertissement, la base tranchera.
+    const lookup = navigator.onLine
+      ? checkAvailability(from, to, edit?.orderId).catch(() =>
+          localAvailability(from, to, edit?.orderId),
+        )
+      : localAvailability(from, to, edit?.orderId);
+    lookup.then((busy) => {
       if (!cancelled) {
         setAvailability({
           key: windowKey,
@@ -976,6 +1022,12 @@ export function OrderQuickForm({
 
     setServerIssue(null);
     setGeneralError(null);
+    // La saisie telle quelle, avant tout gel : c'est elle qu'on garde si la
+    // commande part en file.
+    const typed = store.get();
+    // Identifiant tiré UNE fois : en ligne comme en file. Si la réponse se
+    // perd après que la base a créé la commande, le renvoi ne la recrée pas.
+    const opId = crypto.randomUUID();
     const formData = new FormData();
     formData.set("locale", locale);
     // « Enregistrer » d'une NOUVELLE commande : l'action redirige elle-même
@@ -996,7 +1048,63 @@ export function OrderQuickForm({
     formData.set("picked_up", draft.pickedUp ? "1" : "0");
     formData.set("returned", draft.returned ? "1" : "0");
     formData.set("lines", JSON.stringify(toPayload(lines)));
+    if (edit) formData.set("expected_version", String(edit.version));
+    else formData.set("client_op_id", opId);
     const name = draft.customerName.trim();
+
+    /**
+     * Pas de réseau : la commande devient PROVISOIRE. Elle attend dans la file
+     * et la base la confirmera — ou la refusera, pièce déjà louée — au retour
+     * du réseau. L'écran le dit sans détour : on ne promet pas la tenue.
+     */
+    const queueProvisional = async () => {
+      const fields: Record<string, string> = {};
+      for (const [key, value] of formData.entries()) {
+        if (typeof value === "string" && !["locale", "return_id", "id", "client_op_id", "expected_version"].includes(key)) {
+          fields[key] = value;
+        }
+      }
+      const summary = {
+        customerName: name,
+        eventDate: draft.eventDate,
+        pickup,
+        returnDue,
+        unitIds: [...unitIdsIn(lines)],
+      };
+      if (edit) {
+        await queueOp(
+          {
+            kind: "orderEdit",
+            orderId: edit.orderId,
+            orderNo: edit.orderNo,
+            expectedVersion: edit.version,
+            fields,
+            draft: typed,
+            summary,
+          },
+          t("offline.orderEditTitle", { no: edit.orderNo, name }),
+        );
+        toast.warning(t("offline.orderEditQueued", { name }), { duration: 8000 });
+        // Navigation complète : sans réseau, le service worker sert la fiche
+        // hors ligne.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- navigation COMPLÈTE voulue : sans réseau, seul le service worker peut servir la page hors ligne.
+        window.location.assign(`/${locale}/commandes/${edit.orderId}`);
+        return;
+      }
+      await queueOp(
+        { kind: "order", opId, fields, draft: typed, summary },
+        t("offline.orderTitle", { name, date: formatDate(draft.eventDate, locale) }),
+      );
+      setFrozen(null);
+      reset(another);
+      toast.warning(t("offline.orderQueued", { name }), { duration: 8000 });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    if (!navigator.onLine) {
+      startTransition(queueProvisional);
+      return;
+    }
 
     // Le brouillon du téléphone est vidé TOUT DE SUITE : la redirection
     // démonte le formulaire, il n'y aurait plus de « après » pour le faire.
@@ -1021,8 +1129,12 @@ export function OrderQuickForm({
         // La redirection de l'action passe par ici sous forme d'erreur
         // spéciale de Next : on la laisse filer, la liste s'affiche.
         unstable_rethrow(error);
-        // Réseau coupé : la saisie n'est pas perdue.
         restore();
+        // Réseau coupé en route : la commande part en file, provisoire.
+        if (isNetworkError(error)) {
+          await queueProvisional();
+          return;
+        }
         setGeneralError({ key: "errors.generic" });
         return;
       }
@@ -1107,6 +1219,24 @@ export function OrderQuickForm({
           </Button>
         )}
       </div>
+
+      {!online && (
+        // Sans réseau : la commande sera PROVISOIRE. Dit AVANT la saisie, pour
+        // que personne ne promette la tenue au client.
+        <Alert className="border-warning-foreground/30 bg-warning-soft text-warning-foreground mb-4">
+          <AlertTriangle />
+          <AlertDescription className="text-warning-foreground">
+            {edit ? t("offline.formEditHint") : t("offline.formHint")}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {resumed && (
+        <Alert className="mb-4">
+          <AlertCircle />
+          <AlertDescription>{t("offline.resumedEdit")}</AlertDescription>
+        </Alert>
+      )}
 
       {/* --- Client ---------------------------------------------------------- */}
       <Section id="q-client" title={t("orders.customer")}>

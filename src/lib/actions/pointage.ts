@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
+import { PAY_TYPES, type MarkKind, type PayType } from "@/lib/pointage";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -13,8 +14,9 @@ function resolveLocale(value: unknown): Locale {
 }
 
 /**
- * Codes levés par les fonctions et le trigger du pointage :
- * P0001 = jour déjà payé, P0003 = jour futur ou hors de la période ouverte.
+ * Codes levés par les fonctions et les triggers du pointage :
+ * P0001 = jour déjà payé, P0003 = jour futur ou hors de la période ouverte,
+ * P0004 = case d'un autre type de paie (absence d'un remplaçant…).
  */
 function failure(code: string | undefined): ActionResult {
   const key =
@@ -22,34 +24,44 @@ function failure(code: string | undefined): ActionResult {
       ? "pointage.errors.alreadyPaid"
       : code === "P0003"
         ? "pointage.errors.outOfPeriod"
-        : "errors.generic";
+        : code === "P0004"
+          ? "pointage.errors.wrongPayType"
+          : "errors.generic";
   return { ok: false, error: key };
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const DAY = /^d{4}-d{2}-d{2}$/;
+const KINDS: readonly MarkKind[] = ["absence", "presence"];
 
 /**
- * L'employé coche une absence d'un jour de SA période — aujourd'hui, ou un
- * jour oublié — et la décoche tant que ce jour n'est pas payé (mauvais
- * toucher).
+ * L'employé coche une case d'un jour de SA période — son absence s'il est
+ * permanent, sa présence s'il est remplaçant — aujourd'hui ou un jour oublié,
+ * et la décoche tant que ce jour n'est pas payé (mauvais toucher).
  *
- * Les bornes sont tenues par la base (`mark_absent()`, à la date d'Alger du
- * serveur). L'employé n'a aucun droit d'écriture direct sur `absences`.
+ * Les bornes et le type de paie sont tenus par la base (`mark_absent()` /
+ * `mark_present()`, à la date d'Alger du serveur). L'employé n'a aucun droit
+ * d'écriture direct sur `absences` ni `presences`.
  */
-export async function setMyAbsence(
+export async function setMyMark(
   localeValue: string,
+  kind: MarkKind,
   day: string,
-  absent: boolean,
+  on: boolean,
 ): Promise<ActionResult> {
   const locale = resolveLocale(localeValue);
   if (!(await getProfile())) return { ok: false, error: "errors.forbidden" };
-  if (!DAY.test(day)) return { ok: false, error: "errors.generic" };
+  if (!KINDS.includes(kind) || !DAY.test(day)) return { ok: false, error: "errors.generic" };
 
   const supabase = await createClient();
-  const { error } = absent
-    ? await supabase.rpc("mark_absent", { p_day: day })
-    : await supabase.rpc("unmark_absent", { p_day: day });
+  const { error } =
+    kind === "presence"
+      ? on
+        ? await supabase.rpc("mark_present", { p_day: day })
+        : await supabase.rpc("unmark_present", { p_day: day })
+      : on
+        ? await supabase.rpc("mark_absent", { p_day: day })
+        : await supabase.rpc("unmark_absent", { p_day: day });
   if (error) return failure(error.code);
 
   revalidatePath(`/${locale}/pointage`);
@@ -57,32 +69,63 @@ export async function setMyAbsence(
 }
 
 /**
- * Le propriétaire coche ou décoche l'absence de n'importe quel jour non payé
+ * Le propriétaire coche ou décoche la case de n'importe quel jour non payé
  * — un oubli, une erreur. Un jour déjà payé est refusé par la base (trigger).
  */
-export async function setAbsence(
+export async function setMark(
   localeValue: string,
+  kind: MarkKind,
   userId: string,
   day: string,
-  absent: boolean,
+  on: boolean,
 ): Promise<ActionResult> {
   const locale = resolveLocale(localeValue);
   const profile = await getProfile();
   if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
-  if (!UUID.test(userId) || !DAY.test(day)) return { ok: false, error: "errors.generic" };
+  if (!KINDS.includes(kind) || !UUID.test(userId) || !DAY.test(day)) {
+    return { ok: false, error: "errors.generic" };
+  }
 
   const supabase = await createClient();
-  const { error } = absent
+  const table = kind === "presence" ? "presences" : "absences";
+  const { error } = on
     ? await supabase
-        .from("absences")
+        .from(table)
         .upsert(
           { user_id: userId, day, marked_by: profile.id },
           { onConflict: "user_id,day", ignoreDuplicates: true },
         )
-    : await supabase.from("absences").delete().eq("user_id", userId).eq("day", day);
+    : await supabase.from(table).delete().eq("user_id", userId).eq("day", day);
   if (error) return failure(error.code);
 
   revalidatePath(`/${locale}/pointage`);
+  return { ok: true };
+}
+
+/**
+ * Permanent ou remplaçant. Ce n'est pas un rôle : les droits dans l'app ne
+ * changent pas. Les cases déjà cochées de l'autre type restent en base mais
+ * ne comptent plus — d'où le conseil, à l'écran, de changer juste après une
+ * paie.
+ */
+export async function setPayType(
+  localeValue: string,
+  userId: string,
+  payType: string,
+): Promise<ActionResult> {
+  const locale = resolveLocale(localeValue);
+  const profile = await getProfile();
+  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!UUID.test(userId) || !PAY_TYPES.includes(payType as PayType)) {
+    return { ok: false, error: "errors.generic" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ pay_type: payType }).eq("id", userId);
+  if (error) return failure(error.code);
+
+  revalidatePath(`/${locale}/pointage`);
+  revalidatePath(`/${locale}/equipe`);
   return { ok: true };
 }
 
@@ -113,27 +156,11 @@ export async function setWorkStartDate(
   return { ok: true };
 }
 
-/** Jours d'un mois de paie complet (30, 28…) — réglage de toute l'équipe. */
-export async function setPayMonthDays(localeValue: string, days: number): Promise<ActionResult> {
-  const locale = resolveLocale(localeValue);
-  const profile = await getProfile();
-  if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
-  if (!Number.isInteger(days) || days < 20 || days > 31) {
-    return { ok: false, error: "pointage.errors.monthDays" };
-  }
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("settings").update({ pay_month_days: days }).eq("id", true);
-  if (error) return failure(error.code);
-
-  revalidatePath(`/${locale}/pointage`);
-  return { ok: true };
-}
-
 /**
- * Paie d'un employé : salaire mensuel ÷ N × (jours dus − absences). En UNE
+ * Paie d'un employé : jours payés × prix d'une journée — calendrier −
+ * absences pour un permanent, présences pour un remplaçant. En UNE
  * transaction (`pay_worker()`), la base compte, ajoute la dépense « Salaire »
- * aux frais et remet le compteur à zéro. Rend les jours, les absences et le
+ * aux frais, garde le prix sur le profil et remet le compteur à zéro. Rend les jours, les absences et le
  * total réellement payés, pour le message.
  *
  * Le libellé de la dépense s'écrit dans la langue du propriétaire : c'est lui
@@ -142,7 +169,7 @@ export async function setPayMonthDays(localeValue: string, days: number): Promis
 export async function payWorker(
   localeValue: string,
   userId: string,
-  monthlySalary: number,
+  dailyRate: number,
 ): Promise<
   { ok: true; days: number; absences: number; amount: number } | { ok: false; error: string }
 > {
@@ -150,8 +177,8 @@ export async function payWorker(
   const profile = await getProfile();
   if (!profile || !isOwner(profile)) return { ok: false, error: "errors.forbidden" };
   if (!UUID.test(userId)) return { ok: false, error: "errors.generic" };
-  if (!Number.isFinite(monthlySalary) || monthlySalary <= 0 || monthlySalary > 100_000_000) {
-    return { ok: false, error: "pointage.errors.salaryRequired" };
+  if (!Number.isFinite(dailyRate) || dailyRate <= 0 || dailyRate > 10_000_000) {
+    return { ok: false, error: "pointage.errors.rateRequired" };
   }
 
   const supabase = await createClient();
@@ -165,7 +192,7 @@ export async function payWorker(
 
   const { data, error } = await supabase.rpc("pay_worker", {
     p_user: userId,
-    p_monthly_salary: Math.round(monthlySalary),
+    p_daily_rate: Math.round(dailyRate),
     p_description: description,
   });
   const paid = data?.[0];

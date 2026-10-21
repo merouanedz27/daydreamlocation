@@ -33,6 +33,15 @@ function resolveLocale(value: FormDataEntryValue | null): Locale {
 
 /** Violation de la contrainte d'exclusion : une pièce est déjà réservée. */
 const EXCLUSION_VIOLATION = "23P01";
+const UNIQUE_VIOLATION = "23505";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** L'identifiant d'un geste de la file hors ligne, s'il est bien formé. */
+function clientOpId(formData: FormData): string | null {
+  const value = String(formData.get("client_op_id") ?? "");
+  return UUID.test(value) ? value : null;
+}
 
 /**
  * Traduit un conflit de réservation, ou rend `null` si l'erreur est autre.
@@ -172,6 +181,9 @@ function orderWriteError(error: { code?: string; message: string }): ActionResul
   if (error.message.includes("order_not_found")) {
     return { ok: false, error: "errors.forbidden" };
   }
+  if (error.message.includes("order_changed")) {
+    return { ok: false, error: "errors.orderChangedOffline" };
+  }
   return { ok: false, error: "errors.generic" };
 }
 
@@ -199,7 +211,7 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   const input = parsed.input;
   const supabase = await createClient();
 
-  const { data: orderId, error } = await supabase.rpc("create_order", {
+  const args = {
     p_customer_name: input.customer_name,
     // Vide = pas de numéro : la fonction SQL le ramène à NULL.
     p_customer_phone: input.customer_phone ?? "",
@@ -211,9 +223,30 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
     p_caution_amount: input.caution_amount,
     p_notes: input.notes ?? "",
     p_lines: toRpcLines(input.lines),
-  });
+  };
 
-  if (error) return orderWriteError(error);
+  // Commande PROVISOIRE, saisie hors ligne : son identifiant empêche qu'un
+  // renvoi n'en crée une seconde (`create_order_once`).
+  const opId = clientOpId(formData);
+  const { data: created, error } = opId
+    ? await supabase.rpc("create_order_once", { p_client_op_id: opId, ...args })
+    : await supabase.rpc("create_order", args);
+  const orderId = created;
+
+  if (error) {
+    // Deux renvois simultanés : le second bute sur l'index unique. Le premier
+    // a créé la commande — on la retrouve, c'est un succès.
+    if (opId && error.code === UNIQUE_VIOLATION) {
+      const { data: existing } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("client_op_id", opId)
+        .maybeSingle();
+      if (!existing) return { ok: false, error: "errors.generic" };
+      return { ok: true, id: existing.id };
+    }
+    return orderWriteError(error);
+  }
 
   // « Allez validé » / « Retour validé » cochés DÈS la saisie — son AppSheet
   // les propose dans le formulaire : le client qui réserve et emporte sa tenue
@@ -285,7 +318,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   const before = await snapshotOrder(orderId).catch(() => null);
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("update_order", {
+  const args = {
     p_order_id: orderId,
     p_customer_name: input.customer_name,
     p_customer_phone: input.customer_phone ?? "",
@@ -298,7 +331,16 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
     p_picked_up: formData.get("picked_up") === "1",
     p_returned: formData.get("returned") === "1",
     p_lines: toRpcLines(input.lines),
-  });
+  };
+
+  // Modification faite HORS LIGNE : elle part de la version qu'avait le
+  // téléphone. Si un collègue a changé la commande depuis, la base la refuse
+  // (`order_changed`) au lieu d'écraser son travail.
+  const expected = Number(formData.get("expected_version"));
+  const { error } =
+    Number.isInteger(expected) && expected > 0
+      ? await supabase.rpc("update_order_checked", { p_expected_version: expected, ...args })
+      : await supabase.rpc("update_order", args);
 
   if (error) return orderWriteError(error);
 
@@ -408,11 +450,20 @@ export async function addOrderPayment(formData: FormData): Promise<ActionResult>
   // pire des ambiguïtés.
   const delta = parsed.data.direction === "refund" ? -parsed.data.amount : parsed.data.amount;
 
+  // Geste venu de la file hors ligne : son identifiant le rend rejouable sans
+  // risque — la base ne l'applique qu'une fois.
+  const opId = clientOpId(formData);
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("add_order_payment", {
     p_order_id: orderId,
     p_amount: delta,
+    ...(opId ? { p_client_op_id: opId } : {}),
   });
+
+  // Deux renvois simultanés du même geste : le second bute sur l'index
+  // unique du journal. Le premier est passé — c'est un succès.
+  if (error?.code === UNIQUE_VIOLATION && opId) return { ok: true };
 
   if (error) {
     // Chaque cas se corrige d'un geste différent : le dire vaut mieux qu'un

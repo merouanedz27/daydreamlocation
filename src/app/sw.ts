@@ -115,8 +115,25 @@ const serwist = new Serwist({
     },
   ],
   fallbacks: {
-    // Dans la langue de la page demandée.
+    // Dans la langue de la page demandée. La PREMIÈRE entrée qui correspond
+    // gagne : les formulaires de commande d'abord, la page générale ensuite.
+    // L'adresse affichée reste celle demandée — la page « modifier » y relit
+    // l'identifiant de la commande.
     entries: [
+      ...(["ar", "fr"] as const).flatMap((locale) => [
+        {
+          url: `/${locale}/hors-ligne/nouvelle`,
+          matcher: ({ request }: { request: Request }) =>
+            request.destination === "document" &&
+            new RegExp(`^/${locale}/commandes/nouvelle/?$`).test(new URL(request.url).pathname),
+        },
+        {
+          url: `/${locale}/hors-ligne/modifier`,
+          matcher: ({ request }: { request: Request }) =>
+            request.destination === "document" &&
+            new RegExp(`^/${locale}/commandes/\\d+/modifier/?$`).test(new URL(request.url).pathname),
+        },
+      ]),
       {
         url: "/ar/hors-ligne",
         matcher: ({ request }) =>

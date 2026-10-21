@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PAY_TYPES } from "@/lib/pointage";
 
 /** Messages = CLÉS i18n, jamais des phrases. Voir `daydream-i18n`. */
 
@@ -29,6 +30,7 @@ export const createMemberSchema = z.object({
   email: z.string().trim().toLowerCase().email({ message: "errors.emailInvalid" }),
   password,
   role: z.enum(MEMBER_ROLES, { message: "errors.required" }),
+  pay_type: z.enum(PAY_TYPES, { message: "errors.required" }),
 });
 
 export const resetPasswordSchema = z.object({ password });

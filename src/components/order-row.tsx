@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { MessageButton } from "@/components/customer-message";
 import { Highlight } from "@/components/highlight";
 import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
-import { setOrderChecks } from "@/lib/actions/orders";
+import { sendOrQueue } from "@/lib/offline/outbox";
 import { formatDate, formatNumber } from "@/lib/format";
 import { DONE_NAME_CLASS, isOrderDone, type OrderRow as Order } from "@/lib/orders-query";
 import { daysBetween, todayIso } from "@/lib/rental-range";
@@ -144,26 +144,31 @@ function QuickCheck({
   name: string;
 }) {
   const t = useTranslations();
-  const { locale } = useParams<{ locale: Locale }>();
   const [isPending, startTransition] = useTransition();
-  const [shown, setShown] = useOptimistic(checked);
+  const [optimistic, setOptimistic] = useOptimistic(checked);
+  // Geste gardé dans la file hors ligne : la base ne le connaît pas encore,
+  // la coche le montre quand même. Effacé dès que la base a rattrapé.
+  const [queued, setQueued] = useState<boolean | null>(null);
+  if (queued !== null && queued === checked) setQueued(null);
+  const shown = isPending ? optimistic : (queued ?? optimistic);
 
   const label = field === "picked_up" ? t("orders.pickedUp") : t("orders.returned");
   const Icon = field === "picked_up" ? Plane : CircleCheck;
 
   function toggle() {
-    const next = !checked;
-    const data = new FormData();
-    data.set("id", String(orderId));
-    data.set("locale", locale);
-    data.set("field", field);
-    data.set("value", next ? "1" : "0");
+    const next = !shown;
 
     startTransition(async () => {
-      setShown(next);
-      const result = await setOrderChecks(data);
+      setOptimistic(next);
+      const result = await sendOrQueue(
+        { kind: "check", orderId, field, value: next },
+        `${label} — ${name}`,
+      );
       if (!result.ok) toast.error(t(result.error));
-      else if (next) toast.success(t("orders.checkedToast", { label, name }));
+      else if (result.queued) {
+        setQueued(next);
+        toast(t("offline.queuedToast"));
+      } else if (next) toast.success(t("orders.checkedToast", { label, name }));
     });
   }
 

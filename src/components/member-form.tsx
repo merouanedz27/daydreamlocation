@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createMember } from "@/lib/actions/team";
+import { PAY_TYPES } from "@/lib/pointage";
 import { MEMBER_ROLES } from "@/lib/validation/team";
 import type { Locale } from "@/i18n/routing";
 
@@ -157,6 +158,24 @@ export function MemberForm() {
                 </Select>
                 <FieldDescription>{t("team.roleHint")}</FieldDescription>
                 {field === "role" && error && <FieldError>{t(error)}</FieldError>}
+              </Field>
+
+              <Field data-invalid={field === "pay_type" || undefined}>
+                <FieldLabel htmlFor="pay_type">{t("pointage.payTypeLabel")}</FieldLabel>
+                <Select name="pay_type" defaultValue="permanent" disabled={isPending}>
+                  <SelectTrigger id="pay_type" className="h-12 w-full text-base">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAY_TYPES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {t(`pointage.payType.${p}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{t("pointage.payTypeHint")}</FieldDescription>
+                {field === "pay_type" && error && <FieldError>{t(error)}</FieldError>}
               </Field>
             </FieldGroup>
           </div>

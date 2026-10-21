@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { OrdersFilters } from "@/components/orders-filters";
 import { OrdersList } from "@/components/orders-list";
+import { PendingOrders } from "@/components/pending-orders";
+import type { Locale } from "@/i18n/routing";
 import { getOrdersTable } from "@/lib/queries/orders-list";
 import { getProfile, isOwner } from "@/lib/auth";
 import { ORDERS_PARAM_KEYS, parseOrdersQuery, type OrdersParams } from "@/lib/orders-query";
@@ -49,6 +51,10 @@ export default async function OrdersPage({
 
   return (
     <div>
+      {/* Les commandes PROVISOIRES de ce téléphone (saisies sans réseau), pas
+          encore confirmées par la base : en tête, pour ne pas les oublier. */}
+      <PendingOrders locale={locale as Locale} />
+
       {/* Titre reporté en `sr-only` : la barre de navigation dit déjà où l'on
           est. On le garde dans le DOM — un écran sans `h1` casse la navigation
           par titres des lecteurs d'écran. */}

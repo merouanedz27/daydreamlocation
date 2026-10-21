@@ -18,7 +18,9 @@ import {
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { addOrderPayment, setCautionReturned } from "@/lib/actions/orders";
+import { toast } from "sonner";
+import { setCautionReturned } from "@/lib/actions/orders";
+import { sendOrQueue } from "@/lib/offline/outbox";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
@@ -43,10 +45,13 @@ import type { Locale } from "@/i18n/routing";
  */
 export function OrderPaymentDrawer({
   orderId,
+  name,
   balance,
   amountPaid,
 }: {
   orderId: number;
+  /** Le client : nomme le geste s'il attend dans la file hors ligne. */
+  name: string;
   /** Reste dû. Négatif = trop-perçu, à rendre au client. */
   balance: number;
   amountPaid: number;
@@ -70,13 +75,24 @@ export function OrderPaymentDrawer({
     setOpen(true);
   }
 
-  function onSubmit(formData: FormData) {
+  /**
+   * Sans réseau, l'encaissement attend dans la file. Son identifiant
+   * (`opId`) est tiré ICI, une fois : si la requête part mais que la réponse
+   * se perd, le renvoi porte le même et la base ne compte pas deux fois.
+   */
+  function onSubmit() {
     setError(null);
+    const value = Number(amount);
+    const title = `${direction === "refund" ? t("orders.correctPayment") : t("orders.collect")} ${formatMoney(value, locale)} — ${name}`;
     startTransition(async () => {
-      const result = await addOrderPayment(formData);
+      const result = await sendOrQueue(
+        { kind: "payment", orderId, amount: value, direction, opId: crypto.randomUUID() },
+        title,
+      );
       if (result.ok) {
         setOpen(false);
         setAmount("");
+        if (result.queued) toast(t("offline.queuedToast"));
         return;
       }
       setError(result.error);

@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { signOut } from "@/lib/actions/auth";
+import { clearOfflineData } from "@/lib/offline/outbox";
 import { detachPush } from "@/lib/notifications/browser";
 import { ThemeChoice } from "@/components/theme-choice";
 import { cn } from "@/lib/utils";
@@ -328,6 +329,9 @@ export function AppHeader({
           data.set("locale", locale);
           // Cet appareil ne doit plus recevoir les push du compte qui part.
           await detachPush();
+          // Ni garder ses commandes et ses gestes en attente : dernier envoi
+          // si le réseau le permet, puis tout s'efface (téléphone partagé).
+          await clearOfflineData();
           // `signOut` redirige : elle ne rend jamais la main.
           await signOut(data);
         }}

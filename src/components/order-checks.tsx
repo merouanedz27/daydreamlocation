@@ -1,14 +1,12 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
-import { setOrderChecks } from "@/lib/actions/orders";
+import { sendOrQueue } from "@/lib/offline/outbox";
 import { cn } from "@/lib/utils";
-import type { Locale } from "@/i18n/routing";
 
 /**
  * « Aller validé » / « Retour validé » — le geste du patron, tel quel.
@@ -24,10 +22,13 @@ import type { Locale } from "@/i18n/routing";
  */
 export function OrderChecks({
   orderId,
+  name,
   pickedUp,
   returned,
 }: {
   orderId: number;
+  /** Le client : nomme le geste s'il attend dans la file hors ligne. */
+  name: string;
   pickedUp: boolean;
   returned: boolean;
 }) {
@@ -37,12 +38,14 @@ export function OrderChecks({
     <div className="space-y-2">
       <CheckRow
         orderId={orderId}
+        name={name}
         field="picked_up"
         checked={pickedUp}
         label={t("orders.pickedUp")}
       />
       <CheckRow
         orderId={orderId}
+        name={name}
         field="returned"
         checked={returned}
         label={t("orders.returned")}
@@ -53,17 +56,18 @@ export function OrderChecks({
 
 function CheckRow({
   orderId,
+  name,
   field,
   checked,
   label,
 }: {
   orderId: number;
+  name: string;
   field: "picked_up" | "returned";
   checked: boolean;
   label: string;
 }) {
   const t = useTranslations();
-  const { locale } = useParams<{ locale: Locale }>();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -73,22 +77,21 @@ function CheckRow({
    * quand la transition se termine — y compris si l'écriture a échoué. Un
    * `useState` resterait figé sur un mensonge.
    */
-  const [shown, setShown] = useOptimistic(checked);
+  const [optimistic, setOptimistic] = useOptimistic(checked);
+  // Gardé dans la file hors ligne : coché à l'écran, pas encore en base.
+  const [queued, setQueued] = useState<boolean | null>(null);
+  if (queued !== null && queued === checked) setQueued(null);
+  const shown = isPending ? optimistic : (queued ?? optimistic);
 
   function toggle() {
     setError(null);
-    const next = !checked;
-
-    const data = new FormData();
-    data.set("id", String(orderId));
-    data.set("locale", locale);
-    data.set("field", field);
-    data.set("value", next ? "1" : "0");
+    const next = !shown;
 
     startTransition(async () => {
-      setShown(next);
-      const result = await setOrderChecks(data);
+      setOptimistic(next);
+      const result = await sendOrQueue({ kind: "check", orderId, field, value: next }, `${label} — ${name}`);
       if (!result.ok) setError(result.error);
+      else if (result.queued) setQueued(next);
     });
   }
 
@@ -123,6 +126,9 @@ function CheckRow({
         </span>
 
         <span className={cn("flex-1 text-sm", shown && "font-medium")}>{label}</span>
+        {queued !== null && !isPending && (
+          <span className="text-warning-foreground shrink-0 text-xs">{t("offline.pendingBadge")}</span>
+        )}
       </button>
 
       {error && (
