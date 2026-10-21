@@ -140,6 +140,11 @@ export default async function FraisPage({
                 pathname: "/frais",
                 query: { ...(term && { q: term }), tout: "1" },
               }}
+              // La suite s'ajoute SOUS les lignes déjà lues : on reste à la
+              // même hauteur et on continue de défiler, sans remonter en haut.
+              // `replace` : « Retour » ne repasse pas par la liste tronquée.
+              scroll={false}
+              replace
             >
               {t("frais.seeAll")}
             </Link>

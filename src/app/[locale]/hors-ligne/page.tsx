@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { WifiOff } from "lucide-react";
-import { OfflineViewer } from "@/components/offline-viewer";
-import { RetryButton } from "@/components/retry-button";
-import { routing, type Locale } from "@/i18n/routing";
-import suit from "../../../../public/logo-suit.png";
-import wordmark from "../../../../public/logo-wordmark.png";
+import { ChevronRight, WifiOff } from "lucide-react";
+import { OfflineBackButton } from "@/components/offline-back-button";
+import { routing } from "@/i18n/routing";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -20,20 +16,27 @@ export async function generateMetadata(props: {
   return { title: t("title"), robots: { index: false } };
 }
 
+/** Les écrans que le téléphone garde toujours (voir `/api/offline/pages`). */
+const KEPT = [
+  { path: "/commandes", key: "nav.orders" },
+  { path: "/commandes/demain", key: "nav.tomorrow" },
+  { path: "/commandes/pas-rentres", key: "nav.notReturned" },
+  { path: "/commandes/nouvelle", key: "orders.new" },
+  { path: "/pointage", key: "nav.pointage" },
+  { path: "/frais", key: "nav.frais" },
+] as const;
+
 /**
- * Page « hors ligne » — ce que montre l'application installée quand une page
- * ne peut pas être chargée faute de réseau (cf. `src/app/sw.ts`).
+ * Sans réseau, un écran JAMAIS OUVERT sur ce téléphone — le seul cas où
+ * l'application ne peut pas se montrer telle quelle (les autres écrans sont
+ * resservis par le service worker, voir `src/app/sw.ts`).
  *
- * Mise en cache à l'installation du service worker, elle ne peut dépendre ni
- * d'une session ni d'une donnée : d'où sa place HORS des groupes `(app)` et
- * `(print)`, et son rendu statique.
+ * Une phrase, « Retour », et les écrans gardés. Même barre du haut que
+ * l'application, rien de plus. Statique et sans session : mise en cache à
+ * l'installation du service worker.
  *
- * Logo `unoptimized` : servi tel quel depuis `/_next/static`, que le worker
- * garde. Via `/_next/image`, jamais mis en cache, il manquerait hors ligne.
- *
- * Sous le message, le DERNIER CLICHÉ des commandes gardé sur le téléphone
- * (`OfflineViewer`, lu dans IndexedDB côté navigateur) : demain, pas
- * rentrés, recherche — et ✈ / ✓ mis en attente jusqu'au retour du réseau.
+ * Les liens sont de vrais `<a>` : une navigation complète, que le service
+ * worker sert depuis son cache.
  */
 export default async function OfflinePage({
   params,
@@ -45,31 +48,41 @@ export default async function OfflinePage({
   const t = await getTranslations();
 
   return (
-    <main className="flex min-h-dvh flex-col items-center px-4 py-8">
-      <div className="w-full max-w-md text-center">
-        <Image src={suit} alt="" unoptimized priority className="mx-auto h-auto w-10" />
-        <Image
-          src={wordmark}
-          alt={t("app.name")}
-          unoptimized
-          priority
-          className="mx-auto mt-2 h-auto w-36"
-        />
+    <div className="flex min-h-dvh flex-col">
+      <header className="border-nav-border bg-nav text-nav-foreground sticky top-0 z-40 border-b">
+        <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
+          <span className="font-heading text-base font-medium">{t("app.name")}</span>
+        </div>
+      </header>
 
-        <div className="ornament my-5" aria-hidden>
-          <span className="ornament-diamond" />
+      <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
+        <div className="border-warning-foreground/30 bg-warning-soft text-warning-foreground flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm">
+          <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div>
+            <h1 className="font-medium">{t("offline.title")}</h1>
+            <p className="mt-0.5">{t("offline.body")}</p>
+          </div>
         </div>
 
-        <WifiOff className="text-muted-foreground mx-auto size-7" aria-hidden />
-        <h1 className="font-heading mt-3 text-xl font-medium">{t("offline.title")}</h1>
-        <p className="text-muted-foreground mt-2 text-sm">{t("offline.body")}</p>
-
-        <div className="mt-5">
-          <RetryButton />
+        <div className="mt-4">
+          <OfflineBackButton />
         </div>
 
-        <OfflineViewer locale={locale as Locale} />
-      </div>
-    </main>
+        <h2 className="text-muted-foreground mt-6 mb-2 text-xs font-medium">{t("offline.keptTitle")}</h2>
+        <ul className="border-border bg-card divide-border divide-y rounded-lg border">
+          {KEPT.map(({ path, key }) => (
+            <li key={path}>
+              <a
+                href={`/${locale}${path}`}
+                className="flex min-h-12 items-center justify-between gap-3 px-3 text-sm"
+              >
+                {t(key)}
+                <ChevronRight className="text-muted-foreground size-4 rtl:-scale-x-100" aria-hidden />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </main>
+    </div>
   );
 }

@@ -1,22 +1,44 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
-import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { CacheFirst, NetworkOnly, Serwist } from "serwist";
+import type { PrecacheEntry, RouteHandlerCallbackOptions, SerwistGlobalConfig } from "serwist";
+import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
+import {
+  isCacheablePage,
+  isStorablePage,
+  LOCALE_KEY,
+  MATCH_OPTIONS,
+  PAGES_CACHE,
+  stampResponse,
+} from "../lib/offline/page-cache";
 
 /**
  * Service worker de l'application installée.
  *
- * CE QU'IL GARDE — la coquille, et rien d'autre : les fichiers de
- * `/_next/static` (JS, CSS, polices, logo, tous nommés par leur empreinte) et
- * les deux pages « hors ligne ». Aucune page de données n'entre dans un cache :
- * une disponibilité périmée laisserait deux employés louer la même pièce, et
- * les téléphones des clients n'ont rien à faire sur l'appareil.
+ * CE QU'IL GARDE
+ *   - la coquille : les fichiers de `/_next/static` (JS, CSS, polices, logo,
+ *     tous nommés par leur empreinte) ;
+ *   - LES ÉCRANS DE L'APPLICATION (HTML complet), chacun la dernière fois
+ *     qu'il a été ouvert avec du réseau. Réseau d'abord, toujours : en ligne,
+ *     l'écran est frais. Sans réseau, le dernier gardé revient — même barre du
+ *     haut, même barre basse, même navigation — et le bandeau « Hors ligne »
+ *     dit de quand il date (`page-cache.ts`).
  *
- * C'est pourquoi on n'utilise PAS `defaultCache` de Serwist : il met en cache
- * les pages HTML et les réponses RSC, c'est-à-dire des commandes et des clients.
+ * Un écran périmé ne peut pas faire louer deux fois la même pièce : rien de ce
+ * qui s'écrit hors ligne n'est décidé par lui. Chaque geste part dans la file
+ * (`lib/offline/outbox.ts`), et la base tranche au retour du réseau.
  *
- * Tout ce qui n'est pas listé ci-dessous passe au réseau sans intermédiaire :
- * requêtes RSC, Server Actions, export Excel, Supabase, `/_next/image`.
+ * Les écrans gardés contiennent des noms et des téléphones de clients : ils
+ * s'effacent à la déconnexion, et à chaque nouvelle version de l'application
+ * (leur HTML vise les fichiers de l'ancienne).
+ *
+ * Seul le HTML d'une navigation COMPLÈTE est gardé, jamais une réponse RSC :
+ * celle-ci ne contient que ce qui diffère de l'écran d'où l'on vient, la
+ * resservir depuis un autre écran le casserait. Sans réseau, Next.js retombe
+ * de lui-même sur une navigation complète quand sa requête RSC échoue — et
+ * c'est ce HTML-là qui répond.
+ *
+ * Tout le reste passe au réseau sans intermédiaire : requêtes RSC, Server
+ * Actions, export Excel, Supabase, `/_next/image`.
  *
  * Types à part (`tsconfig.sw.json`) : la lib `webworker` entre en conflit avec
  * `dom` dans le tsconfig principal.
@@ -97,6 +119,27 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
+/** Les adresses de départ : elles redirigent vers `/{langue}/commandes`. */
+const ROOTS = new Set(["/", "/fr", "/fr/", "/ar", "/ar/"]);
+
+/**
+ * `/` (l'application installée s'ouvre là) : réseau d'abord. Sans réseau, la
+ * redirection du serveur n'arrive pas — on la fait ici, vers la liste des
+ * commandes de la dernière langue utilisée, que le cache des écrans ressert.
+ */
+async function openRoot({ request, event }: RouteHandlerCallbackOptions): Promise<Response> {
+  try {
+    const preloaded = await (event as FetchEvent).preloadResponse;
+    return (preloaded as Response | undefined) ?? (await fetch(request));
+  } catch {
+    const pathLocale = /^\/(fr|ar)/.exec(new URL(request.url).pathname)?.[1];
+    const stored = await (await caches.open(PAGES_CACHE)).match(LOCALE_KEY);
+    const locale = pathLocale ?? (stored ? await stored.text() : "fr");
+    const target = `/${locale === "ar" ? "ar" : "fr"}/commandes`;
+    return Response.redirect(new URL(target, self.location.origin).href, 302);
+  }
+}
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
@@ -108,32 +151,41 @@ const serwist = new Serwist({
       handler: new CacheFirst({ cacheName: "next-static" }),
     },
     {
-      // Réseau uniquement. La route n'existe que pour qu'une navigation
-      // échouée (pas de réseau) reçoive la page « hors ligne » ci-dessous.
+      matcher: ({ request, sameOrigin, url }) =>
+        sameOrigin && request.mode === "navigate" && ROOTS.has(url.pathname),
+      handler: openRoot,
+    },
+    {
+      // Les écrans de l'application : réseau d'abord, le dernier gardé sans
+      // réseau. 8 s d'attente au plus : sur un réseau qui ne répond plus
+      // (« une barre »), l'écran gardé vaut mieux qu'une page blanche.
+      matcher: ({ request, sameOrigin, url }) =>
+        sameOrigin && request.mode === "navigate" && isCacheablePage(url.pathname),
+      handler: new NetworkFirst({
+        cacheName: PAGES_CACHE,
+        networkTimeoutSeconds: 8,
+        matchOptions: MATCH_OPTIONS,
+        plugins: [
+          {
+            // Seule une page HTML complète entre, datée de l'instant.
+            cacheWillUpdate: async ({ response }) =>
+              isStorablePage(response) ? stampResponse(response) : null,
+          },
+          new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 14 * 24 * 60 * 60 }),
+        ],
+      }),
+    },
+    {
+      // Le reste (impression, connexion…) : réseau uniquement. Une navigation
+      // échouée reçoit la petite page « hors ligne » ci-dessous.
       matcher: ({ request }) => request.mode === "navigate",
       handler: new NetworkOnly(),
     },
   ],
   fallbacks: {
-    // Dans la langue de la page demandée. La PREMIÈRE entrée qui correspond
-    // gagne : les formulaires de commande d'abord, la page générale ensuite.
-    // L'adresse affichée reste celle demandée — la page « modifier » y relit
-    // l'identifiant de la commande.
+    // Un écran jamais ouvert sur ce téléphone, sans réseau : la petite page
+    // « hors ligne », dans la langue demandée.
     entries: [
-      ...(["ar", "fr"] as const).flatMap((locale) => [
-        {
-          url: `/${locale}/hors-ligne/nouvelle`,
-          matcher: ({ request }: { request: Request }) =>
-            request.destination === "document" &&
-            new RegExp(`^/${locale}/commandes/nouvelle/?$`).test(new URL(request.url).pathname),
-        },
-        {
-          url: `/${locale}/hors-ligne/modifier`,
-          matcher: ({ request }: { request: Request }) =>
-            request.destination === "document" &&
-            new RegExp(`^/${locale}/commandes/\\d+/modifier/?$`).test(new URL(request.url).pathname),
-        },
-      ]),
       {
         url: "/ar/hors-ligne",
         matcher: ({ request }) =>
@@ -145,6 +197,12 @@ const serwist = new Serwist({
       },
     ],
   },
+});
+
+// Nouvelle version de l'application : les écrans gardés visent les fichiers
+// de l'ancienne — on les jette. L'application les regarnit dès son ouverture.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(caches.delete(PAGES_CACHE));
 });
 
 serwist.addEventListeners();

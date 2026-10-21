@@ -18,10 +18,5 @@ export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   additionalPrecacheEntries: [
     { url: "/fr/hors-ligne", revision },
     { url: "/ar/hors-ligne", revision },
-    // Saisie et modification de commande sans réseau (commandes provisoires).
-    { url: "/fr/hors-ligne/nouvelle", revision },
-    { url: "/ar/hors-ligne/nouvelle", revision },
-    { url: "/fr/hors-ligne/modifier", revision },
-    { url: "/ar/hors-ligne/modifier", revision },
   ],
 });

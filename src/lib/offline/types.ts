@@ -1,5 +1,5 @@
 /**
- * Hors ligne — les formes partagées par le serveur (`/api/offline/snapshot`)
+ * Hors ligne — les formes partagées par le serveur (`/api/offline/catalog`)
  * et le téléphone (IndexedDB, file d'attente). Aucune valeur, aucune
  * dépendance : importable des deux côtés.
  */
@@ -12,41 +12,6 @@ import type {
   PickerModel,
   Settings,
 } from "@/lib/queries/orders";
-
-/** Une commande telle qu'on la relit sans réseau : de quoi servir un client au comptoir. */
-export type OfflineOrder = {
-  id: number;
-  order_no: string;
-  customer_name: string;
-  customer_phone: string | null;
-  pickup_date: IsoDate;
-  event_date: IsoDate;
-  return_due_date: IsoDate;
-  status: string;
-  picked_up: boolean;
-  returned: boolean;
-  total_price: number;
-  amount_paid: number;
-  balance: number;
-  caution_amount: number;
-  caution_returned: boolean;
-  /** Pièces actives : « Tuxedo B · 50 · TUX-B-03 ». */
-  lines: { label: string; size: string | null; ref: string | null }[];
-  notes: string | null;
-  /** Version en base (`orders.version`) : une modification hors ligne part de celle-ci. */
-  version: number;
-  /** Les lignes complètes, pour rouvrir la commande dans le formulaire sans réseau. */
-  editLines: {
-    unit_id: number | null;
-    model_name_snapshot: string | null;
-    size_snapshot: string | null;
-    line_note: string | null;
-    external_label: string | null;
-    external_source: string | null;
-    external_cost: number | null;
-    article_units: { ref_code: string } | null;
-  }[];
-};
 
 /** Une pièce du stock réservée : `range` est la plage Postgres, nettoyage compris. */
 export type OfflineBooking = {
@@ -71,17 +36,6 @@ export type OfflineCatalog = {
 
 /** Les champs du formulaire de commande, tels que les lit `createOrder` / `updateOrder`. */
 export type OrderFields = Record<string, string>;
-
-/** Le dernier état connu, gardé sur le téléphone. */
-export type OfflineSnapshot = {
-  /** À qui appartient ce cliché : un autre compte sur le même téléphone ne le relit pas. */
-  userId: string;
-  /** ISO — « données du 21/10 à 14:32 ». */
-  syncedAt: string;
-  /** Jour d'Alger au moment du cliché. */
-  today: IsoDate;
-  orders: OfflineOrder[];
-};
 
 /**
  * Un geste mis en attente. Seuls des gestes SANS risque de double location :

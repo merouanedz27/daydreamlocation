@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Check, Lock, X } from "lucide-react";
 import { sheet } from "@/components/sheet-table";
 import { sendOrQueue } from "@/lib/offline/outbox";
+import { useOutbox } from "@/components/offline-sync";
 import { formatDayMonth, formatWeekdayShort } from "@/lib/format";
 import { isLocked, noon, periodDays, selfCanToggle, type MarkKind } from "@/lib/pointage";
 import { cn } from "@/lib/utils";
@@ -146,6 +147,19 @@ export function PointageDays({
     for (const [day] of caughtUp) next.delete(day);
     setQueued(next);
   }
+  // Écran resservi sans réseau : les cases en file se voient quand même.
+  const inQueue = new Map<string, boolean>();
+  for (const item of useOutbox()) {
+    const op = item.op;
+    if (
+      item.status === "pending" &&
+      op.kind === "mark" &&
+      op.markKind === kind &&
+      op.userId === (mode === "owner" ? userId : null)
+    ) {
+      inQueue.set(op.day, op.on);
+    }
+  }
   const presence = kind === "presence";
   const column = presence ? t("pointage.presentColumn") : t("pointage.absent");
 
@@ -184,8 +198,12 @@ export function PointageDays({
           {days.map((day) => {
             const isToday = day === today;
             const locked = isLocked(day, lockedThrough);
-            const waiting = queued.has(day);
-            const on = waiting ? queued.get(day)! : optimistic.has(day);
+            const waiting = queued.has(day) || inQueue.has(day);
+            const on = queued.has(day)
+              ? queued.get(day)!
+              : inQueue.has(day)
+                ? inQueue.get(day)!
+                : optimistic.has(day);
             const editable =
               mode === "owner" ? !locked : selfCanToggle(day, on, today, start, lockedThrough);
             const label = `${formatWeekdayShort(noon(day), locale)} ${formatDayMonth(noon(day), locale)}`;

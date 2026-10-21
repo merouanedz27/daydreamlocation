@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useSyncExternalStore, useTransition } from "react";
-import { useRouter } from "@/i18n/navigation";
+import { usePathname, useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AlertCircle, CloudUpload, RotateCw, Trash2, Wifi, WifiOff } from "lucide-react";
@@ -14,24 +14,52 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
+import { useParams } from "next/navigation";
 import {
   dropOtherUsers,
   flushOutbox,
   getOutbox,
   OUTBOX_EVENT,
   refreshCatalog,
-  refreshSnapshot,
   removeOutboxItem,
   retryOutboxItem,
   setOfflineContext,
 } from "@/lib/offline/outbox";
 import type { OutboxItem } from "@/lib/offline/types";
+import { keepPage, keepPages, pageCachedAt, rememberLocale } from "@/lib/offline/pages";
 import { formatDayMonth, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
-/** Le cliché se refait au plus toutes les 5 minutes, onglet visible. */
+/** La file part, et les écrans gardés sont revus, toutes les 5 minutes (onglet visible). */
 const REFRESH_MS = 5 * 60_000;
+/** Écrans du quotidien : regardés au plus tous les quarts d'heure. */
+const PAGES_MAX_AGE_MS = 15 * 60_000;
+/** Fiches commande : au plus toutes les heures — elles sont plus nombreuses. */
+const DETAILS_MAX_AGE_MS = 60 * 60_000;
+/** L'écran affiché : regardé au plus toutes les 10 minutes. */
+const CURRENT_MAX_AGE_MS = 10 * 60_000;
+/** Les listes que touche un geste envoyé : regardées tout de suite après. */
+const LISTS_AFTER_SEND = ["/commandes", "/commandes/demain", "/commandes/pas-rentres"];
+
+/**
+ * Les écrans à garder (`/api/offline/pages`), l'un après l'autre : d'abord
+ * ceux du quotidien, puis les fiches des commandes en cours.
+ */
+async function keepAppPages(locale: string) {
+  try {
+    const response = await fetch(`/api/offline/pages?locale=${locale}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    if (!response.ok) return;
+    const { pages, details } = (await response.json()) as { pages: string[]; details: string[] };
+    await keepPages(pages, PAGES_MAX_AGE_MS);
+    await keepPages(details, DETAILS_MAX_AGE_MS);
+  } catch {
+    /* hors ligne entre-temps : on réessaiera */
+  }
+}
 
 function subscribeOnline(onChange: () => void) {
   window.addEventListener("online", onChange);
@@ -58,7 +86,8 @@ const BACK_ONLINE_MS = 4000;
  * Le bandeau de connexion, collé sous la barre du haut.
  *
  *   - hors ligne : bandeau ambre, tant que dure la coupure — l'équipe doit
- *     savoir AVANT de toucher que ses gestes partiront plus tard ;
+ *     savoir AVANT de toucher que ses gestes partiront plus tard, et DE QUAND
+ *     date l'écran qu'elle regarde (« page de 14:32 ») ;
  *   - retour du réseau : bandeau vert « De nouveau en ligne », 4 secondes.
  *   - en ligne : rien. Un badge « en ligne » permanent serait du bruit sur
  *     chaque écran.
@@ -68,8 +97,23 @@ const BACK_ONLINE_MS = 4000;
  */
 export function ConnectionBanner() {
   const t = useTranslations("offline");
+  const { locale } = useParams<{ locale: Locale }>();
   const online = useOnline();
+  const pathname = usePathname();
   const [back, setBack] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
+
+  // L'heure de l'écran affiché, telle que le cache des écrans la connaît.
+  useEffect(() => {
+    if (online) return;
+    let alive = true;
+    void pageCachedAt(window.location.pathname + window.location.search).then((at) => {
+      if (alive) setCachedAt(at);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [online, pathname]);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -109,44 +153,72 @@ export function ConnectionBanner() {
           ) : (
             <WifiOff className="size-4 shrink-0" aria-hidden />
           )}
-          <span>{online ? t("bannerBack") : t("bannerOffline")}</span>
+          <span>
+            {online
+              ? t("bannerBack")
+              : cachedAt
+                ? t("bannerOfflineAt", {
+                    date: formatDayMonth(cachedAt, locale),
+                    time: formatTime(cachedAt, locale),
+                  })
+                : t("bannerOffline")}
+          </span>
         </div>
       )}
     </div>
   );
 }
 
-/** La file des gestes, relue à chaque changement. */
+const NO_ITEMS: OutboxItem[] = [];
+let outboxItems: OutboxItem[] = NO_ITEMS;
+const outboxListeners = new Set<() => void>();
+let outboxBound = false;
+
+function reloadOutbox() {
+  void getOutbox().then((next) => {
+    outboxItems = next;
+    for (const listener of outboxListeners) listener();
+  });
+}
+
+function subscribeOutbox(onChange: () => void) {
+  outboxListeners.add(onChange);
+  // Une seule lecture d'IndexedDB pour tout l'écran, quel que soit le nombre
+  // de lignes qui regardent la file.
+  if (!outboxBound) {
+    outboxBound = true;
+    window.addEventListener(OUTBOX_EVENT, reloadOutbox);
+    reloadOutbox();
+  }
+  return () => {
+    outboxListeners.delete(onChange);
+  };
+}
+
+/** La file des gestes, partagée par tout l'écran, relue à chaque changement. */
 export function useOutbox(): OutboxItem[] {
-  const [items, setItems] = useState<OutboxItem[]>([]);
-  useEffect(() => {
-    let alive = true;
-    const load = () => getOutbox().then((next) => alive && setItems(next));
-    load();
-    window.addEventListener(OUTBOX_EVENT, load);
-    return () => {
-      alive = false;
-      window.removeEventListener(OUTBOX_EVENT, load);
-    };
-  }, []);
-  return items;
+  return useSyncExternalStore(subscribeOutbox, () => outboxItems, () => NO_ITEMS);
 }
 
 /**
  * Le mode hors ligne de l'application, monté une fois dans le layout `(app)`.
  *
- *   1. Il garde sur le téléphone un CLICHÉ des commandes (`/api/offline/
- *      snapshot`) : au chargement, toutes les 5 minutes, au retour du réseau.
- *      Sans réseau, la page « hors ligne » le relit.
- *   2. Il RENVOIE la file des gestes faits sans réseau (✈ / ✓, encaissements,
- *      frais, pointage) dès que le réseau revient ou que l'onglet reprend la
- *      main, puis rafraîchit l'écran.
- *   3. Il le DIT : une pastille au-dessus de la barre basse — « Hors ligne ·
+ *   1. Il GARDE LES ÉCRANS pour le hors ligne (`lib/offline/pages.ts`) :
+ *      l'écran affiché, les écrans du quotidien et les fiches des commandes en
+ *      cours. Sans réseau, l'application reste la même — le service worker
+ *      ressert ces écrans.
+ *   2. Il garde le CATALOGUE du formulaire de commande (stock, clients,
+ *      réservations) : sans réseau, la saisie avertit des pièces prises.
+ *   3. Il RENVOIE la file des gestes faits sans réseau (✈ / ✓, encaissements,
+ *      frais, pointage, commandes provisoires) dès que le réseau revient ou
+ *      que l'onglet reprend la main, puis rafraîchit l'écran.
+ *   4. Il le DIT : une pastille au-dessus de la barre basse — « Hors ligne ·
  *      2 en attente », « Envoi… », « 1 refusé » — qui ouvre la liste.
  */
 export function OfflineSync({ userId, locale }: { userId: string; locale: Locale }) {
   const t = useTranslations("offline");
   const router = useRouter();
+  const pathname = usePathname();
   const online = useOnline();
   const items = useOutbox();
   const [open, setOpen] = useState(false);
@@ -162,16 +234,29 @@ export function OfflineSync({ userId, locale }: { userId: string; locale: Locale
         router.refresh();
       }
       if (rejected > 0) toast.error(t("rejectedToast", { count: rejected }));
-      await refreshSnapshot();
       // Une commande envoyée a changé les réservations : catalogue relu tout de suite.
       await refreshCatalog(sent > 0);
+      // Les listes que les gestes envoyés ont changées, regardées tout de suite.
+      if (sent > 0) await keepPages(LISTS_AFTER_SEND.map((path) => `/${locale}${path}`), 0);
     } finally {
       setSending(false);
     }
-  }, [router, t]);
+    await keepAppPages(locale);
+  }, [router, t, locale]);
+
+  // L'écran affiché entre dans le cache — un peu après, pour ne pas gêner son
+  // chargement. Navigation dans l'application : le service worker ne le voit
+  // pas passer, c'est ici qu'on le lui donne.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void keepPage(window.location.pathname + window.location.search, CURRENT_MAX_AGE_MS);
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
 
   useEffect(() => {
     setOfflineContext({ userId, locale });
+    void rememberLocale(locale);
     let last = 0;
     const run = () => {
       last = Date.now();
@@ -182,7 +267,7 @@ export function OfflineSync({ userId, locale }: { userId: string; locale: Locale
 
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      // La file part toujours ; le cliché, seulement s'il a vieilli.
+      // La file part toujours ; les écrans, seulement s'ils ont vieilli.
       if (Date.now() - last > REFRESH_MS) run();
       else void flushOutbox();
     };
@@ -248,19 +333,6 @@ export function OfflineSync({ userId, locale }: { userId: string; locale: Locale
           </DrawerHeader>
 
           <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-6">
-            {!online && (
-              // Navigation complète : sans réseau, le service worker sert la
-              // page « hors ligne », qui relit le cliché.
-              <div className="grid grid-cols-2 gap-2">
-                <Button asChild variant="outline" className="h-12 text-sm">
-                  <a href={`/${locale}/hors-ligne`}>{t("openViewer")}</a>
-                </Button>
-                <Button asChild variant="outline" className="h-12 text-sm">
-                  <a href={`/${locale}/hors-ligne/nouvelle`}>{t("newOrder")}</a>
-                </Button>
-              </div>
-            )}
-
             {mine.length === 0 ? (
               <p className="text-muted-foreground py-6 text-center text-sm">{t("queueEmpty")}</p>
             ) : (
@@ -300,7 +372,7 @@ function QueueRow({ item, locale }: { item: OutboxItem; locale: Locale }) {
         <p className="truncate text-sm font-medium">{item.title}</p>
         <p className={cn("text-xs", rejected ? "text-destructive" : "text-muted-foreground")}>
           {rejected
-            ? t("offline.rejectedBecause", { reason: t(item.error ?? "errors.generic") })
+            ? t("offline.rejectedBecause", { reason: t(item.error ?? "errors.generic", item.errorValues) })
             : t("offline.pendingSince", {
                 date: formatDayMonth(item.createdAt, locale),
                 time: formatTime(item.createdAt, locale),

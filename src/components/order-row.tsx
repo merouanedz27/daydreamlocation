@@ -10,6 +10,8 @@ import { Highlight } from "@/components/highlight";
 import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
 import { sendOrQueue } from "@/lib/offline/outbox";
+import { useOutbox } from "@/components/offline-sync";
+import type { OutboxItem } from "@/lib/offline/types";
 import { formatDate, formatNumber } from "@/lib/format";
 import { DONE_NAME_CLASS, isOrderDone, type OrderRow as Order } from "@/lib/orders-query";
 import { daysBetween, todayIso } from "@/lib/rental-range";
@@ -150,7 +152,9 @@ function QuickCheck({
   // la coche le montre quand même. Effacé dès que la base a rattrapé.
   const [queued, setQueued] = useState<boolean | null>(null);
   if (queued !== null && queued === checked) setQueued(null);
-  const shown = isPending ? optimistic : (queued ?? optimistic);
+  // Écran resservi sans réseau : la coche en file se voit quand même.
+  const inQueue = pendingCheck(useOutbox(), orderId, field);
+  const shown = isPending ? optimistic : (queued ?? inQueue ?? optimistic);
 
   const label = field === "picked_up" ? t("orders.pickedUp") : t("orders.returned");
   const Icon = field === "picked_up" ? Plane : CircleCheck;
@@ -194,6 +198,18 @@ function QuickCheck({
       )}
     </button>
   );
+}
+
+/** La valeur d'une coche encore en file pour cette commande, ou `null`. */
+function pendingCheck(items: OutboxItem[], orderId: number, field: "picked_up" | "returned"): boolean | null {
+  let value: boolean | null = null;
+  for (const item of items) {
+    const op = item.op;
+    if (item.status === "pending" && op.kind === "check" && op.orderId === orderId && op.field === field) {
+      value = op.value;
+    }
+  }
+  return value;
 }
 
 /** Le cadre d'une liste de lignes : une carte, des séparateurs fins. */

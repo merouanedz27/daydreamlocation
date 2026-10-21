@@ -6,6 +6,7 @@ import { AlertCircle, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
 import { sendOrQueue } from "@/lib/offline/outbox";
+import { useOutbox } from "@/components/offline-sync";
 import { cn } from "@/lib/utils";
 
 /**
@@ -81,7 +82,17 @@ function CheckRow({
   // Gardé dans la file hors ligne : coché à l'écran, pas encore en base.
   const [queued, setQueued] = useState<boolean | null>(null);
   if (queued !== null && queued === checked) setQueued(null);
-  const shown = isPending ? optimistic : (queued ?? optimistic);
+  // Écran resservi sans réseau : la coche en file se voit quand même.
+  const outbox = useOutbox();
+  let inQueue: boolean | null = null;
+  for (const item of outbox) {
+    const op = item.op;
+    if (item.status === "pending" && op.kind === "check" && op.orderId === orderId && op.field === field) {
+      inQueue = op.value;
+    }
+  }
+  const waiting = queued ?? inQueue;
+  const shown = isPending ? optimistic : (waiting ?? optimistic);
 
   function toggle() {
     setError(null);
@@ -126,7 +137,7 @@ function CheckRow({
         </span>
 
         <span className={cn("flex-1 text-sm", shown && "font-medium")}>{label}</span>
-        {queued !== null && !isPending && (
+        {waiting !== null && !isPending && (
           <span className="text-warning-foreground shrink-0 text-xs">{t("offline.pendingBadge")}</span>
         )}
       </button>

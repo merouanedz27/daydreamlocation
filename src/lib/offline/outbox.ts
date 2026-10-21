@@ -24,27 +24,21 @@
 import { addOrderPayment, createOrder, setOrderChecks, updateOrder } from "@/lib/actions/orders";
 import { createExpense } from "@/lib/actions/expenses";
 import { setMark, setMyMark } from "@/lib/actions/pointage";
+import { clearPages } from "@/lib/offline/pages";
 import { idbClear, idbGet, idbSet, idbUpdate } from "@/lib/offline/store";
-import type {
-  OfflineCatalog,
-  OfflineOrder,
-  OfflineSnapshot,
-  OutboxItem,
-  OutboxOp,
-} from "@/lib/offline/types";
+import type { OfflineCatalog, OutboxItem, OutboxOp } from "@/lib/offline/types";
 import type { Unavailability } from "@/lib/queries/orders";
 import { freeFrom, rangesOverlap, rentalRange } from "@/lib/rental-range";
 
 const OUTBOX = "outbox";
-const SNAPSHOT = "snapshot";
+/** L'ancien cliché des commandes (avant les écrans gardés) : effacé s'il traîne. */
+const LEGACY_SNAPSHOT = "snapshot";
 const CATALOG = "catalog";
 /** Le catalogue (stock, clients, réservations) change peu : relu au plus toutes les 30 min. */
 const CATALOG_MAX_AGE_MS = 30 * 60_000;
 
 /** Émis à chaque changement de la file : l'indicateur se met à jour. */
 export const OUTBOX_EVENT = "daydream:outbox";
-/** Émis à chaque nouveau cliché. */
-export const SNAPSHOT_EVENT = "daydream:snapshot";
 
 type Context = { userId: string; locale: string };
 let context: Context | null = null;
@@ -118,9 +112,6 @@ async function enqueue(op: OutboxOp, title: string): Promise<void> {
     ...items.filter((i) => !(i.status === "pending" && sameTarget(i.op, op))),
     item,
   ]);
-  if (op.kind === "check") {
-    await patchSnapshotOrder(op.orderId, { [op.field]: op.value });
-  }
   emit(OUTBOX_EVENT);
 }
 
@@ -267,36 +258,17 @@ export function flushOutbox(): Promise<{ sent: number; rejected: number }> {
 
 /**
  * Change de compte sur le même téléphone : les gestes d'un autre ne partiront
- * jamais sous celui-ci, et son cliché ne se relit pas.
+ * jamais sous celui-ci, et son catalogue ne se relit pas.
  */
 export async function dropOtherUsers(userId: string): Promise<void> {
-  const snapshot = await getSnapshot();
-  if (snapshot && snapshot.userId !== userId) await idbSet(SNAPSHOT, undefined);
+  await idbSet(LEGACY_SNAPSHOT, undefined);
   const catalog = await getCatalog();
   if (catalog && catalog.userId !== userId) await idbSet(CATALOG, undefined);
   await idbUpdate<OutboxItem[]>(OUTBOX, (items = []) => items.filter((i) => i.userId === userId));
   emit(OUTBOX_EVENT);
 }
 
-// --- Cliché -------------------------------------------------------------------
-
-export async function getSnapshot(): Promise<OfflineSnapshot | undefined> {
-  return idbGet<OfflineSnapshot>(SNAPSHOT);
-}
-
-/** Va chercher le dernier état. Silencieux en cas d'échec : l'ancien reste. */
-export async function refreshSnapshot(): Promise<void> {
-  if (!navigator.onLine) return;
-  try {
-    const response = await fetch("/api/offline/snapshot", { cache: "no-store", credentials: "same-origin" });
-    if (!response.ok) return;
-    const snapshot = (await response.json()) as OfflineSnapshot;
-    await idbSet(SNAPSHOT, snapshot);
-    emit(SNAPSHOT_EVENT);
-  } catch {
-    /* hors ligne entre-temps : l'ancien cliché reste */
-  }
-}
+// --- Catalogue du formulaire de commande ----------------------------------
 
 export async function getCatalog(): Promise<OfflineCatalog | undefined> {
   return idbGet<OfflineCatalog>(CATALOG);
@@ -356,28 +328,16 @@ export async function localAvailability(
   return [...latest.values()];
 }
 
-/** Le geste fait hors ligne se voit tout de suite dans le cliché. */
-async function patchSnapshotOrder(orderId: number, patch: Partial<OfflineOrder>): Promise<void> {
-  await idbUpdate<OfflineSnapshot | undefined>(SNAPSHOT, (snapshot) =>
-    snapshot
-      ? {
-          ...snapshot,
-          orders: snapshot.orders.map((o) => (o.id === orderId ? { ...o, ...patch } : o)),
-        }
-      : snapshot,
-  );
-  emit(SNAPSHOT_EVENT);
-}
-
 /**
  * Déconnexion : un dernier envoi si le réseau le permet, puis tout s'efface —
- * les téléphones des clients n'ont rien à faire sur un appareil partagé.
- * Rend le nombre de gestes perdus (encore en attente faute de réseau).
+ * file, catalogue ET écrans gardés : les téléphones des clients n'ont rien à
+ * faire sur un appareil partagé. Rend le nombre de gestes perdus (encore en
+ * attente faute de réseau).
  */
 export async function clearOfflineData(): Promise<number> {
   await flushOutbox().catch(() => undefined);
   const left = (await getOutbox()).filter((i) => i.status === "pending").length;
-  await idbClear();
+  await Promise.all([idbClear(), clearPages()]);
   emit(OUTBOX_EVENT);
   return left;
 }
