@@ -2,18 +2,15 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowLeft, Pencil, Plus, Shirt } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Pencil, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ModelRestoreButton } from "@/components/model-danger-zone";
 import { getBlockedUnitIds, getModel, isUnitFree } from "@/lib/queries/stock";
 import { todayIso } from "@/lib/rental-range";
 import { getProfile, canManageStock } from "@/lib/auth";
-import { UnitEdit } from "@/components/unit-edit";
-import { SetDelete } from "@/components/set-delete";
-import { PARTS, type Part } from "@/lib/stock-refs";
-import { cn } from "@/lib/utils";
+import { ModelUnits, type ModelItem, type ModelUnitRow } from "@/components/model-units";
+import { PARTS, sortParts, type Part } from "@/lib/stock-refs";
 import { formatMoney } from "@/lib/format";
 import { photoUrl } from "@/lib/storage";
 import type { Locale } from "@/i18n/routing";
@@ -25,13 +22,6 @@ export async function generateMetadata(props: {
   const model = await getModel(Number(modelId));
   return { title: model?.name_fr ?? "" };
 }
-
-const UNIT_STATUS_KEY: Record<string, string> = {
-  disponible: "available",
-  nettoyage: "cleaning",
-  reparation: "repair",
-  retire: "retired",
-};
 
 export default async function ModelPage({
   params,
@@ -62,91 +52,45 @@ export default async function ModelPage({
       : model.categories.name_fr
     : null;
 
-  const units = [...(model.article_units ?? [])].sort((a, b) =>
-    (a.ref_code ?? "").localeCompare(b.ref_code ?? ""),
-  );
-  type Unit = (typeof units)[number];
-
   // Costume DIVISIBLE : ses parties regroupées sous leur costume
   // (« TUX-A-03 » → veste, pantalon…). Les pièces simples restent seules.
-  const parts = [...(model.article_model_parts ?? [])].sort(
-    (a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part),
-  );
-  const groups: { setRef: string | null; units: Unit[] }[] = [];
-  for (const unit of units) {
-    const group = unit.set_ref ? groups.find((g) => g.setRef === unit.set_ref) : undefined;
-    if (group) group.units.push(unit);
-    else groups.push({ setRef: unit.set_ref, units: [unit] });
+  // Les pièces retirées ne sont plus au stock : elles ne s'affichent pas.
+  const allUnits = model.article_units ?? [];
+  const parts = sortParts(model.article_model_parts ?? []);
+  const groups = new Map<string, ModelItem>();
+  for (const unit of allUnits) {
+    if (unit.status === "retire") continue;
+    const key = unit.set_ref ?? `#${unit.id}`;
+    const row: ModelUnitRow = {
+      id: unit.id,
+      ref: unit.ref_code,
+      part: unit.part,
+      size: unit.size,
+      length_cm: unit.length_cm,
+      price_override: unit.price_override,
+      status: unit.status,
+      free: isUnitFree(unit, blocked),
+    };
+    const item = groups.get(key) ?? {
+      key,
+      ref: unit.set_ref ?? unit.ref_code,
+      setRef: unit.set_ref,
+      size: unit.size?.trim() ?? "",
+      free: true,
+      units: [],
+    };
+    item.units.push(row);
+    item.free = item.free && row.free;
+    // Taille d'un costume = celle de sa veste.
+    if (unit.part === "veste") item.size = unit.size?.trim() ?? "";
+    groups.set(key, item);
   }
-  for (const group of groups) {
-    group.units.sort(
-      (a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part),
-    );
-  }
-  const setCount = groups.filter((g) => g.setRef).length;
-  const liveSets = groups.filter(
-    (g) => g.setRef && g.units.some((u) => u.status !== "retire"),
+  const items = [...groups.values()].sort((a, b) =>
+    a.ref.localeCompare(b.ref, undefined, { numeric: true }),
   );
-  const freeSets = liveSets.filter((g) => g.units.every((u) => isUnitFree(u, blocked))).length;
-
-  const unitBody = (unit: Unit) => {
-    const free = isUnitFree(unit, blocked);
-    const price = unit.price_override ?? model.base_price;
-    return (
-      <>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {unit.part && <span className="me-1.5">{t(`stock.parts.${unit.part}`)}</span>}
-            <bdi className={cn(unit.part && "text-muted-foreground font-normal")}>
-              {unit.ref_code}
-            </bdi>
-          </p>
-          <p className="text-muted-foreground mt-0.5 text-sm">
-            {unit.size && (
-              <>
-                {t("stock.size")}{" "}
-                <span className="tabular text-foreground">{unit.size}</span>
-              </>
-            )}
-            {unit.length_cm && <span className="tabular"> · {unit.length_cm} cm</span>}
-          </p>
-        </div>
-
-        {unit.price_override !== null && (
-          <span className="tabular text-sm font-medium">{formatMoney(price, l)}</span>
-        )}
-
-        <Badge
-          className={
-            free
-              ? "bg-success-soft text-success-foreground border-transparent"
-              : unit.status === "disponible"
-                ? "bg-gold-soft text-foreground border-transparent"
-                : "bg-muted text-muted-foreground border-transparent"
-          }
-        >
-          {free
-            ? t("stock.available")
-            : unit.status === "disponible"
-              ? t("stock.reserved")
-              : t(`stock.${UNIT_STATUS_KEY[unit.status]}`)}
-        </Badge>
-
-        {canEdit && (
-          <UnitEdit
-            unit={{
-              id: unit.id,
-              ref_code: unit.ref_code,
-              size: unit.size,
-              length_cm: unit.length_cm,
-              price_override: unit.price_override,
-            }}
-            categorySlug={unit.part ?? model.categories?.slug ?? null}
-          />
-        )}
-      </>
-    );
-  };
+  for (const item of items) {
+    item.units.sort((a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part));
+  }
 
   return (
     <div>
@@ -234,69 +178,18 @@ export default async function ModelPage({
         <span className="ornament-diamond" />
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg">
-            {setCount ? t("stock.parts.costumes") : t("stock.pieces")}{" "}
-            <span className="text-muted-foreground tabular text-base font-normal">
-              ({setCount || units.length})
-            </span>
-          </h2>
-          {setCount > 0 && (
-            <p className="text-muted-foreground text-sm">
-              {t("stock.parts.completeFree", { count: freeSets, n: String(freeSets) })}
-            </p>
-          )}
-        </div>
-        {canEdit && (
-          <Button asChild size="sm" variant="secondary">
-            <Link href={`/stock/${model.id}/piece`}>
-              <Plus className="size-4" aria-hidden />
-              {t("stock.addPiece")}
-            </Link>
-          </Button>
-        )}
-      </div>
-
-      {/* Chaque ligne est UNE pièce réelle. C'est le niveau auquel la
-          disponibilité se calcule — jamais au niveau du modèle. Les parties
-          d'un costume sont rangées sous lui : chacune se loue seule. */}
-      <ul className="mt-4 space-y-2">
-        {groups.map((group) =>
-          group.setRef ? (
-            <li key={group.setRef} className="border-border bg-card rounded-lg border">
-              <div className="border-border flex items-center gap-2 border-b py-1 ps-3 pe-1">
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  <bdi>{group.setRef}</bdi>
-                </p>
-                {canEdit && <SetDelete modelId={model.id} setRef={group.setRef} />}
-              </div>
-              <ul className="divide-border divide-y">
-                {group.units.map((unit) => (
-                  <li
-                    key={unit.id}
-                    className={cn("flex items-center gap-3 p-3", canEdit && "py-1.5 pe-1")}
-                  >
-                    {unitBody(unit)}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ) : (
-            group.units.map((unit) => (
-              <li
-                key={unit.id}
-                className={cn(
-                  "border-border bg-card flex items-center gap-3 rounded-lg border p-3",
-                  canEdit && "py-1.5 pe-1",
-                )}
-              >
-                {unitBody(unit)}
-              </li>
-            ))
-          ),
-        )}
-      </ul>
+      {/* Chaque article est UNE pièce réelle (ou un costume) : c'est le niveau
+          auquel la disponibilité se calcule. L'écran, lui, les compte par
+          taille. */}
+      <ModelUnits
+        modelId={model.id}
+        refCode={model.ref_code}
+        categorySlug={model.categories?.slug ?? null}
+        parts={parts.map((p) => p.part as Part)}
+        items={items}
+        existingRefs={allUnits.map((u) => u.ref_code)}
+        canEdit={canEdit}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -20,6 +20,7 @@ import { ViewToggle, type ListView } from "@/components/view-toggle";
 import { createDeviceSetting } from "@/lib/device-setting";
 import { CURRENCY_SUFFIX, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useHold } from "@/lib/use-hold";
 import type { Locale } from "@/i18n/routing";
 
 /** Un modèle prêt à afficher : tout est calculé côté serveur. */
@@ -49,74 +50,6 @@ const viewSetting = createDeviceSetting<ListView>({
   fallback: "list",
   sanitize: (value) => (value === "list" || value === "table" ? value : null),
 });
-
-/** Durée de l'appui long, comme la sélection de la liste des commandes. */
-const HOLD_MS = 500;
-
-/**
- * Appui long sur un modèle → il se SÉLECTIONNE (administrateur seulement),
- * comme dans la liste des commandes. Ensuite, chaque toucher coche ou décoche
- * au lieu d'ouvrir la fiche. Le doigt qui glisse fait défiler la liste : au-delà
- * de quelques pixels, ce n'est plus un appui. Le « clic » du relâché qui suit
- * un appui long est avalé. Sur ordinateur, le clic droit fait pareil.
- */
-function useHold(
-  enabled: boolean,
-  selecting: boolean,
-  onHold: (model: StockModelRow) => void,
-) {
-  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
-  const held = useRef(false);
-
-  const cancel = () => {
-    if (press.current) window.clearTimeout(press.current.timer);
-    press.current = null;
-  };
-
-  return (model: StockModelRow) =>
-    enabled
-      ? {
-          onPointerDown: (e: React.PointerEvent) => {
-            if (e.pointerType === "mouse") return;
-            cancel();
-            held.current = false;
-            const timer = window.setTimeout(() => {
-              press.current = null;
-              held.current = true;
-              navigator.vibrate?.(30);
-              onHold(model);
-            }, HOLD_MS);
-            press.current = { timer, x: e.clientX, y: e.clientY };
-          },
-          onPointerMove: (e: React.PointerEvent) => {
-            const p = press.current;
-            if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) cancel();
-          },
-          onPointerUp: cancel,
-          onPointerCancel: cancel,
-          onContextMenu: (e: React.MouseEvent) => {
-            // Le menu natif (« Ouvrir dans un onglet »…) cède la place au nôtre.
-            e.preventDefault();
-            if (!held.current) onHold(model);
-          },
-          onClickCapture: (e: React.MouseEvent) => {
-            if (held.current) {
-              held.current = false;
-              e.preventDefault();
-              e.stopPropagation();
-              return;
-            }
-            // En mode sélection, toucher la ligne coche — sauf la case elle-même,
-            // qui se coche seule.
-            if (selecting && !(e.target as HTMLElement).closest("label,input")) {
-              e.preventDefault();
-              e.stopPropagation();
-              onHold(model);
-            }
-          },
-        }
-      : {};
-}
 
 export function StockModels({
   models,
@@ -152,7 +85,7 @@ export function StockModels({
 
   const clear = () => setSelected(new Set());
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(models.map((m) => m.id)));
-  const hold = useHold(canEdit, selecting, (m) => toggleOne(m.id));
+  const hold = useHold<StockModelRow>(canEdit, selecting, (m) => toggleOne(m.id));
 
   const idsData = (extra: Record<string, string> = {}) => {
     const data = new FormData();

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Pencil, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -13,7 +13,6 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -34,23 +33,34 @@ export type EditableUnit = {
 
 /**
  * Corrige une pièce existante — avant tout sa TAILLE — depuis la fiche du
- * modèle. Un toucher sur le crayon ouvre le tiroir ; la référence, elle, ne
- * change jamais.
+ * modèle. Un toucher sur la pièce ouvre le tiroir (`open`, piloté par la
+ * liste) ; la référence, elle, ne change jamais.
  */
 export function UnitEdit({
   unit,
   categorySlug,
+  open,
+  onOpenChange: setOpen,
 }: {
   unit: EditableUnit;
   categorySlug: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
-  const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [size, setSize] = useState(unit.size ?? "");
   const [error, setError] = useState<{ message: string; field?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [shownFor, setShownFor] = useState<number | null>(null);
+  // Chaque ouverture repart de la pièce telle qu'elle est, sans l'erreur d'avant.
+  if (open && shownFor !== unit.id) {
+    setShownFor(unit.id);
+    setSize(unit.size ?? "");
+    setError(null);
+  }
+  if (!open && shownFor !== null) setShownFor(null);
   const series = sizeSeries(categorySlug);
 
   function onSubmit(formData: FormData) {
@@ -83,26 +93,7 @@ export function UnitEdit({
 
   return (
     <>
-      <Drawer
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (next) {
-            setSize(unit.size ?? "");
-            setError(null);
-          }
-        }}
-      >
-        <DrawerTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-11 shrink-0"
-            aria-label={t("stock.editPieceNamed", { ref: unit.ref_code })}
-          >
-            <Pencil className="size-4" aria-hidden />
-          </Button>
-        </DrawerTrigger>
+      <Drawer open={open} onOpenChange={setOpen}>
 
         <DrawerContent className="max-h-[92svh]">
           <DrawerHeader className="text-start">

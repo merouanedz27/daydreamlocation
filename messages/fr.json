@@ -271,9 +271,7 @@
       "priceFor": "Prix de location : {part} seul(e)",
       "eachCostume": "Chaque costume = {parts} ({refs}).",
       "costumes": "Costumes",
-      "completeFree": "{count, plural, =0 {Aucun costume complet libre aujourd'hui} =1 {1 costume complet libre aujourd'hui} other {{n} costumes complets libres aujourd'hui}}",
-      "deleteSetNamed": "Supprimer le costume {ref}",
-      "deleteSetBody": "Toutes ses pièces sont supprimées. Si l'une a déjà été louée, elles passent en « retirée » pour garder l'historique."
+      "completeFree": "{count, plural, =0 {Aucun costume complet libre aujourd'hui} =1 {1 costume complet libre aujourd'hui} other {{n} costumes complets libres aujourd'hui}}"
     },
     "title": "Stock",
     "model": "Modèle",
@@ -314,12 +312,9 @@
     "quantity": "Nombre d'exemplaires",
     "nextRefHint": "Première référence attribuée : {ref}",
     "sizeSeries": "Tailles reçues",
-    "sizeSeriesHint": "Touchez chaque taille reçue : une pièce sera créée par taille. Sans taille, indiquez le nombre d'exemplaires ci-dessous.",
     "otherSize": "Autre taille (M, 42…)",
     "addSize": "Ajouter",
-    "seriesCount": "{count} pièce(s), une par taille : {first} → {last}",
     "editPiece": "Modifier la pièce",
-    "editPieceNamed": "Modifier la pièce {ref}",
     "pieceSavedToast": "Pièce {ref} modifiée",
     "newModelHint": "Un modèle est un type de vêtement. Vous y ajouterez ensuite les pièces réelles.",
     "conditions": {
@@ -404,7 +399,24 @@
     "deletePieceTitle": "Supprimer {ref} ?",
     "deletePieceBody": "Jamais louée : effacée définitivement. Déjà louée : retirée du stock à la place, ses commandes passées ne changent pas.",
     "pieceDeletedToast": "{ref} supprimée",
-    "pieceRetiredToast": "{ref} déjà louée : retirée du stock"
+    "pieceRetiredToast": "{ref} déjà louée : retirée du stock",
+    "noSize": "Sans taille",
+    "sizeFree": "{count, plural, =0 {aucune libre} =1 {1 libre} other {{n} libres}}",
+    "freeToday": "{count, plural, =0 {Aucune pièce libre aujourd'hui} =1 {1 pièce libre aujourd'hui} other {{n} pièces libres aujourd'hui}}",
+    "addSizeOpen": "Taille",
+    "addSizeTitle": "Ajouter une taille",
+    "addSizeHint": "Touchez la taille reçue, puis + pour le nombre. Une taille déjà en stock se règle avec son − / + sur la fiche.",
+    "addPiecesSubmit": "{count, plural, =0 {Ajouter} =1 {Ajouter 1 pièce} other {Ajouter {n} pièces}}",
+    "moreOptions": "Plus d'options (prix, achat, état)",
+    "holdHint": "Touchez une taille pour voir ses pièces. Appui long sur une pièce pour la sélectionner.",
+    "piecesSelected": "{count, plural, =1 {1 sélectionnée} other {{n} sélectionnées}}",
+    "deleteSelectedTitle": "{count, plural, =1 {Supprimer 1 pièce ?} other {Supprimer {n} pièces ?}}",
+    "deleteSelectedBody": "Jamais louée : effacée. Déjà louée : retirée du stock, ses commandes passées ne changent pas. Réservée pour une commande à venir : gardée.",
+    "deletedPart": "{count, plural, =1 {1 supprimée} other {{n} supprimées}}",
+    "retiredPart": "{count, plural, =1 {1 retirée (déjà louée)} other {{n} retirées (déjà louées)}}",
+    "keptPart": "{count, plural, =1 {1 gardée (réservée)} other {{n} gardées (réservées)}}",
+    "oneRetiredToast": "Déjà louée : retirée du stock, son historique est gardé",
+    "piecesAddedToast": "{count, plural, =1 {1 pièce ajoutée} other {{n} pièces ajoutées}}"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -509,7 +521,8 @@
     "emailFailed": "L'e-mail n'a pas pu partir. Réessayez.",
     "nameTooShort": "Le nom doit contenir au moins 2 caractères.",
     "nameTooLong": "Le nom ne doit pas dépasser 80 caractères.",
-    "orderChangedOffline": "La commande a été modifiée entre-temps par quelqu'un d'autre. Rouvrez-la pour repartir de sa dernière version."
+    "orderChangedOffline": "La commande a été modifiée entre-temps par quelqu'un d'autre. Rouvrez-la pour repartir de sa dernière version.",
+    "sizeAllReserved": "Toutes les pièces de cette taille sont réservées pour une commande à venir."
   },
   "update": {
     "available": "Nouvelle version de l'application disponible",

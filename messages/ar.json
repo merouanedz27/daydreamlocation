@@ -271,9 +271,7 @@
       "priceFor": "سعر الكراء: {part} وحدها",
       "eachCostume": "كل بدلة = {parts} ({refs}).",
       "costumes": "البدلات",
-      "completeFree": "{count, plural, =0 {لا توجد بدلة كاملة متاحة اليوم} =1 {بدلة كاملة واحدة متاحة اليوم} other {{n} بدلات كاملة متاحة اليوم}}",
-      "deleteSetNamed": "حذف البدلة {ref}",
-      "deleteSetBody": "تُحذف جميع قطعها. إذا سبق كراء إحداها، تُصبح « مسحوبة » للحفاظ على السجل."
+      "completeFree": "{count, plural, =0 {لا توجد بدلة كاملة متاحة اليوم} =1 {بدلة كاملة واحدة متاحة اليوم} other {{n} بدلات كاملة متاحة اليوم}}"
     },
     "title": "المخزون",
     "model": "الموديل",
@@ -314,12 +312,9 @@
     "quantity": "عدد النسخ",
     "nextRefHint": "أول مرجع سيُمنح: {ref}",
     "sizeSeries": "المقاسات المستلمة",
-    "sizeSeriesHint": "المس كل مقاس مستلم: تُنشأ قطعة لكل مقاس. بدون مقاس، أدخل عدد النسخ أدناه.",
     "otherSize": "مقاس آخر (M، 42…)",
     "addSize": "إضافة",
-    "seriesCount": "{count} قطعة، واحدة لكل مقاس: {first} ← {last}",
     "editPiece": "تعديل القطعة",
-    "editPieceNamed": "تعديل القطعة {ref}",
     "pieceSavedToast": "تم تعديل القطعة {ref}",
     "newModelHint": "الموديل هو نوع اللباس. ستضيف إليه بعد ذلك القطع الحقيقية.",
     "conditions": {
@@ -404,7 +399,24 @@
     "deletePieceTitle": "حذف {ref}؟",
     "deletePieceBody": "لم تُؤجَّر قط: تُحذف نهائيًا. سبق تأجيرها: تُسحب من المخزون بدلًا من ذلك، ولا تتغير طلبياتها السابقة.",
     "pieceDeletedToast": "حُذفت {ref}",
-    "pieceRetiredToast": "{ref} سبق تأجيرها: سُحبت من المخزون"
+    "pieceRetiredToast": "{ref} سبق تأجيرها: سُحبت من المخزون",
+    "noSize": "بدون مقاس",
+    "sizeFree": "{count, plural, =0 {لا شيء متاح} =1 {1 متاحة} other {{n} متاحة}}",
+    "freeToday": "{count, plural, =0 {لا توجد قطعة متاحة اليوم} =1 {قطعة واحدة متاحة اليوم} other {{n} قطع متاحة اليوم}}",
+    "addSizeOpen": "مقاس",
+    "addSizeTitle": "إضافة مقاس",
+    "addSizeHint": "المس المقاس المستلم، ثم + للعدد. المقاس الموجود في المخزون يُعدَّل بـ − / + في البطاقة.",
+    "addPiecesSubmit": "{count, plural, =0 {إضافة} =1 {إضافة قطعة واحدة} other {إضافة {n} قطع}}",
+    "moreOptions": "خيارات أكثر (السعر، الشراء، الحالة)",
+    "holdHint": "المس مقاسًا لرؤية قطعه. اضغط مطولًا على قطعة لتحديدها.",
+    "piecesSelected": "{count, plural, =1 {قطعة واحدة محددة} other {{n} محددة}}",
+    "deleteSelectedTitle": "{count, plural, =1 {حذف قطعة واحدة؟} other {حذف {n} قطع؟}}",
+    "deleteSelectedBody": "لم تُؤجَّر قط: تُحذف. أُجِّرت من قبل: تُسحب من المخزون ولا تتغير طلباتها السابقة. محجوزة لطلب قادم: تبقى.",
+    "deletedPart": "{count, plural, =1 {1 محذوفة} other {{n} محذوفة}}",
+    "retiredPart": "{count, plural, =1 {1 مسحوبة (أُجِّرت من قبل)} other {{n} مسحوبة (أُجِّرت من قبل)}}",
+    "keptPart": "{count, plural, =1 {1 باقية (محجوزة)} other {{n} باقية (محجوزة)}}",
+    "oneRetiredToast": "أُجِّرت من قبل: سُحبت من المخزون مع حفظ سجلها",
+    "piecesAddedToast": "{count, plural, =1 {أُضيفت قطعة واحدة} other {أُضيفت {n} قطع}}"
   },
   "dashboard": {
     "title": "لوحة القيادة",
@@ -509,7 +521,8 @@
     "emailFailed": "تعذّر إرسال البريد. حاول مرة أخرى.",
     "nameTooShort": "يجب أن يحتوي الاسم على حرفين على الأقل.",
     "nameTooLong": "يجب ألا يتجاوز الاسم 80 حرفًا.",
-    "orderChangedOffline": "عدّل شخص آخر هذا الطلب في الأثناء. أعد فتحه لتنطلق من آخر نسخة."
+    "orderChangedOffline": "عدّل شخص آخر هذا الطلب في الأثناء. أعد فتحه لتنطلق من آخر نسخة.",
+    "sizeAllReserved": "كل قطع هذا المقاس محجوزة لطلب قادم."
   },
   "update": {
     "available": "يتوفر إصدار جديد من التطبيق",

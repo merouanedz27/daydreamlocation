@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,19 +11,27 @@ import { MAX_PIECES } from "@/lib/validation/stock";
 import { cn } from "@/lib/utils";
 
 /**
- * Les pièces d'un modèle, saisies SUR LA PAGE DE CRÉATION : on touche une
- * taille reçue, puis − / + pour le nombre (« 50 × 4 »). Chaque ligne part en
- * champ caché `pieces` = « 50:4 » ; la Server Action crée les pièces avec le
- * modèle et leur dérive les références.
+ * Les pièces d'un modèle, saisies par taille : on touche une taille reçue,
+ * puis − / + pour le nombre (« 50 × 4 »). Chaque ligne part en champ caché
+ * `pieces` = « 50:4 » ; la Server Action crée les pièces et leur dérive les
+ * références. Sert à la création du modèle comme à l'ajout depuis sa fiche.
  */
 export function ModelPieces({
   categorySlug,
   refCode,
   parts = [],
+  existingRefs = [],
+  excludeSizes = [],
+  onTotalChange,
   disabled,
 }: {
   categorySlug: string | null;
   refCode: string;
+  /** Références déjà prises : la prévisualisation annonce les suivantes. */
+  existingRefs?: string[];
+  /** Tailles déjà en stock, qui ont leur propre − / + sur la fiche. */
+  excludeSizes?: readonly string[];
+  onTotalChange?: (total: number) => void;
   /** Costume divisible : chaque pièce saisie est un costume de ces parties. */
   parts?: readonly Part[];
   disabled: boolean;
@@ -32,11 +40,15 @@ export function ModelPieces({
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [other, setOther] = useState("");
 
-  const series = sizeSeries(categorySlug);
+  const series = sizeSeries(categorySlug).filter((size) => !excludeSizes.includes(size));
   const chosen = sortSizes(Object.keys(counts));
   const chips = sortSizes([...series, ...chosen]);
   const total = chosen.reduce((n, size) => n + counts[size], 0);
-  const refs = nextUnitRefs(refCode.trim() || "REF", [], Math.max(total, 1));
+  const refs = nextUnitRefs(refCode.trim() || "REF", existingRefs, Math.max(total, 1));
+
+  useEffect(() => {
+    onTotalChange?.(total);
+  }, [total, onTotalChange]);
 
   function change(size: string, delta: number) {
     setCounts((current) => {

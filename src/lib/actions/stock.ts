@@ -17,6 +17,7 @@ import type { PartInput } from "@/lib/validation/stock";
 import type { Database } from "@/lib/supabase/database.types";
 import { sortSizes } from "@/lib/sizes";
 import { PHOTO_BUCKET } from "@/lib/storage";
+import { parseDateRange, todayIso } from "@/lib/rental-range";
 import { redirectTo } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
 
@@ -335,7 +336,7 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
 
 /** Champs réellement rendus par `UnitForm` — voir `firstIssue`. */
 const UNIT_FIELDS = [
-  "sizes",
+  "pieces",
   "length_cm",
   "quantity",
   "price_override",
@@ -358,7 +359,6 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
 
   const parsed = unitSchema.safeParse({
     model_id: formData.get("model_id"),
-    sizes: formData.getAll("sizes").map(String),
     length_cm: formData.get("length_cm"),
     price_override: formData.get("price_override"),
     purchase_price: formData.get("purchase_price"),
@@ -368,9 +368,26 @@ export async function createUnits(formData: FormData): Promise<ActionResult> {
 
   if (!parsed.success) return firstIssue(parsed.error, UNIT_FIELDS);
 
-  const { model_id, quantity, sizes, ...unit } = parsed.data;
-  // Une série cochée décide du nombre : une pièce par taille, sans doublon.
-  const series = [...new Set(sizes)];
+  const pieces = piecesSchema.safeParse(formData.getAll("pieces").map(String));
+  if (!pieces.success) {
+    const issue = pieces.error.issues.at(-1)!;
+    return {
+      ok: false,
+      error: issue.message.startsWith("errors.") ? issue.message : "errors.generic",
+      field: "pieces",
+    };
+  }
+
+  const { model_id, quantity, ...unit } = parsed.data;
+  // « 50 × 3 » donne trois pièces en 50, dans l'ordre des tailles. Sans
+  // taille saisie, `quantity` pièces sans taille.
+  const quantities = new Map<string, number>();
+  for (const { size, qty } of pieces.data) {
+    quantities.set(size, (quantities.get(size) ?? 0) + qty);
+  }
+  const series = sortSizes([...quantities.keys()]).flatMap((size) =>
+    Array.from({ length: quantities.get(size) ?? 0 }, () => size),
+  );
   const count = series.length || quantity;
   const supabase = await createClient();
 
@@ -541,6 +558,268 @@ export async function deleteUnit(
 }
 
 /**
+ * Un « article » de la fiche : une pièce simple, ou un COSTUME (toutes les
+ * parties d'un même `set_ref`). Sa taille est celle de la pièce, ou celle de
+ * la veste du costume — sinon de sa première partie.
+ */
+type StockItem = { key: string; ref: string; size: string; unitIds: number[] };
+
+async function modelItems(supabase: Supabase, modelId: number): Promise<StockItem[] | null> {
+  const { data, error } = await supabase
+    .from("article_units")
+    .select("id, ref_code, size, status, set_ref, part")
+    .eq("model_id", modelId)
+    .neq("status", "retire");
+  if (error) return null;
+
+  const items = new Map<string, StockItem>();
+  for (const unit of data) {
+    const key = unit.set_ref ?? `#${unit.id}`;
+    const item = items.get(key) ?? {
+      key,
+      ref: unit.set_ref ?? unit.ref_code,
+      size: unit.size?.trim() ?? "",
+      unitIds: [],
+    };
+    item.unitIds.push(unit.id);
+    if (unit.part === "veste") item.size = unit.size?.trim() ?? "";
+    items.set(key, item);
+  }
+  return [...items.values()];
+}
+
+/**
+ * Ce que les commandes disent de ces pièces : celles qui ont DÉJÀ servi (une
+ * ligne, même annulée — l'effacement serait refusé) et celles qu'une commande
+ * active retient AUJOURD'HUI OU PLUS TARD — on ne les retire jamais, le client
+ * viendrait chercher une veste qui n'est plus au stock.
+ */
+async function unitUsage(
+  supabase: Supabase,
+  unitIds: number[],
+): Promise<{ used: Set<number>; booked: Set<number> } | null> {
+  const used = new Set<number>();
+  const booked = new Set<number>();
+  if (!unitIds.length) return { used, booked };
+  const today = todayIso();
+  const { data, error } = await supabase
+    .from("order_lines")
+    .select("unit_id, is_active, rental_range")
+    .in("unit_id", unitIds);
+  if (error) return null;
+  for (const line of data) {
+    if (line.unit_id === null) continue;
+    used.add(line.unit_id);
+    const range = parseDateRange(line.rental_range);
+    if (line.is_active && (!range || range.upper > today)) booked.add(line.unit_id);
+  }
+  return { used, booked };
+}
+
+/**
+ * Efface un article, ou le RETIRE si une commande passée le désigne
+ * (`on delete restrict`). Un seul `delete` pour toutes ses parties : la base
+ * refuse tout ou rien.
+ */
+async function eraseItem(
+  supabase: Supabase,
+  unitIds: number[],
+): Promise<"deleted" | "retired" | null> {
+  const { error } = await supabase.from("article_units").delete().in("id", unitIds);
+  if (!error) return "deleted";
+  if (error.code !== FOREIGN_KEY_VIOLATION) return null;
+  const { error: retireError } = await supabase
+    .from("article_units")
+    .update({ status: "retire", status_since: new Date().toISOString() })
+    .in("id", unitIds);
+  return retireError ? null : "retired";
+}
+
+/** Le plus récent d'abord : « − » enlève la dernière pièce arrivée. */
+function newestFirst(a: StockItem, b: StockItem): number {
+  return b.ref.localeCompare(a.ref, undefined, { numeric: true });
+}
+
+/**
+ * « + » sur une taille de la fiche : `count` pièces de plus dans cette taille.
+ *
+ * Chaque pièce reste un vêtement réel, avec sa référence (la disponibilité se
+ * calcule à la pièce) — seul l'écran les compte par taille. La nouvelle pièce
+ * reprend la longueur, le prix et l'état de sa voisine de même taille : le
+ * « + » ne pose aucune question.
+ */
+export async function addUnitsOfSize(formData: FormData): Promise<ActionResult> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const modelId = Number(formData.get("model_id"));
+  const size = String(formData.get("size") ?? "").trim().slice(0, 20);
+  const count = Number(formData.get("count") ?? 1);
+  if (!Number.isInteger(modelId) || modelId <= 0) return { ok: false, error: "errors.generic" };
+  if (!Number.isInteger(count) || count < 1 || count > 50) {
+    return { ok: false, error: "errors.tooManyPieces" };
+  }
+
+  const supabase = await createClient();
+  const [{ data: model }, { data: existing }] = await Promise.all([
+    supabase
+      .from("article_models")
+      .select("ref_code, article_model_parts(part)")
+      .eq("id", modelId)
+      .single(),
+    supabase
+      .from("article_units")
+      .select("ref_code, size, status, length_cm, price_override, purchase_price, condition")
+      .eq("model_id", modelId)
+      .order("id", { ascending: false }),
+  ]);
+  if (!model || !existing) return { ok: false, error: "errors.generic" };
+
+  const sibling = existing.find((u) => u.status !== "retire" && (u.size?.trim() ?? "") === size);
+  const extra: Partial<UnitInsert> = sibling
+    ? {
+        length_cm: sibling.length_cm,
+        price_override: sibling.price_override,
+        purchase_price: sibling.purchase_price,
+        condition: sibling.condition,
+      }
+    : {};
+
+  const refs = nextUnitRefs(
+    model.ref_code,
+    existing.map((u) => u.ref_code),
+    count,
+  );
+  const parts = sortParts(model.article_model_parts).map((p) => p.part as Part);
+  const rows: UnitInsert[] = parts.length
+    ? setRows(
+        modelId,
+        refs.map((ref) => ({ ref, size: size || null })),
+        parts,
+        { ...extra, price_override: null },
+      )
+    : refs.map((ref_code) => ({ ...extra, model_id: modelId, ref_code, size: size || null }));
+
+  const { error } = await supabase.from("article_units").insert(rows);
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) return { ok: false, error: "errors.refCodeRace" };
+    return { ok: false, error: "errors.generic" };
+  }
+
+  revalidatePath(`/${locale}/stock/${modelId}`);
+  revalidatePath(`/${locale}/stock`);
+  return { ok: true };
+}
+
+/**
+ * « − » sur une taille : une pièce de moins.
+ *
+ * Laquelle ? D'abord une pièce JAMAIS louée (effacée), sinon une pièce dont
+ * aucune commande à venir ne dépend (retirée : ses commandes passées la
+ * désignent toujours). Si toutes sont promises à un client, on refuse.
+ */
+export async function removeUnitOfSize(
+  formData: FormData,
+): Promise<{ ok: true; retired: boolean } | { ok: false; error: string }> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const modelId = Number(formData.get("model_id"));
+  const size = String(formData.get("size") ?? "").trim();
+  if (!Number.isInteger(modelId) || modelId <= 0) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const items = (await modelItems(supabase, modelId))?.filter((i) => i.size === size);
+  if (!items) return { ok: false, error: "errors.generic" };
+  if (!items.length) return { ok: false, error: "errors.generic" };
+
+  const usage = await unitUsage(
+    supabase,
+    items.flatMap((i) => i.unitIds),
+  );
+  if (!usage) return { ok: false, error: "errors.generic" };
+
+  items.sort(newestFirst);
+  const target =
+    items.find((i) => i.unitIds.every((id) => !usage.used.has(id))) ??
+    items.find((i) => i.unitIds.every((id) => !usage.booked.has(id)));
+  if (!target) return { ok: false, error: "errors.sizeAllReserved" };
+
+  const outcome = await eraseItem(supabase, target.unitIds);
+  if (!outcome) return { ok: false, error: "errors.generic" };
+
+  revalidatePath(`/${locale}/stock/${modelId}`);
+  revalidatePath(`/${locale}/stock`);
+  return { ok: true, retired: outcome === "retired" };
+}
+
+/**
+ * « Supprimer » sur une SÉLECTION de la fiche (appui long) : des pièces
+ * simples (`ids`) et des costumes entiers (`set_refs`). Même règle que
+ * `deleteUnit`, article par article ; un article promis à une commande à venir
+ * est GARDÉ, et compté pour le dire.
+ */
+export async function deleteUnits(
+  formData: FormData,
+): Promise<
+  | { ok: true; deleted: number; retired: number; kept: number }
+  | { ok: false; error: string }
+> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const modelId = Number(formData.get("model_id"));
+  if (!Number.isInteger(modelId) || modelId <= 0) return { ok: false, error: "errors.generic" };
+  const ids = new Set(parseIds(formData.get("ids")));
+  const setRefs = new Set(
+    String(formData.get("set_refs") ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  if (!ids.size && !setRefs.size) return { ok: false, error: "errors.generic" };
+  if (ids.size + setRefs.size > MAX_BULK) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const all = await modelItems(supabase, modelId);
+  if (!all) return { ok: false, error: "errors.generic" };
+  // Uniquement des articles DE CE MODÈLE : un identifiant étranger est ignoré.
+  const items = all.filter((i) =>
+    i.key.startsWith("#") ? ids.has(i.unitIds[0]) : setRefs.has(i.ref),
+  );
+
+  const usage = await unitUsage(
+    supabase,
+    items.flatMap((i) => i.unitIds),
+  );
+  if (!usage) return { ok: false, error: "errors.generic" };
+
+  let deleted = 0;
+  let retired = 0;
+  let kept = 0;
+  for (const item of items) {
+    if (item.unitIds.some((id) => usage.booked.has(id))) {
+      kept++;
+      continue;
+    }
+    const outcome = await eraseItem(supabase, item.unitIds);
+    if (outcome === "deleted") deleted++;
+    else if (outcome === "retired") retired++;
+  }
+
+  revalidatePath(`/${locale}/stock/${modelId}`);
+  revalidatePath(`/${locale}/stock`);
+  if (!deleted && !retired && !kept) return { ok: false, error: "errors.generic" };
+  return { ok: true, deleted, retired, kept };
+}
+
+/**
  * Modifie un modèle.
  *
  * La référence fournisseur reste modifiable — une faute de frappe se corrige.
@@ -597,48 +876,6 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
   revalidatePath(`/${locale}/stock`);
   revalidatePath(`/${locale}/stock/${id}`);
   redirectTo(`/stock/${id}`, locale);
-}
-
-/**
- * Supprime un COSTUME entier (toutes ses parties) saisi par erreur. Même
- * règle que `deleteUnit` : jamais loué, il est effacé ; sinon ses parties
- * passent en « retirée ». Un seul `delete` : la base refuse tout ou rien.
- */
-export async function deleteSet(
-  formData: FormData,
-): Promise<{ ok: true; retired: boolean } | { ok: false; error: string }> {
-  const locale = resolveLocale(formData.get("locale"));
-
-  const profile = await getProfile();
-  if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
-
-  const setRef = String(formData.get("set_ref") ?? "").trim();
-  const modelId = Number(formData.get("model_id"));
-  if (!setRef || !Number.isInteger(modelId) || modelId <= 0) {
-    return { ok: false, error: "errors.generic" };
-  }
-
-  const supabase = await createClient();
-  let retired = false;
-  const { error } = await supabase
-    .from("article_units")
-    .delete()
-    .eq("model_id", modelId)
-    .eq("set_ref", setRef);
-  if (error) {
-    if (error.code !== FOREIGN_KEY_VIOLATION) return { ok: false, error: "errors.generic" };
-    const { error: retireError } = await supabase
-      .from("article_units")
-      .update({ status: "retire" })
-      .eq("model_id", modelId)
-      .eq("set_ref", setRef);
-    if (retireError) return { ok: false, error: "errors.generic" };
-    retired = true;
-  }
-
-  revalidatePath(`/${locale}/stock/${modelId}`);
-  revalidatePath(`/${locale}/stock`);
-  return { ok: true, retired };
 }
 
 /**

@@ -127,11 +127,6 @@ export type PartInput = z.infer<typeof partsSchema>[number];
 
 export const unitSchema = z.object({
   model_id: z.coerce.number().int().positive(),
-  /**
-   * La SÉRIE de tailles cochées : une pièce par taille (46, 48, 50 → trois
-   * pièces). Vide = `quantity` pièces sans taille.
-   */
-  sizes: z.array(z.string().trim().min(1).max(20)).max(20).default([]),
   length_cm: z
     .union([z.literal(""), z.coerce.number().min(0).max(999)])
     .optional()
@@ -146,7 +141,8 @@ export const unitSchema = z.object({
     .transform((v) => (v === "" || v === undefined ? null : Number(v))),
   condition: z.enum(["neuf", "bon", "use", "retire"]).default("bon"),
   /**
-   * Nombre d'exemplaires à créer d'un coup.
+   * Nombre d'exemplaires SANS TAILLE à créer d'un coup — quand aucune
+   * taille n'est saisie (`pieces`, lu à part avec `piecesSchema`).
    *
    * Le client achète souvent le même modèle en plusieurs tailles ou en
    * plusieurs exemplaires. Saisir la même fiche cinq fois au téléphone est
