@@ -55,7 +55,7 @@ export default async function TomorrowPage({
       <RefreshOnNewDay day={today} />
 
       <div className="text-center">
-        <h1 className="truncate text-xl">{t("nav.todayAndTomorrow")}</h1>
+        <h1 className="truncate text-xl">{t("nav.tomorrow")}</h1>
         <p className="text-muted-foreground text-sm">
           {t("calendar.count", { count: orders.length, n: formatNumber(orders.length, l) })}
         </p>
