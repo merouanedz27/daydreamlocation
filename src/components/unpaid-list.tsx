@@ -12,9 +12,18 @@ import type { UnpaidOrder } from "@/lib/queries/dashboard";
 /** Les premières dettes ; « Voir les N autres » déplie TOUTE la liste. */
 const FIRST = 8;
 
-export function UnpaidList({ orders, locale }: { orders: UnpaidOrder[]; locale: Locale }) {
+export function UnpaidList({
+  orders,
+  locale,
+  collapse = true,
+}: {
+  orders: UnpaidOrder[];
+  locale: Locale;
+  /** `false` : tout d'un coup — la page des impayés n'a que cette liste. */
+  collapse?: boolean;
+}) {
   const t = useTranslations("dashboard");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!collapse);
   const shown = open ? orders : orders.slice(0, FIRST);
   const hidden = orders.length - FIRST;
 

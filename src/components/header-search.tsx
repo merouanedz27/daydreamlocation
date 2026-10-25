@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * Ailleurs (fiche, formulaire, bilan…), une recherche part dans les commandes.
  */
 const SCOPES: { test: RegExp; placeholder: string }[] = [
-  { test: /^\/commandes(\/(calendrier|demain|pas-rentres))?$/, placeholder: "search.orders" },
+  { test: /^\/commandes(\/(calendrier|demain|pas-rentres|impayes))?$/, placeholder: "search.orders" },
   { test: /^\/stock$/, placeholder: "search.stock" },
   { test: /^\/stock\/ensembles$/, placeholder: "search.ensembles" },
   { test: /^\/frais$/, placeholder: "search.frais" },

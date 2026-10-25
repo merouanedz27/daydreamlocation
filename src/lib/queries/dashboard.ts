@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { todayIso } from "@/lib/rental-range";
+import { orderSearchFilter } from "@/lib/orders-query";
+import { pieceOrderIds } from "@/lib/queries/orders-list";
 
 /**
  * Chiffres du tableau de bord.
@@ -161,15 +163,22 @@ export type UnpaidOrder = {
  * Le total et le nombre viennent de `dashboard_stats` (donc de la base, sans
  * plafond) ; cette requête sert à AFFICHER les lignes. `null` : toutes — le
  * tableau de bord en montre huit et déplie le reste (`UnpaidList`).
+ *
+ * `q` : la recherche de l'en-tête, sur la page des impayés de l'équipe.
  */
-export async function getUnpaidOrders(limit: number | null = 8): Promise<UnpaidOrder[]> {
-  const supabase = await createClient();
+export async function getUnpaidOrders(
+  limit: number | null = 8,
+  q?: string,
+): Promise<UnpaidOrder[]> {
+  const [supabase, pieceIds] = await Promise.all([createClient(), pieceOrderIds(q)]);
   let query = supabase
     .from("orders")
     .select("id, order_no, customer_name, event_date, total_price, amount_paid, balance")
     .neq("status", "annulee")
     .gt("balance", 0)
     .order("balance", { ascending: false });
+  const search = orderSearchFilter(q, pieceIds);
+  if (search) query = query.or(search);
   if (limit !== null) query = query.limit(limit);
   const { data } = await query;
 

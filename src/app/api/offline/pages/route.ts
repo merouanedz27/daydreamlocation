@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     "/commandes",
     "/commandes/demain",
     "/commandes/pas-rentres",
+    "/commandes/impayes",
     "/commandes/nouvelle",
     "/commandes/calendrier",
     "/pointage",

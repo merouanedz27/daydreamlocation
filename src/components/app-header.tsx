@@ -3,6 +3,7 @@
 import {
   CalendarDays,
   ClipboardList,
+  HandCoins,
   Clock,
   Download,
   KeyRound,
@@ -87,6 +88,7 @@ export function AppHeader({
     { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
+    { href: "/commandes/impayes", icon: HandCoins, label: t("nav.unpaid") },
     ...(showDashboard
       ? [
           { href: "/tableau-de-bord", icon: TrendingUp, label: t("nav.dashboard") },

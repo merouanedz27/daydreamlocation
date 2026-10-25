@@ -31,7 +31,12 @@ const DETAILS_MAX_AGE_MS = 60 * 60_000;
 /** L'écran affiché : regardé au plus toutes les 10 minutes. */
 const CURRENT_MAX_AGE_MS = 10 * 60_000;
 /** Les listes que touche un geste envoyé : regardées tout de suite après. */
-const LISTS_AFTER_SEND = ["/commandes", "/commandes/demain", "/commandes/pas-rentres"];
+const LISTS_AFTER_SEND = [
+  "/commandes",
+  "/commandes/demain",
+  "/commandes/pas-rentres",
+  "/commandes/impayes",
+];
 
 /**
  * Les écrans à garder (`/api/offline/pages`), l'un après l'autre : d'abord
