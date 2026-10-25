@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { PressingBoard } from "@/components/pressing-board";
+import { PressingSend, PressingTabs } from "@/components/pressing-board";
+import { StockFilters } from "@/components/stock-filters";
 import { requireProfile } from "@/lib/auth";
-import { getBlockedUnitIds, getPressingUnits } from "@/lib/queries/stock";
+import { getBlockedUnitIds, getCategories, getPressingUnits } from "@/lib/queries/stock";
 import { todayIso } from "@/lib/rental-range";
 import type { Locale } from "@/i18n/routing";
 
@@ -15,7 +16,9 @@ export async function generateMetadata(props: {
 }
 
 /**
- * Le pressing (dégraissage) : ce qui y est parti, et de quoi y envoyer.
+ * Le pressing (dégraissage), onglet « À envoyer » : les pièces disponibles,
+ * filtrables par catégorie. Ce qui y est déjà parti vit sur sa propre page,
+ * /pressing/en-cours.
  *
  * OUVERT À TOUTE L'ÉQUIPE — ce sont les employés qui portent les costumes au
  * pressing. Ils ne peuvent pourtant rien changer d'autre au stock : la page
@@ -26,27 +29,41 @@ export default async function PressingPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; categorie?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
   await requireProfile(locale as Locale);
 
-  const { q = "" } = await searchParams;
-  const [t, units, blocked] = await Promise.all([
+  const { q = "", categorie = "" } = await searchParams;
+  const [t, units, blocked, categories] = await Promise.all([
     getTranslations(),
     getPressingUnits(),
     getBlockedUnitIds(todayIso()),
+    getCategories(),
   ]);
 
+  const available = units.filter((u) => u.status === "disponible");
+  const outCount = units.length - available.length;
+  // Pas de puce vide : seulement les catégories qui ont une pièce à envoyer.
+  const used = new Set(available.map((u) => u.categorySlug));
+  const shownCategories = categories.filter((c) => used.has(c.slug));
+  const filtered = categorie ? available.filter((u) => u.categorySlug === categorie) : available;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-xl">{t("nav.pressing")}</h1>
         <p className="text-muted-foreground mt-1 text-sm">{t("pressing.hint")}</p>
       </div>
 
-      <PressingBoard units={units} rentedIds={[...blocked]} q={q.trim().slice(0, 80)} />
+      <PressingTabs toSend={available.length} out={outCount} />
+
+      {shownCategories.length > 1 && (
+        <StockFilters categories={shownCategories} locale={locale as Locale} />
+      )}
+
+      <PressingSend units={filtered} rentedIds={[...blocked]} q={q.trim().slice(0, 80)} />
     </div>
   );
 }

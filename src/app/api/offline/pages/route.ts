@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     "/pointage",
     "/frais",
     "/pressing",
+    "/pressing/en-cours",
     "/stock",
     ...(isOwner(profile) ? ["/tableau-de-bord"] : []),
   ].map(at);

@@ -17,7 +17,7 @@ const SCOPES: { test: RegExp; placeholder: string }[] = [
   { test: /^\/stock$/, placeholder: "search.stock" },
   { test: /^\/stock\/ensembles$/, placeholder: "search.ensembles" },
   { test: /^\/frais$/, placeholder: "search.frais" },
-  { test: /^\/pressing$/, placeholder: "search.pressing" },
+  { test: /^\/pressing(\/en-cours)?$/, placeholder: "search.pressing" },
   { test: /^\/equipe$/, placeholder: "search.team" },
 ];
 

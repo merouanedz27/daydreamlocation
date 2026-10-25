@@ -72,7 +72,7 @@ async function move(formData: FormData, toPressing: boolean): Promise<PressingRe
 
   if (error) return { ok: false, error: "errors.generic" };
 
-  revalidatePath(`/${locale}/pressing`);
+  revalidatePath(`/${locale}/pressing`, "layout");
   revalidatePath(`/${locale}/stock`, "layout");
   if (!toPressing && cost) {
     revalidatePath(`/${locale}/frais`);

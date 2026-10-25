@@ -222,6 +222,8 @@ export type PressingUnit = {
   modelName: string;
   modelNameAr: string | null;
   modelRef: string;
+  /** Catégorie du modèle (costume, chemise…), pour le filtre. */
+  categorySlug: string | null;
 };
 
 /**
@@ -235,7 +237,7 @@ export async function getPressingUnits(): Promise<PressingUnit[]> {
     .from("article_units")
     .select(
       `id, ref_code, size, part, status, status_since,
-       article_models!inner ( ref_code, name_fr, name_ar, is_active )`,
+       article_models!inner ( ref_code, name_fr, name_ar, is_active, categories ( slug ) )`,
     )
     .in("status", ["disponible", "nettoyage"])
     .eq("article_models.is_active", true)
@@ -250,7 +252,12 @@ export async function getPressingUnits(): Promise<PressingUnit[]> {
     part: string | null;
     status: "disponible" | "nettoyage";
     status_since: string | null;
-    article_models: { ref_code: string; name_fr: string; name_ar: string | null };
+    article_models: {
+      ref_code: string;
+      name_fr: string;
+      name_ar: string | null;
+      categories: { slug: string } | null;
+    };
   };
   return ((data ?? []) as unknown as Raw[]).map((u) => ({
     id: u.id,
@@ -262,5 +269,6 @@ export async function getPressingUnits(): Promise<PressingUnit[]> {
     modelName: u.article_models.name_fr,
     modelNameAr: u.article_models.name_ar,
     modelRef: u.article_models.ref_code,
+    categorySlug: u.article_models.categories?.slug ?? null,
   }));
 }
