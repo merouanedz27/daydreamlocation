@@ -132,7 +132,11 @@ function sanitizeQuickDraft(value: unknown): QuickDraft | null {
   } else if (d.v !== 2 && d.v !== 3 && d.v !== 4) {
     return null;
   }
-  if (d.v !== 3) {
+  // v1 et v2 SEULEMENT. Écrit `d.v !== 3`, ce bloc s'appliquait aussi aux
+  // brouillons v4 : chaque rechargement insérait deux cases vides après la
+  // veste, et chaussures / accessoires glissaient en « Autre pièce » — des
+  // champs en double, un de plus à chaque visite.
+  if (d.v === 1 || d.v === 2) {
     // Brouillon d'avant les cases par partie : une seule case « Costume »,
     // ses tailles gilet / pantalon à part. Un costume nommé les reprend
     // dans sa taille (« 50 · G 48 · P 52 ») ; gilet et pantalon arrivent vides.
@@ -157,6 +161,9 @@ function sanitizeQuickDraft(value: unknown): QuickDraft | null {
     ];
   }
   if (slots.length < FIXED_SLOTS) return null;
+  // Les pièces en plus restées vides n'ont rien à garder — et cela nettoie
+  // les brouillons déjà gonflés par le bug ci-dessus.
+  slots = slots.filter((s, i) => i < FIXED_SLOTS || s.name.trim());
   return { ...EMPTY_DRAFT, ...d, v: 4, slots };
 }
 
