@@ -234,7 +234,9 @@
       "sizeVestShort": "Gilet",
       "sizePantsShort": "Pantalon",
       "stepDown": "Moins {step}",
-      "stepUp": "Plus {step}"
+      "stepUp": "Plus {step}",
+      "addSale": "Vendre un article",
+      "noSaleStock": "Aucun article à vendre en stock. Ajoutez-en dans Stock › Vente."
     },
     "callNamed": "Appeler {name}",
     "printNamed": "Bon de location de {name}",

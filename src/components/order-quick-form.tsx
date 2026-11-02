@@ -22,6 +22,7 @@ import {
   Package,
   Plane,
   Plus,
+  Tag,
   X,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -648,6 +649,8 @@ export function OrderQuickForm({
     index: number;
     n: number;
     open: boolean;
+    /** « + Article à vendre » : la liste ne montre que le stock de VENTE. */
+    sale?: boolean;
   } | null>(null);
   const [sizePicker, setSizePicker] = useState<{
     index: number;
@@ -740,7 +743,7 @@ export function OrderQuickForm({
     return sortSizes([...series, ...stock]);
   }
 
-  function pickerOptions(index: number): PickerOption[] {
+  function pickerOptions(index: number, saleOnly = false): PickerOption[] {
     const slotNo = catalogSlotOf(index);
     // Une pièce EN PLUS peut être n'importe quoi : tout est proposé.
     const extra = slotNo === null;
@@ -776,6 +779,21 @@ export function OrderQuickForm({
         featured,
       };
     };
+
+    // « + Article à vendre » : tout le stock de VENTE, toutes catégories —
+    // les libres d'abord, puis par nom et taille.
+    if (saleOnly) {
+      return [...unitIndex.entries()]
+        .filter(([id]) => isSaleUnit(id))
+        .map(([id, { name, unit }]) => ({ option: unitOption(id, true), name, size: unit.size ?? "" }))
+        .sort(
+          (a, b) =>
+            Number(Boolean(a.option.disabled)) - Number(Boolean(b.option.disabled)) ||
+            a.name.localeCompare(b.name) ||
+            a.size.localeCompare(b.size, undefined, { numeric: true }),
+        )
+        .map((r) => r.option);
+    }
 
     // Veste, gilet, pantalon, chemise, jabador et chaussures : les pièces du stock de
     // CETTE case, dans la taille choisie.
@@ -957,11 +975,22 @@ export function OrderQuickForm({
     setPicker({ ...picker, open: false });
   }
 
-  /** « + Autre pièce » : une case en plus, et sa liste ouverte d'emblée. */
-  function addSlotAndPick() {
+  /**
+   * « + Autre pièce » / « + Article à vendre » : une case en plus, et sa liste
+   * ouverte d'emblée.
+   *
+   * Une case en plus restée VIDE est reprise au lieu d'en ajouter une autre :
+   * un double toucher — ou le « clic fantôme » du téléphone pendant que la
+   * liste s'ouvre — ajoutait sinon deux cases.
+   */
+  function addSlotAndPick(sale = false) {
     const slots = store.get().slots;
-    updateDraft({ slots: [...slots, EMPTY_SLOT] });
-    openPicker(slots.length);
+    let index = slots.findIndex((s, i) => i >= FIXED_SLOTS && !s.name.trim());
+    if (index === -1) {
+      index = slots.length;
+      updateDraft({ slots: [...slots, EMPTY_SLOT] });
+    }
+    setPicker({ index, n: Date.now(), open: true, sale });
   }
 
   /**
@@ -1617,15 +1646,30 @@ export function OrderQuickForm({
           </p>
         )}
 
-        <Button
-          type="button"
-          variant="outline"
-          onClick={addSlotAndPick}
-          className="mt-4 h-11 w-full text-base"
-        >
-          <Plus className="size-4" aria-hidden />
-          {t("orders.quick.addOther")}
-        </Button>
+        <div className={cn("mt-4 grid gap-2", saleUnitIds.size > 0 && "grid-cols-2")}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => addSlotAndPick()}
+            className="h-11 text-base"
+          >
+            <Plus className="size-4" aria-hidden />
+            {t("orders.quick.addOther")}
+          </Button>
+          {/* Le stock de VENTE (chaussures pour commencer) : un geste à part,
+              visible, plutôt que de le chercher dans la case Chaussures. */}
+          {saleUnitIds.size > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => addSlotAndPick(true)}
+              className="border-gold-strong/50 h-11 text-base"
+            >
+              <Tag className="text-gold-strong size-4" aria-hidden />
+              {t("orders.quick.addSale")}
+            </Button>
+          )}
+        </div>
       </Section>
 
       {/* --- Paiement --------------------------------------------------------
@@ -1810,23 +1854,29 @@ export function OrderQuickForm({
           open={picker.open}
           onOpenChange={(open) => (open ? null : closePicker())}
           title={
-            sizedSlot(picker.index)
-              ? sizedTitle(picker.index)
-              : slotLabel(picker.index)
+            picker.sale
+              ? t("orders.quick.addSale")
+              : sizedSlot(picker.index)
+                ? sizedTitle(picker.index)
+                : slotLabel(picker.index)
           }
-          options={pickerOptions(picker.index)}
+          options={pickerOptions(picker.index, picker.sale)}
           selected={selectedKeys(picker.index)}
           onDone={(keys) => applyPicked(picker.index, keys)}
-          // Veste, gilet, pantalon : du stock seulement.
+          // Veste, gilet, pantalon, vente : du stock seulement.
           allowNew={
+            !picker.sale &&
             !partOfSlot(picker.index) &&
             !STOCK_ONLY_SLOTS.has(catalogSlotOf(picker.index) ?? 0)
           }
-          // Les cases fixes : un toucher choisit et referme. « + Autre pièce »
-          // garde ses cases à cocher et « Valider » (cravate + ceinture…).
-          instant={picker.index < FIXED_SLOTS}
+          // Les cases fixes et la vente : un toucher choisit et referme.
+          // « + Autre pièce » garde ses cases à cocher et « Valider »
+          // (cravate + ceinture…).
+          instant={picker.sale || picker.index < FIXED_SLOTS}
           emptyText={
-            sizedSlot(picker.index)
+            picker.sale
+              ? t("orders.quick.noSaleStock")
+              : sizedSlot(picker.index)
               ? draft.slots[picker.index]?.size.trim()
                 ? t("orders.quick.noPartInSize", {
                     part: slotLabel(picker.index),

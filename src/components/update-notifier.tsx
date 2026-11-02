@@ -12,6 +12,10 @@ const LOADED_BUILD = process.env.NEXT_PUBLIC_BUILD_ID;
 const CHECK_EVERY_MS = 10 * 60 * 1000;
 /** Jamais plus d'une vérification par minute (retours rapides à l'appli). */
 const MIN_GAP_MS = 60 * 1000;
+/** « Actualiser » n'attend jamais le service worker plus longtemps. */
+const RELOAD_TIMEOUT_MS = 3000;
+
+const wait = (ms: number) => new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms));
 
 /**
  * « Nouvelle version disponible — Actualiser ».
@@ -84,8 +88,16 @@ export function UpdateNotifier() {
     try {
       // Le service worker (`skipWaiting`) prend la nouvelle version tout seul ;
       // on lui demande seulement de regarder tout de suite.
-      const registration = await navigator.serviceWorker?.getRegistration();
-      await registration?.update();
+      //
+      // JAMAIS sans limite : `update()` peut ne jamais répondre (réseau qui
+      // traîne, service worker en pleine installation). Le bouton tournait
+      // alors indéfiniment et seul un rafraîchissement à la main débloquait.
+      // Au bout de 3 s, on recharge quoi qu'il arrive.
+      const registration = await Promise.race([
+        navigator.serviceWorker?.getRegistration(),
+        wait(RELOAD_TIMEOUT_MS),
+      ]);
+      if (registration) await Promise.race([registration.update(), wait(RELOAD_TIMEOUT_MS)]);
     } catch {
       // Sans service worker, le rechargement suffit.
     }

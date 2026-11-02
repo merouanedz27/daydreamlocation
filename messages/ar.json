@@ -234,7 +234,9 @@
       "sizeVestShort": "الصدرية",
       "sizePantsShort": "السروال",
       "stepDown": "ناقص {step}",
-      "stepUp": "زائد {step}"
+      "stepUp": "زائد {step}",
+      "addSale": "بيع سلعة",
+      "noSaleStock": "لا توجد سلع للبيع في المخزون. أضفها من المخزون › بيع."
     },
     "callNamed": "الاتصال بـ {name}",
     "printNamed": "وصل الكراء لـ {name}",
