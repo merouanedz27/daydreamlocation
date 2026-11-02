@@ -66,6 +66,7 @@ function firstIssue(
 
 /** Champs réellement rendus par `ModelForm` — voir `firstIssue`. */
 const MODEL_FIELDS = [
+  "purpose",
   "ref_code",
   "name_fr",
   "category_id",
@@ -239,6 +240,7 @@ export async function createModel(formData: FormData): Promise<ActionResult> {
   if (!canManageStock(profile)) return { ok: false, error: "errors.forbidden" };
 
   const parsed = modelSchema.safeParse({
+    purpose: formData.get("purpose"),
     ref_code: formData.get("ref_code"),
     name_fr: formData.get("name_fr"),
     name_ar: formData.get("name_ar"),
@@ -837,6 +839,7 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
 
   const parsed = modelUpdateSchema.safeParse({
     id: formData.get("id"),
+    purpose: formData.get("purpose"),
     ref_code: formData.get("ref_code"),
     name_fr: formData.get("name_fr"),
     name_ar: formData.get("name_ar"),
@@ -865,6 +868,10 @@ export async function updateModel(formData: FormData): Promise<ActionResult> {
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
       return { ok: false, error: "errors.refCodeTaken", field: "ref_code" };
+    }
+    // Location ↔ vente sur un modèle déjà commandé : la base refuse.
+    if (error.message === "purpose_locked") {
+      return { ok: false, error: "errors.purposeLocked", field: "purpose" };
     }
     return { ok: false, error: "errors.generic" };
   }

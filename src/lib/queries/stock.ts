@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
+import type { Purpose } from "@/lib/purpose";
 
 export type Category = Tables<"categories">;
 export type ArticleModel = Tables<"article_models">;
@@ -31,6 +32,8 @@ export async function getModels(options?: {
    * boutique. Le retrait n'a d'intérêt que s'il retire vraiment.
    */
   archived?: boolean;
+  /** Le stock de location ou celui de vente — jamais les deux mêlés. */
+  purpose?: Purpose;
 }): Promise<ModelWithStock[]> {
   const supabase = await createClient();
 
@@ -38,12 +41,16 @@ export async function getModels(options?: {
     .from("article_models")
     .select(
       `id, ref_code, name_fr, name_ar, category_id, color, brand, description,
-       base_price, purchase_price, photo_path, is_active, created_at,
+       base_price, purchase_price, photo_path, is_active, created_at, purpose,
        categories ( id, slug, name_fr, name_ar ),
        article_units ( id, size, status, set_ref, part )`,
     )
     .eq("is_active", !options?.archived)
     .order("ref_code");
+
+  if (options?.purpose) {
+    query = query.eq("purpose", options.purpose);
+  }
 
   if (options?.categorySlug) {
     query = query.eq("categories.slug", options.categorySlug);
@@ -164,6 +171,31 @@ export async function getBlockedUnitIds(day: IsoDate): Promise<Set<number>> {
     if (row.unit_id !== null) ids.add(row.unit_id);
   }
   return ids;
+}
+
+/**
+ * Les pièces VENDUES : une ligne de vente active les tient pour toujours,
+ * même si le client ne passe la prendre que dans un mois. Annuler la commande
+ * les rend au stock.
+ */
+export async function getSoldUnits(): Promise<Map<number, number>> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("order_lines")
+    .select("unit_id, order_id")
+    .eq("line_kind", "vente")
+    .eq("is_active", true)
+    .not("unit_id", "is", null);
+
+  if (error) throw error;
+
+  // pièce → commande qui l'a vendue
+  const sold = new Map<number, number>();
+  for (const row of data ?? []) {
+    if (row.unit_id !== null) sold.set(row.unit_id, row.order_id);
+  }
+  return sold;
 }
 
 /**

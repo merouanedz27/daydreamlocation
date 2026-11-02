@@ -34,10 +34,11 @@ export default async function DashboardPage({
 
   const [stats, unpaid] = await Promise.all([getDashboardStats(), getUnpaidOrders(null)]);
 
+  // Le total (locations + ventes), avec la part des ventes dessous.
   const kpis = [
-    { label: t("dashboard.thisWeek"), value: stats.revenue.week },
-    { label: t("dashboard.thisMonth"), value: stats.revenue.month },
-    { label: t("dashboard.thisYear"), value: stats.revenue.year },
+    { label: t("dashboard.thisWeek"), value: stats.revenue.week, sales: stats.sales.week },
+    { label: t("dashboard.thisMonth"), value: stats.revenue.month, sales: stats.sales.month },
+    { label: t("dashboard.thisYear"), value: stats.revenue.year, sales: stats.sales.year },
   ];
 
   return (
@@ -104,7 +105,7 @@ export default async function DashboardPage({
 
       {/* 2. Locations sur trois périodes calendaires complètes. */}
       <section className="mt-8">
-        <h2 className="text-lg">{t("dashboard.revenue")}</h2>
+        <h2 className="text-lg">{t("dashboard.totalIn")}</h2>
         <dl className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
           {kpis.map((k) => (
             // Trois cartes sur deux colonnes : la dernière prend la ligne entière.
@@ -116,6 +117,11 @@ export default async function DashboardPage({
               <dd className="tabular mt-1 text-xl font-medium">
                 {formatMoney(k.value, l)}
               </dd>
+              {k.sales > 0 && (
+                <dd className="text-muted-foreground mt-0.5 truncate text-xs">
+                  {t("dashboard.ofWhichSales", { amount: formatMoney(k.sales, l) })}
+                </dd>
+              )}
             </div>
           ))}
         </dl>
@@ -156,6 +162,8 @@ export default async function DashboardPage({
         <div className="mt-3">
           <DashboardResult
             revenue={stats.revenue}
+            sales={stats.sales}
+            salesCost={stats.salesCost}
             expenses={stats.expenses}
             upcoming={stats.upcoming}
           />

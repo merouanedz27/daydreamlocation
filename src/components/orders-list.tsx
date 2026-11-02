@@ -499,7 +499,9 @@ export function OrdersList({
               ? t("orders.lateBy", {
                   count: formatNumber(-daysBetween(today, order.return_due_date), locale),
                 })
-              : t(`orders.status.${STATUS_KEYS[order.status]}`)}
+              : order.has_rental === false && order.status === "retournee"
+                ? t("orders.saleDone")
+                : t(`orders.status.${STATUS_KEYS[order.status]}`)}
           </Badge>
         );
       }

@@ -185,7 +185,10 @@ export default async function OrderPage({
         >
           {late
             ? t("orders.lateBy", { count: formatNumber(daysLate, l) })
-            : t(`orders.status.${STATUS_KEYS[order.status]}`)}
+            : !order.has_rental && order.status === "retournee"
+              ? // Vente seule remise au client : « Vendue », pas « Rendue ».
+                t("orders.saleDone")
+              : t(`orders.status.${STATUS_KEYS[order.status]}`)}
         </Badge>
       </div>
 
@@ -350,6 +353,7 @@ export default async function OrderPage({
                     name={order.customer_name}
                     pickedUp={order.picked_up}
                     returned={order.returned}
+                    hasRental={order.has_rental}
                   />
                 </div>
               )}
@@ -382,6 +386,7 @@ export default async function OrderPage({
                       unlinked: t("stock.unlinked"),
                       cost: t("orders.externalCost"),
                       view: t("orders.viewInStock"),
+                      sold: t("orders.saleTag"),
                     }}
                   />
                 ))}
@@ -601,7 +606,14 @@ function PieceRow({
   line: OrderDetailLine;
   locale: Locale;
   showCost: boolean;
-  labels: { size: string; external: string; unlinked: string; cost: string; view: string };
+  labels: {
+    size: string;
+    external: string;
+    unlinked: string;
+    cost: string;
+    view: string;
+    sold: string;
+  };
 }) {
   const unit = line.article_units;
   const external = !unit && line.external_label !== null;
@@ -610,6 +622,9 @@ function PieceRow({
     <>
       {line.size_snapshot && <span>{`${labels.size} ${line.size_snapshot}`}</span>}
       <bdi>{unit.ref_code}</bdi>
+      {line.line_kind === "vente" && (
+        <span className="text-gold-strong font-medium">{labels.sold}</span>
+      )}
     </>
   ) : external ? (
     <>

@@ -40,12 +40,22 @@ export function RevenueChart({ monthly }: { monthly: MonthlyPoint[] }) {
   const { locale } = useParams<{ locale: Locale }>();
 
   const config = {
-    revenue: { label: t("dashboard.revenue"), color: "var(--chart-1)" },
+    rental: { label: t("dashboard.rentals"), color: "var(--chart-1)" },
+    sales: { label: t("dashboard.sales"), color: "var(--chart-2)" },
     expenses: { label: t("dashboard.expenses"), color: "var(--chart-4)" },
   } satisfies ChartConfig;
 
+  // Locations et ventes EMPILÉES : la hauteur de la pile reste le total du
+  // mois, comme avant la vente ; la couleur dit d'où il vient.
   const data = useMemo(
-    () => monthly.map((p) => ({ ...p, label: monthLabel(p.month, locale) })),
+    () =>
+      monthly.map((p) => ({
+        month: p.month,
+        rental: p.revenue - p.sales,
+        sales: p.sales,
+        expenses: p.expenses,
+        label: monthLabel(p.month, locale),
+      })),
     [monthly, locale],
   );
 
@@ -95,7 +105,8 @@ export function RevenueChart({ monthly }: { monthly: MonthlyPoint[] }) {
           <ChartLegend content={<ChartLegendContent />} />
           {/* Des barres et non une aire : douze seaux mensuels DISCRETS, pas
               un flux continu qu'on pourrait interpoler. */}
-          <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="rental" stackId="in" fill="var(--color-rental)" />
+          <Bar dataKey="sales" stackId="in" fill="var(--color-sales)" radius={[4, 4, 0, 0]} />
           <Bar dataKey="expenses" fill="var(--color-expenses)" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ChartContainer>

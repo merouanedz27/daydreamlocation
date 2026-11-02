@@ -70,6 +70,7 @@ export default async function EditModelPage({
         model={model}
         parts={model.article_model_parts ?? []}
         pieceCount={units.length}
+        purposeLocked={hasHistory}
       />
 
       {/* Le geste destructeur vit ICI, au bout de la page de modification, et

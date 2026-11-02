@@ -26,12 +26,15 @@ export function OrderChecks({
   name,
   pickedUp,
   returned,
+  hasRental = true,
 }: {
   orderId: number;
   /** Le client : nomme le geste s'il attend dans la file hors ligne. */
   name: string;
   pickedUp: boolean;
   returned: boolean;
+  /** Faux pour une vente seule : rien ne revient, la base coche le retour avec la sortie. */
+  hasRental?: boolean;
 }) {
   const t = useTranslations();
 
@@ -44,13 +47,15 @@ export function OrderChecks({
         checked={pickedUp}
         label={t("orders.pickedUp")}
       />
-      <CheckRow
-        orderId={orderId}
-        name={name}
-        field="returned"
-        checked={returned}
-        label={t("orders.returned")}
-      />
+      {hasRental && (
+        <CheckRow
+          orderId={orderId}
+          name={name}
+          field="returned"
+          checked={returned}
+          label={t("orders.returned")}
+        />
+      )}
     </div>
   );
 }

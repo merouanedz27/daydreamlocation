@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { StockFilters } from "@/components/stock-filters";
 import { StockModels, type StockModelRow } from "@/components/stock-models";
-import { StockTabs } from "@/components/stock-tabs";
+import { StockTabs, StockUsageSwitch } from "@/components/stock-tabs";
 import {
   countArchivedModels,
   countStock,
   getBlockedUnitIds,
   getCategories,
   getModels,
+  getSoldUnits,
 } from "@/lib/queries/stock";
+import { parsePurpose } from "@/lib/purpose";
 import { getProfile, canManageStock } from "@/lib/auth";
 import { todayIso } from "@/lib/rental-range";
 import { sortSizes } from "@/lib/sizes";
@@ -32,12 +34,16 @@ export default async function StockPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ categorie?: string; q?: string; archives?: string }>;
+  searchParams: Promise<{ categorie?: string; q?: string; archives?: string; usage?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const { categorie, q, archives } = await searchParams;
+  const { categorie, q, archives, usage } = await searchParams;
+  // Location (défaut) ou vente : deux stocks qui ne se mélangent pas.
+  const purpose = parsePurpose(usage);
+  const forSale = purpose === "vente";
+  const newModelHref = forSale ? "/stock/nouveau?usage=vente" : "/stock/nouveau";
   const l = locale as Locale;
   const t = await getTranslations();
 
@@ -48,12 +54,15 @@ export default async function StockPage({
 
   // Une seule requête de disponibilité pour la page entière : la demander par
   // modèle referait un aller-retour par carte.
-  const [categories, models, profile, archivedCount, blocked] = await Promise.all([
+  const [categories, models, profile, archivedCount, blocked, sold] = await Promise.all([
     getCategories(),
-    getModels({ categorySlug: categorie, search: q, archived }),
+    // Les archives montrent les deux stocks : un modèle retiré n'est plus
+    // ni loué ni vendu.
+    getModels({ categorySlug: categorie, search: q, archived, purpose: archived ? undefined : purpose }),
     getProfile(),
     archived ? Promise.resolve(0) : countArchivedModels(),
     getBlockedUnitIds(todayIso()),
+    forSale ? getSoldUnits() : Promise.resolve(new Map<number, number>()),
   ]);
 
   const canEdit = canManageStock(profile);
@@ -61,7 +70,10 @@ export default async function StockPage({
   // Données prêtes à afficher : le client choisit seulement la présentation
   // (cartes ou tableau), jamais ce qui est compté comme disponible.
   const rows: StockModelRow[] = models.map((model) => {
-    const stock = countStock(model.article_units ?? [], blocked);
+    // Une paire vendue a quitté la boutique : elle ne compte plus du tout,
+    // ni dans le total ni dans les tailles.
+    const units = (model.article_units ?? []).filter((u) => !sold.has(u.id));
+    const stock = countStock(units, blocked);
     return {
       id: model.id,
       name: l === "ar" && model.name_ar ? model.name_ar : model.name_fr,
@@ -77,9 +89,7 @@ export default async function StockPage({
       available: stock.available,
       total: stock.total,
       // Les tailles en stock, pièces retirées exclues : « 46 · 48 · 50 ».
-      sizes: sortSizes(
-        (model.article_units ?? []).filter((u) => u.status !== "retire").map((u) => u.size),
-      ),
+      sizes: sortSizes(units.filter((u) => u.status !== "retire").map((u) => u.size)),
     };
   });
 
@@ -105,8 +115,11 @@ export default async function StockPage({
               même place que « Nouvel ensemble » sur l'autre onglet. */}
           <StockTabs
             active="models"
-            action={canEdit ? { href: "/stock/nouveau", label: t("stock.newModel") } : undefined}
+            action={canEdit ? { href: newModelHref, label: t("stock.newModel") } : undefined}
           />
+          <div className="mt-3">
+            <StockUsageSwitch active={purpose} />
+          </div>
         </>
       )}
 
@@ -126,7 +139,7 @@ export default async function StockPage({
           </p>
           {canEdit && !archived && !q && !categorie && (
             <Button asChild className="mt-6">
-              <Link href="/stock/nouveau">
+              <Link href={newModelHref}>
                 <Plus className="size-4" aria-hidden />
                 {t("stock.newModel")}
               </Link>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PARTS } from "@/lib/stock-refs";
+import { parsePurpose } from "@/lib/purpose";
 
 /** Messages = CLÉS i18n, jamais des phrases. Voir `daydream-i18n`. */
 
@@ -39,6 +40,9 @@ const requiredMoney = z
   );
 
 export const modelSchema = z.object({
+  // Location ou vente. `formData.get` rend `null` quand le champ manque : pas
+  // de `.default()`, qui ne s'applique qu'à `undefined`.
+  purpose: z.unknown().transform(parsePurpose),
   ref_code: z
     .string()
     .trim()

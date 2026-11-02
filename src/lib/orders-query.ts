@@ -52,6 +52,8 @@ export type OrderRow = {
   picked_up: boolean;
   /** « Retour validé » : la tenue est revenue. */
   returned: boolean;
+  /** Faux pour une vente seule : rien à rendre. Absent d'un ancien cliché hors ligne = location. */
+  has_rental?: boolean;
   total_price: number;
   amount_paid: number;
   balance: number | null;

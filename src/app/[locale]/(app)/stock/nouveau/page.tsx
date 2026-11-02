@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { ModelForm } from "@/components/model-form";
 import { getCategories } from "@/lib/queries/stock";
 import { requireStockManager } from "@/lib/auth";
+import { parsePurpose } from "@/lib/purpose";
 import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata(props: {
@@ -18,10 +19,13 @@ export async function generateMetadata(props: {
 
 export default async function NewModelPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ usage?: string }>;
 }) {
   const { locale } = await params;
+  const purpose = parsePurpose((await searchParams).usage);
   setRequestLocale(locale);
 
   // Réservé au propriétaire. La Server Action le revérifie de son côté :
@@ -33,7 +37,7 @@ export default async function NewModelPage({
   return (
     <div className="mx-auto max-w-lg">
       <Button asChild variant="ghost" size="sm" className="-ms-2 mb-2">
-        <Link href="/stock">
+        <Link href={purpose === "vente" ? "/stock?usage=vente" : "/stock"}>
           <ArrowLeft className="icon-directional size-4" aria-hidden />
           {t("common.back")}
         </Link>
@@ -46,7 +50,7 @@ export default async function NewModelPage({
         <span className="ornament-diamond" />
       </div>
 
-      <ModelForm categories={categories} />
+      <ModelForm categories={categories} defaultPurpose={purpose} />
     </div>
   );
 }

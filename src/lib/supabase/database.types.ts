@@ -96,6 +96,7 @@ export type Database = {
           is_active: boolean;
           created_at: string;
           purchase_price: number;
+          purpose: string;
         };
         Insert: {
           ref_code: string;
@@ -110,6 +111,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           purchase_price?: number;
+          purpose?: string;
         };
         Update: {
           ref_code?: string;
@@ -124,6 +126,7 @@ export type Database = {
           is_active?: boolean;
           created_at?: string;
           purchase_price?: number;
+          purpose?: string;
         };
         Relationships: [
           {
@@ -390,6 +393,7 @@ export type Database = {
           size_snapshot: string | null;
           rental_range: string | null;
           is_active: boolean;
+          line_kind: string;
         };
         Insert: {
           order_id: number;
@@ -403,6 +407,7 @@ export type Database = {
           size_snapshot?: string | null;
           rental_range?: string | null;
           is_active?: boolean;
+          line_kind?: string;
         };
         Update: {
           order_id?: number;
@@ -416,6 +421,7 @@ export type Database = {
           size_snapshot?: string | null;
           rental_range?: string | null;
           is_active?: boolean;
+          line_kind?: string;
         };
         Relationships: [
           {
@@ -499,6 +505,7 @@ export type Database = {
           updated_at: string;
           client_op_id: string | null;
           version: number;
+          has_rental: boolean;
         };
         Insert: {
           order_no?: string;
@@ -523,6 +530,7 @@ export type Database = {
           updated_at?: string;
           client_op_id?: string | null;
           version?: number;
+          has_rental?: boolean;
         };
         Update: {
           order_no?: string;
@@ -547,6 +555,7 @@ export type Database = {
           updated_at?: string;
           client_op_id?: string | null;
           version?: number;
+          has_rental?: boolean;
         };
         Relationships: [
           {

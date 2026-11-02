@@ -16,7 +16,7 @@ import { ticketFields, type TicketFields } from "@/lib/ticket-fields";
 
 /** Colonnes d'une ligne de liste — partagées par tous les écrans de liste. */
 const ROW_COLUMNS = `id, order_no, customer_name, customer_phone, event_date,
-  pickup_date, return_due_date, status, picked_up, returned, total_price,
+  pickup_date, return_due_date, status, picked_up, returned, has_rental, total_price,
   amount_paid, balance, caution_amount`;
 
 /** Au-delà, le terme est trop vague (« a ») pour servir : on s'en tient aux commandes les plus récentes. */

@@ -18,10 +18,17 @@ import type { Locale } from "@/i18n/routing";
  */
 export function DashboardResult({
   revenue,
+  sales,
+  salesCost,
   expenses,
   upcoming,
 }: {
+  /** Locations + ventes. */
   revenue: PeriodTotals;
+  /** La part des ventes dans `revenue`. */
+  sales: PeriodTotals;
+  /** Prix d'achat des paires vendues : ce que la vente a « consommé » du stock. */
+  salesCost: PeriodTotals;
   expenses: PeriodTotals;
   upcoming: Upcoming;
 }) {
@@ -45,13 +52,29 @@ export function DashboardResult({
 
       {periods.map((p) => {
         const rev = revenue[p.key];
+        const sold = sales[p.key];
+        const soldCost = salesCost[p.key];
         const exp = expenses[p.key];
-        const profit = rev - exp;
+        // Une paire vendue n'est pas un gain net : ce qu'elle avait coûté
+        // sort du bénéfice. Une location, elle, ne consomme pas le stock.
+        const profit = rev - soldCost - exp;
 
         return (
           <TabsContent key={p.key} value={p.key} className="mt-4">
-            <dl className="grid grid-cols-3 gap-3">
-              <Figure label={t("dashboard.revenue")} value={formatMoney(rev, locale)} />
+            {/* Les ventes À PART (locations | ventes), puis FONDUES dans le
+                total et le bénéfice — les deux lectures que veut le patron. */}
+            <dl className="grid grid-cols-2 gap-3">
+              <Figure label={t("dashboard.rentals")} value={formatMoney(rev - sold, locale)} />
+              <Figure
+                label={t("dashboard.sales")}
+                value={formatMoney(sold, locale)}
+                note={
+                  sold > 0
+                    ? t("dashboard.salesMargin", { amount: formatMoney(sold - soldCost, locale) })
+                    : undefined
+                }
+              />
+              <Figure label={t("dashboard.totalIn")} value={formatMoney(rev, locale)} wide />
               <Figure label={t("dashboard.expenses")} value={formatMoney(exp, locale)} />
               <Figure
                 label={t("dashboard.profit")}
@@ -61,6 +84,12 @@ export function DashboardResult({
                 tone={profit < 0 ? "bad" : "good"}
               />
             </dl>
+
+            {soldCost > 0 && (
+              <p className="text-muted-foreground mt-3 text-xs">
+                {t("dashboard.profitWithSalesHint", { cost: formatMoney(soldCost, locale) })}
+              </p>
+            )}
 
             {/* UN ZÉRO DOIT S'EXPLIQUER. « Ce mois : 0 » à côté de
                 « Cette année : 11 300 » s'est lu comme une panne, alors que
@@ -96,13 +125,19 @@ function Figure({
   label,
   value,
   tone,
+  note,
+  wide,
 }: {
   label: string;
   value: string;
   tone?: "good" | "bad";
+  /** Une précision sous le chiffre (la marge des ventes). */
+  note?: string;
+  /** Toute la largeur : le total, entre le détail et le résultat. */
+  wide?: boolean;
 }) {
   return (
-    <div className="border-border rounded-lg border p-3">
+    <div className={cn("border-border rounded-lg border p-3", wide && "bg-gold-soft/40 col-span-2")}>
       <dt className="text-muted-foreground truncate text-xs">{label}</dt>
       <dd
         className={cn(
@@ -113,6 +148,7 @@ function Figure({
       >
         {value}
       </dd>
+      {note && <p className="text-muted-foreground mt-0.5 truncate text-xs">{note}</p>}
     </div>
   );
 }

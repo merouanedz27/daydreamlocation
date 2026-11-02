@@ -54,7 +54,7 @@ export default async function EditEnsemblePage({
         <span className="ornament-diamond" />
       </div>
 
-      <EnsembleForm models={models} ensemble={ensemble} />
+      <EnsembleForm models={models.filter((m) => m.purpose === "location")} ensemble={ensemble} />
 
       <section className="border-border mt-10 border-t pt-6">
         <EnsembleDelete id={ensemble.id} name={ensemble.name} />

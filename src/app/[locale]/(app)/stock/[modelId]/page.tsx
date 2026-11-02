@@ -6,7 +6,7 @@ import { ArrowLeft, Pencil, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ModelRestoreButton } from "@/components/model-danger-zone";
-import { getBlockedUnitIds, getModel, isUnitFree } from "@/lib/queries/stock";
+import { getBlockedUnitIds, getModel, getSoldUnits, isUnitFree } from "@/lib/queries/stock";
 import { todayIso } from "@/lib/rental-range";
 import { getProfile, canManageStock } from "@/lib/auth";
 import { ModelUnits, type ModelItem, type ModelUnitRow } from "@/components/model-units";
@@ -34,12 +34,14 @@ export default async function ModelPage({
   const id = Number(modelId);
   if (!Number.isFinite(id)) notFound();
 
-  const [model, profile, blocked] = await Promise.all([
+  const [model, profile, blocked, sold] = await Promise.all([
     getModel(id),
     getProfile(),
     getBlockedUnitIds(todayIso()),
+    getSoldUnits(),
   ]);
   if (!model) notFound();
+  const forSale = model.purpose === "vente";
 
   const l = locale as Locale;
   const t = await getTranslations();
@@ -68,8 +70,9 @@ export default async function ModelPage({
       size: unit.size,
       length_cm: unit.length_cm,
       price_override: unit.price_override,
-      status: unit.status,
-      free: isUnitFree(unit, blocked),
+      // Une paire vendue garde sa fiche (son historique), marquée comme telle.
+      status: sold.has(unit.id) ? "vendue" : unit.status,
+      free: !sold.has(unit.id) && isUnitFree(unit, blocked),
     };
     const item = groups.get(key) ?? {
       key,
@@ -96,7 +99,7 @@ export default async function ModelPage({
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
         <Button asChild variant="ghost" size="sm" className="-ms-2">
-          <Link href="/stock">
+          <Link href={forSale ? "/stock?usage=vente" : "/stock"}>
             <ArrowLeft className="icon-directional size-4" aria-hidden />
             {t("common.back")}
           </Link>
@@ -154,7 +157,11 @@ export default async function ModelPage({
           <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
             <div>
               <dt className="text-muted-foreground text-xs">
-                {parts.length ? t("stock.parts.fullPrice") : t("stock.rentalPrice")}
+                {forSale
+                  ? t("stock.salePrice")
+                  : parts.length
+                    ? t("stock.parts.fullPrice")
+                    : t("stock.rentalPrice")}
               </dt>
               <dd className="tabular text-lg font-medium">{formatMoney(model.base_price, l)}</dd>
             </div>

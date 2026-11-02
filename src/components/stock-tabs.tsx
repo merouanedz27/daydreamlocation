@@ -3,6 +3,7 @@ import { Layers, Plus, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { PURPOSES, type Purpose } from "@/lib/purpose";
 
 /**
  * Modèles | Ensembles — deux vues du stock, deux vraies URL.
@@ -65,5 +66,40 @@ export async function StockTabs({
         </Button>
       )}
     </div>
+  );
+}
+
+/**
+ * Location | Vente — les deux stocks du catalogue, portés par l'URL
+ * (`?usage=vente`). Même segment que les onglets, un cran plus discret : il
+ * filtre la liste, il ne change pas d'écran.
+ */
+export async function StockUsageSwitch({ active }: { active: Purpose }) {
+  const t = await getTranslations();
+
+  return (
+    <nav
+      aria-label={t("stock.usage.label")}
+      className="border-border grid grid-cols-2 gap-1 rounded-lg border p-1"
+    >
+      {PURPOSES.map((purpose) => {
+        const current = purpose === active;
+        return (
+          <Link
+            key={purpose}
+            href={purpose === "vente" ? "/stock?usage=vente" : "/stock"}
+            aria-current={current ? "page" : undefined}
+            className={cn(
+              "flex min-h-10 items-center justify-center rounded-md text-sm transition-colors",
+              current
+                ? "bg-gold-soft text-foreground font-medium"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t(`stock.usage.${purpose}`)}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

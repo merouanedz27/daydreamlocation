@@ -23,7 +23,10 @@ export type PeriodTotals = {
 export type MonthlyPoint = {
   /** « 2026-09 » */
   month: string;
+  /** Le TOTAL encaissable du mois : locations + ventes. */
   revenue: number;
+  /** La part des ventes dans `revenue`. */
+  sales: number;
   expenses: number;
 };
 
@@ -60,7 +63,12 @@ export type StockValue = { pieces: number; total: number };
 export type DashboardStats = {
   today: string;
   stockValue: StockValue;
+  /** Locations + ventes : la somme des `total_price`. */
   revenue: PeriodTotals;
+  /** La part des VENTES dans `revenue` (prix de vente des paires vendues). */
+  sales: PeriodTotals;
+  /** Ce que les paires vendues avaient coûté : la marge des ventes = sales − salesCost. */
+  salesCost: PeriodTotals;
   /**
    * La CAISSE du jour, tirée du journal `order_payments` : les acomptes pris
    * aujourd'hui (`versement`) et les restes soldés aujourd'hui (`reste`), sur
@@ -91,6 +99,8 @@ const EMPTY: DashboardStats = {
   today: new Date().toISOString().slice(0, 10),
   stockValue: { pieces: 0, total: 0 },
   revenue: { day: 0, week: 0, month: 0, year: 0 },
+  sales: { day: 0, week: 0, month: 0, year: 0 },
+  salesCost: { day: 0, week: 0, month: 0, year: 0 },
   cashToday: { versement: 0, reste: 0, since: null },
   expenses: { day: 0, week: 0, month: 0, year: 0 },
   monthly: [],
@@ -119,6 +129,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     today: String(raw.today ?? EMPTY.today),
     stockValue: { pieces: num(stockValue.pieces), total: num(stockValue.total) },
     revenue: periods(raw.revenue as Record<string, unknown>),
+    sales: periods(raw.sales as Record<string, unknown>),
+    salesCost: periods(raw.salesCost as Record<string, unknown>),
     cashToday: {
       versement: num(cash.versement),
       reste: num(cash.reste),
@@ -128,6 +140,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     monthly: ((raw.monthly ?? []) as Record<string, unknown>[]).map((m) => ({
       month: String(m.month),
       revenue: num(m.revenue),
+      sales: num(m.sales),
       expenses: num(m.expenses),
     })),
     stock: {

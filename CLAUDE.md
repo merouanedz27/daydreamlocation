@@ -114,6 +114,11 @@ supabase/migrations/
 - **frais** — retouche, pressing. Une `expenses` avec un `order_id` renseigné.
 - **pièce externe** — sous-louée chez un confrère : une ligne de commande **sans** `unit_id`.
   N'entre pas dans le stock.
+- **vente** — un modèle a un usage (`article_models.purpose` : `location` | `vente`). Une pièce de
+  vente se pioche dans une commande comme les autres ; sa ligne (`line_kind = 'vente'`, posé par
+  trigger) bloque la pièce **sans fin** (`rental_range = [retrait, ∞)`) : la même contrainte
+  `EXCLUDE` interdit de la vendre deux fois. Une commande sans aucune location (`has_rental = false`)
+  n'a rien à rendre : « Allez Valid » coche aussi le retour.
 
 **Ni la caution ni le versement ne sont du chiffre d'affaires.** La recette est `total_price`.
 

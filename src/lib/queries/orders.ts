@@ -11,6 +11,8 @@ import {
   SHOE_ITEMS,
 } from "@/lib/item-catalog";
 import { normalizeSearch } from "@/lib/search";
+import { parsePurpose, type Purpose } from "@/lib/purpose";
+import { getSoldUnits } from "@/lib/queries/stock";
 
 export type Settings = Tables<"settings">;
 
@@ -49,6 +51,12 @@ export type PickerUnit = {
   /** Costume divisible : le costume (« TUX-A-03 ») et la partie de la pièce. */
   set_ref: string | null;
   part: string | null;
+  /**
+   * Paire VENDUE : la commande qui la tient (vente active). Le sélecteur la
+   * cache — sauf dans cette commande-là, qu'on modifie. Calculé à la lecture
+   * du catalogue, il voyage aussi dans le cliché hors ligne.
+   */
+  sold_order_id: number | null;
 };
 
 export type PickerModel = {
@@ -58,6 +66,8 @@ export type PickerModel = {
   name_ar: string | null;
   photo_path: string | null;
   base_price: number;
+  /** Location ou vente : le sélecteur sépare les deux stocks. */
+  purpose: Purpose;
   category_slug: string | null;
   category_fr: string | null;
   category_ar: string | null;
@@ -87,11 +97,11 @@ export async function getOrderCatalogue(): Promise<{
 }> {
   const supabase = await createClient();
 
-  const [{ data: models }, { data: ensembles }] = await Promise.all([
+  const [{ data: models }, { data: ensembles }, sold] = await Promise.all([
     supabase
       .from("article_models")
       .select(
-        `id, ref_code, name_fr, name_ar, photo_path, base_price,
+        `id, ref_code, name_fr, name_ar, photo_path, base_price, purpose,
          categories ( slug, name_fr, name_ar ),
          article_units ( id, ref_code, size, length_cm, status, price_override, set_ref, part ),
          article_model_parts ( part, rent_price )`,
@@ -103,6 +113,7 @@ export async function getOrderCatalogue(): Promise<{
       .select(`id, name, package_price, ensemble_items ( unit_id )`)
       .eq("is_active", true)
       .order("name"),
+    getSoldUnits(),
   ]);
 
   type RawModel = {
@@ -112,8 +123,9 @@ export async function getOrderCatalogue(): Promise<{
     name_ar: string | null;
     photo_path: string | null;
     base_price: number;
+    purpose: string;
     categories: { slug: string; name_fr: string; name_ar: string } | null;
-    article_units: PickerUnit[];
+    article_units: Omit<PickerUnit, "sold_order_id">[];
     article_model_parts: { part: string; rent_price: number }[];
   };
 
@@ -132,11 +144,14 @@ export async function getOrderCatalogue(): Promise<{
       name_ar: m.name_ar,
       photo_path: m.photo_path,
       base_price: m.base_price,
+      purpose: parsePurpose(m.purpose),
       category_slug: m.categories?.slug ?? null,
       category_fr: m.categories?.name_fr ?? null,
       category_ar: m.categories?.name_ar ?? null,
       // Une pièce retirée du stock n'a plus à apparaître nulle part.
-      units: (m.article_units ?? []).filter((u) => u.status !== "retire"),
+      units: (m.article_units ?? [])
+        .filter((u) => u.status !== "retire")
+        .map((u) => ({ ...u, sold_order_id: sold.get(u.id) ?? null })),
       parts: sortParts(m.article_model_parts ?? []),
     })),
     ensembles: ((ensembles ?? []) as unknown as RawEnsemble[]).map((e) => ({

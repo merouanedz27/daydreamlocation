@@ -258,7 +258,11 @@
       "save": "Enregistrer les modifications",
       "savedToast": "Commande de {name} modifiée",
       "backToOrder": "Retour à la commande"
-    }
+    },
+    "saleTag": "Vente",
+    "saleDate": "Date de vente",
+    "saleOnlyHint": "Vente seule : rien à rendre, pas de caution.",
+    "saleDone": "Vendue"
   },
   "stock": {
     "parts": {
@@ -417,7 +421,17 @@
     "retiredPart": "{count, plural, =1 {1 retirée (déjà louée)} other {{n} retirées (déjà louées)}}",
     "keptPart": "{count, plural, =1 {1 gardée (réservée)} other {{n} gardées (réservées)}}",
     "oneRetiredToast": "Déjà louée : retirée du stock, son historique est gardé",
-    "piecesAddedToast": "{count, plural, =1 {1 pièce ajoutée} other {{n} pièces ajoutées}}"
+    "piecesAddedToast": "{count, plural, =1 {1 pièce ajoutée} other {{n} pièces ajoutées}}",
+    "usage": {
+      "label": "Location ou vente",
+      "location": "Location",
+      "vente": "Vente",
+      "locationHint": "Se loue pour un événement, puis revient au stock.",
+      "venteHint": "Se vend : la pièce quitte le stock dès que la commande est enregistrée.",
+      "lockedHint": "Déjà utilisé dans une commande : ce choix ne peut plus changer."
+    },
+    "salePrice": "Prix de vente",
+    "sold": "Vendue"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -450,7 +464,13 @@
     "upcomingTitle": "Réservations à venir",
     "upcomingCount": "{count} commande(s)",
     "upcomingNext": "premier retrait le {date}",
-    "noRevenueYet": "Aucune location sur cette période : la recette se compte à la date de retrait. {count} commande(s) déjà réservée(s) plus tard, pour {total}."
+    "noRevenueYet": "Aucune location sur cette période : la recette se compte à la date de retrait. {count} commande(s) déjà réservée(s) plus tard, pour {total}.",
+    "rentals": "Locations",
+    "sales": "Ventes",
+    "totalIn": "Total (locations + ventes)",
+    "salesMargin": "Marge : {amount}",
+    "profitWithSalesHint": "Bénéfice = total − prix d’achat des articles vendus ({cost}) − frais.",
+    "ofWhichSales": "dont ventes : {amount}"
   },
   "auth": {
     "signIn": "Se connecter",
@@ -523,7 +543,8 @@
     "nameTooShort": "Le nom doit contenir au moins 2 caractères.",
     "nameTooLong": "Le nom ne doit pas dépasser 80 caractères.",
     "orderChangedOffline": "La commande a été modifiée entre-temps par quelqu'un d'autre. Rouvrez-la pour repartir de sa dernière version.",
-    "sizeAllReserved": "Toutes les pièces de cette taille sont réservées pour une commande à venir."
+    "sizeAllReserved": "Toutes les pièces de cette taille sont réservées pour une commande à venir.",
+    "purposeLocked": "Ce modèle a déjà servi dans une commande : il ne peut plus passer de la location à la vente (ni l’inverse)."
   },
   "update": {
     "available": "Nouvelle version de l'application disponible",

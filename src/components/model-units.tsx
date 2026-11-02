@@ -62,6 +62,7 @@ const UNIT_STATUS_KEY: Record<string, string> = {
   nettoyage: "cleaning",
   reparation: "repair",
   retire: "retired",
+  vendue: "sold",
 };
 
 /** Combien de références la confirmation nomme avant « … ». */

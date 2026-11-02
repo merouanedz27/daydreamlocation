@@ -26,6 +26,7 @@ import { PhotoUpload } from "@/components/photo-upload";
 import { ModelPieces } from "@/components/model-pieces";
 import { ModelParts, initialParts } from "@/components/model-parts";
 import { PARTS } from "@/lib/stock-refs";
+import { PURPOSES, parsePurpose, type Purpose } from "@/lib/purpose";
 import { createModel, updateModel } from "@/lib/actions/stock";
 import type { ArticleModel, Category, ModelPart } from "@/lib/queries/stock";
 import type { Locale } from "@/i18n/routing";
@@ -46,12 +47,18 @@ export function ModelForm({
   model,
   parts = [],
   pieceCount = 0,
+  defaultPurpose = "location",
+  purposeLocked = false,
 }: {
   categories: Category[];
   model?: ArticleModel;
   /** Les parties d'un costume divisible déjà enregistrées. */
   parts?: ModelPart[];
   pieceCount?: number;
+  /** L'usage proposé à la création : celui de l'onglet d'où l'on vient. */
+  defaultPurpose?: Purpose;
+  /** Une pièce du modèle a déjà servi : l'usage ne change plus (la base le refuse aussi). */
+  purposeLocked?: boolean;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
@@ -65,8 +72,13 @@ export function ModelForm({
   const [refCode, setRefCode] = useState(model?.ref_code ?? "");
   const [categoryId, setCategoryId] = useState(model ? String(model.category_id) : "");
   const categorySlug = categories.find((c) => String(c.id) === categoryId)?.slug ?? null;
-  // Un COSTUME se divise en parties (veste, pantalon, gilet), louables seules.
-  const divisible = categorySlug === "costume";
+  const [purpose, setPurpose] = useState<Purpose>(
+    model ? parsePurpose(model.purpose) : defaultPurpose,
+  );
+  const forSale = purpose === "vente";
+  // Un COSTUME de location se divise en parties (veste, pantalon, gilet),
+  // louables seules. Un article vendu part entier.
+  const divisible = categorySlug === "costume" && !forSale;
   const [partsValue, setPartsValue] = useState(() => initialParts(parts));
   const chosenParts = divisible ? PARTS.filter((p) => partsValue[p].on) : [];
 
@@ -88,7 +100,38 @@ export function ModelForm({
       <input type="hidden" name="locale" value={locale} />
       {model && <input type="hidden" name="id" value={model.id} />}
 
+      <input type="hidden" name="purpose" value={purpose} />
+
       <FieldGroup>
+        {/* Premier choix : il décide du stock où le modèle apparaît, et du
+            sens du prix (location ou vente). */}
+        <Field data-invalid={field === "purpose" || undefined}>
+          <FieldLabel id="purpose-label">{t("stock.usage.label")}</FieldLabel>
+          <div role="radiogroup" aria-labelledby="purpose-label" className="grid grid-cols-2 gap-1.5">
+            {PURPOSES.map((p) => {
+              const active = purpose === p;
+              return (
+                <Button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  variant={active ? "default" : "outline"}
+                  disabled={isPending || (purposeLocked && !active)}
+                  onClick={() => setPurpose(p)}
+                  className="h-11 text-sm"
+                >
+                  {t(`stock.usage.${p}`)}
+                </Button>
+              );
+            })}
+          </div>
+          <FieldDescription>
+            {purposeLocked ? t("stock.usage.lockedHint") : t(`stock.usage.${purpose}Hint`)}
+          </FieldDescription>
+          {field === "purpose" && error && <FieldError>{t(error)}</FieldError>}
+        </Field>
+
         <Field>
           <FieldLabel>{t("stock.photo")}</FieldLabel>
           <PhotoUpload defaultPath={model?.photo_path ?? null} />
@@ -168,7 +211,11 @@ export function ModelForm({
 
         <Field data-invalid={field === "base_price" || undefined}>
           <FieldLabel htmlFor="base_price">
-            {divisible ? t("stock.parts.fullPrice") : t("stock.rentalPrice")}
+            {forSale
+              ? t("stock.salePrice")
+              : divisible
+                ? t("stock.parts.fullPrice")
+                : t("stock.rentalPrice")}
           </FieldLabel>
           <Input
             id="base_price"

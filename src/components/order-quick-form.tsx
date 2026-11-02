@@ -467,6 +467,24 @@ export function OrderQuickForm({
     return map;
   }, [models]);
 
+  /** Les paires du stock de VENTE. Leur ligne sera une vente — c'est la base qui le déduit. */
+  const saleUnitIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const model of models) {
+      if (model.purpose === "vente") for (const unit of model.units) ids.add(unit.id);
+    }
+    return ids;
+  }, [models]);
+  const isSaleUnit = (id: number | null | undefined) => Boolean(id && saleUnitIds.has(id));
+
+  // VENTE SEULE : tout ce qui est saisi vient du stock de vente. Rien à
+  // rendre, donc une seule date — celle de la vente — envoyée comme retrait et
+  // retour. La base, elle, en déduit `has_rental` toute seule.
+  const filledSlots = draft.slots.filter((s) => s.name.trim());
+  const saleOnly = filledSlots.length > 0 && filledSlots.every((s) => isSaleUnit(s.unitId));
+  const sendPickup = saleOnly && draft.eventDate ? draft.eventDate : pickup;
+  const sendReturn = saleOnly && draft.eventDate ? draft.eventDate : returnDue;
+
   // --- lignes envoyées -------------------------------------------------------
   const lines: DraftLine[] = useMemo(() => {
     const filled = draft.slots
@@ -525,8 +543,8 @@ export function OrderQuickForm({
       customer_name: draft.customerName,
       customer_phone: draft.customerPhone,
       event_date: draft.eventDate,
-      pickup_date: pickup,
-      return_due_date: returnDue,
+      pickup_date: sendPickup,
+      return_due_date: sendReturn,
       discount: 0,
       amount_paid: draft.paid,
       caution_amount: draft.caution,
@@ -654,6 +672,10 @@ export function OrderQuickForm({
       const name =
         (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
       for (const unit of model.units) {
+        // Une paire vendue par UNE AUTRE commande a quitté la boutique : elle
+        // n'est plus proposée nulle part. Celle de la commande qu'on modifie
+        // reste, sinon elle disparaîtrait de sa propre case.
+        if (unit.sold_order_id && unit.sold_order_id !== edit?.orderId) continue;
         map.set(unit.id, {
           model,
           unit,
@@ -663,7 +685,7 @@ export function OrderQuickForm({
       }
     }
     return map;
-  }, [models, locale]);
+  }, [models, locale, edit?.orderId]);
 
   /** Pourquoi une pièce ne peut pas être prise, pour la case `index`. */
   function unitState(id: number, index: number) {
@@ -741,6 +763,9 @@ export function OrderQuickForm({
               aria-hidden
             />
             {unit.size && `${t("stock.size")} ${unit.size}`}
+            {isSaleUnit(id) && (
+              <span className="text-gold-strong font-medium"> · {t("orders.saleTag")}</span>
+            )}
             {reason && (
               <span className="text-warning-foreground"> · {reason}</span>
             )}
@@ -1037,8 +1062,8 @@ export function OrderQuickForm({
     formData.set("customer_name", draft.customerName);
     formData.set("customer_phone", draft.customerPhone);
     formData.set("event_date", draft.eventDate);
-    formData.set("pickup_date", pickup);
-    formData.set("return_due_date", returnDue);
+    formData.set("pickup_date", sendPickup);
+    formData.set("return_due_date", sendReturn);
     formData.set("discount", "0");
     formData.set("amount_paid", draft.paid);
     formData.set("caution_amount", draft.caution);
@@ -1065,8 +1090,8 @@ export function OrderQuickForm({
       const summary = {
         customerName: name,
         eventDate: draft.eventDate,
-        pickup,
-        returnDue,
+        pickup: sendPickup,
+        returnDue: sendReturn,
         unitIds: [...unitIdsIn(lines)],
       };
       if (edit) {
@@ -1272,7 +1297,7 @@ export function OrderQuickForm({
 
           <Field data-invalid={!!issues.event_date || undefined}>
             <FieldLabel htmlFor="q-date">
-              {t("orders.eventDate")}
+              {saleOnly ? t("orders.saleDate") : t("orders.eventDate")}
               <RequiredMark />
             </FieldLabel>
             <DatePicker
@@ -1286,7 +1311,12 @@ export function OrderQuickForm({
               <FieldError>{issueText("event_date")}</FieldError>
             )}
 
-            {windowLabel && (
+            {saleOnly ? (
+              <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                <Package className="text-gold-strong size-4 shrink-0" aria-hidden />
+                {t("orders.saleOnlyHint")}
+              </p>
+            ) : windowLabel && (
               <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 text-sm">
                 <span className="flex items-center gap-1.5">
                   <CalendarRange
@@ -1307,7 +1337,7 @@ export function OrderQuickForm({
             )}
           </Field>
 
-          {draft.eventDate && showDates && (
+          {draft.eventDate && showDates && !saleOnly && (
             <div className="grid grid-cols-2 gap-3">
               <Field data-invalid={!!issues.pickup_date || undefined}>
                 <FieldLabel htmlFor="q-pickup">
@@ -1354,7 +1384,9 @@ export function OrderQuickForm({
               formulaire. Le plus souvent laissées à ✗ — on les coche sur la
               fiche le jour J — mais un client qui réserve et emporte sa tenue
               dans la foulée se valide ici, sans rouvrir la commande. */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Vente seule : rien ne revient. La base coche le retour avec la
+              sortie ; la case « Retour » n'a rien à faire à l'écran. */}
+          <div className={cn("grid gap-3", saleOnly ? "grid-cols-1" : "grid-cols-2")}>
             <FlagToggle
               icon={<Plane className="size-4 rtl:-scale-x-100" aria-hidden />}
               label={t("orders.pickedUp")}
@@ -1365,14 +1397,16 @@ export function OrderQuickForm({
                 updateDraft({ pickedUp: v, returned: v && draft.returned })
               }
             />
-            <FlagToggle
-              icon={<CircleCheck className="size-4" aria-hidden />}
-              label={t("orders.returned")}
-              checked={draft.returned}
-              onChange={(v) =>
-                updateDraft({ returned: v, pickedUp: v || draft.pickedUp })
-              }
-            />
+            {!saleOnly && (
+              <FlagToggle
+                icon={<CircleCheck className="size-4" aria-hidden />}
+                label={t("orders.returned")}
+                checked={draft.returned}
+                onChange={(v) =>
+                  updateDraft({ returned: v, pickedUp: v || draft.pickedUp })
+                }
+              />
+            )}
           </div>
         </FieldGroup>
       </Section>
@@ -1534,6 +1568,11 @@ export function OrderQuickForm({
                     )}
                     {t("orders.quick.fromStock")} <bdi>{slot.ref}</bdi>
                     {slot.size && ` · ${t("stock.size")} ${slot.size}`}
+                    {isSaleUnit(slot.unitId) && (
+                      <span className="text-gold-strong font-medium">
+                        {` · ${t("orders.saleTag")}`}
+                      </span>
+                    )}
                     {taken &&
                       ` · ${
                         taken.freeFrom
@@ -1646,18 +1685,22 @@ export function OrderQuickForm({
             </p>
           </div>
 
-          <Field data-invalid={!!issues.caution_amount || undefined}>
-            <FieldLabel htmlFor="q-caution">{t("orders.caution")}</FieldLabel>
-            <MoneyStepper
-              id="q-caution"
-              value={draft.caution}
-              onChange={(v) => updateDraft({ caution: v })}
-              invalid={!!issues.caution_amount}
-            />
-            {issues.caution_amount && (
-              <FieldError>{issueText("caution_amount")}</FieldError>
-            )}
-          </Field>
+          {/* Pas de caution sur une vente seule : rien ne revient. Une caution
+              déjà saisie reste visible, pour pouvoir l'effacer. */}
+          {(!saleOnly || draft.caution) && (
+            <Field data-invalid={!!issues.caution_amount || undefined}>
+              <FieldLabel htmlFor="q-caution">{t("orders.caution")}</FieldLabel>
+              <MoneyStepper
+                id="q-caution"
+                value={draft.caution}
+                onChange={(v) => updateDraft({ caution: v })}
+                invalid={!!issues.caution_amount}
+              />
+              {issues.caution_amount && (
+                <FieldError>{issueText("caution_amount")}</FieldError>
+              )}
+            </Field>
+          )}
 
           <Field data-invalid={!!issues.notes || undefined}>
             <FieldLabel htmlFor="q-notes">{t("orders.notesTitle")}</FieldLabel>

@@ -46,7 +46,7 @@ export default async function NewEnsemblePage({
         <span className="ornament-diamond" />
       </div>
 
-      <EnsembleForm models={models} />
+      <EnsembleForm models={models.filter((m) => m.purpose === "location")} />
     </div>
   );
 }
