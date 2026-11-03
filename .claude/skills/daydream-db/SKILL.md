@@ -7,7 +7,8 @@ description: Database reference for DayDream Location — full schema, Supabase 
 
 ## Workflow — non négociable
 
-**Pas de base locale, pas de Docker.** On travaille sur le projet Supabase en ligne.
+**Développement sur Supabase local (Docker)**, ports 563xx. La production n'est touchée que par
+les commandes `:prod`, qui lisent `.env.production.local`.
 
 Le schéma vit dans `supabase/migrations/`, un fichier par changement, **toujours**. C'est la seule
 source de vérité : un changement appliqué sans fichier n'est pas reproductible et sera perdu au
@@ -15,11 +16,13 @@ prochain environnement.
 
 ```bash
 npx supabase migration new <nom>   # cree le fichier SQL horodate
-# -> ecrire le SQL, puis le faire appliquer (copier-coller dans l'editeur SQL
-#    du dashboard : c'est le mode retenu sur ce projet)
+# -> ecrire le SQL
+npm run db:migrate                 # l'appliquer sur la base LOCALE
 npm run db:types                   # REGENERER LES TYPES, sinon TypeScript ment
-npm run db:test                    # rejouer les tests de disponibilite
-npm run db:advisors                # audit securite + performance
+npm run db:test                    # rejouer les tests de disponibilite (local)
+# puis, une fois valide, en production :
+npm run db:push:prod
+npm run db:advisors:prod           # audit securite + performance
 ```
 
 **Une migration déjà appliquée ne se modifie jamais** : on en écrit une nouvelle qui corrige.
@@ -27,8 +30,8 @@ npm run db:advisors                # audit securite + performance
 ### Génération des types
 
 `npm run db:types` exécute `scripts/gen-types.mjs`, qui introspecte le catalogue Postgres via la
-connexion `SUPABASE_DB_URL`. On n'utilise **pas** `supabase gen types` : avec `--db-url` il lance
-pg-meta dans un conteneur Docker, et avec `--project-id` il exige un jeton de compte.
+connexion `SUPABASE_DB_URL` (base locale par défaut). On n'utilise **pas** `supabase gen types` :
+le script reproduit son format sans jeton de compte.
 
 Le script exclut correctement de `Insert`/`Update` les colonnes `generated always` — c'est ce qui
 rend `orders.balance` impossible à écrire depuis le code, et pas seulement depuis SQL.

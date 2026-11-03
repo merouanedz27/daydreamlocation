@@ -2,7 +2,10 @@
 /**
  * Crée (ou met à jour) un compte pour l'équipe.
  *
- *   node scripts/create-account.mjs <email> <mot-de-passe> "<Nom complet>" [owner|staff]
+ *   node scripts/create-account.mjs <email> <mot-de-passe> "<Nom complet>" [owner|staff] [--prod]
+ *
+ * Base locale (Docker) par défaut ; `--prod` pour amorcer le premier compte
+ * propriétaire en production (voir env.mjs).
  *
  * L'inscription publique est DÉSACTIVÉE sur le projet, et c'est voulu : la clé
  * publiable est visible dans le navigateur, donc un formulaire d'inscription
@@ -26,15 +29,15 @@
  * Le mot de passe n'est ni journalisé ni écrit sur disque : il ne transite que
  * comme paramètre lié de la requête SQL.
  */
-import { readFileSync } from "node:fs";
-import { argv, env, exit } from "node:process";
+import { exit } from "node:process";
 import pg from "pg";
+import { args, dbConfig } from "./env.mjs";
 
-const [, , email, password, fullName, role = "staff"] = argv;
+const [email, password, fullName, role = "staff"] = args;
 
 if (!email || !password || !fullName) {
   console.error(
-    'usage: node scripts/create-account.mjs <email> <mot-de-passe> "<Nom complet>" [owner|staff]',
+    'usage: node scripts/create-account.mjs <email> <mot-de-passe> "<Nom complet>" [owner|staff] [--prod]',
   );
   exit(2);
 }
@@ -47,24 +50,7 @@ if (password.length < 8) {
   exit(2);
 }
 
-try {
-  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && !env[m[1]]) env[m[1]] = m[2];
-  }
-} catch {
-  /* .env.local absent */
-}
-
-if (!env.SUPABASE_DB_URL) {
-  console.error("SUPABASE_DB_URL absent de .env.local.");
-  exit(2);
-}
-
-const client = new pg.Client({
-  connectionString: env.SUPABASE_DB_URL,
-  ssl: { rejectUnauthorized: false },
-});
+const client = new pg.Client(dbConfig());
 
 // `auth.users` n'a pas de contrainte unique simple sur `email` : l'unicité vient
 // d'un index PARTIEL (`users_email_partial_key ... where is_sso_user = false`),

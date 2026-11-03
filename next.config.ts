@@ -4,6 +4,12 @@ import type { NextConfig } from "next";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+// Le Supabase dont viennent les photos du stock : le conteneur Docker en local
+// (http://127.0.0.1:56321), le projet en ligne en production. Lu dans l'env,
+// pour ne jamais coder en dur l'adresse d'un projet.
+const supabase = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:56321");
+const supabaseIsLocal = ["127.0.0.1", "localhost"].includes(supabase.hostname);
+
 const nextConfig: NextConfig = {
   // L'identifiant de CE build, figé dans le code du navigateur : comparé à
   // `/api/version` par `UpdateNotifier` pour annoncer une mise à jour.
@@ -25,11 +31,16 @@ const nextConfig: NextConfig = {
     // Photos du stock servies depuis Supabase Storage.
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "ydhlonfforwvgpgffwqw.supabase.co",
+        protocol: supabase.protocol === "http:" ? "http" : "https",
+        hostname: supabase.hostname,
+        port: supabase.port,
         pathname: "/storage/v1/object/public/**",
       },
     ],
+    // Next refuse par défaut d'optimiser une image venue d'une IP locale
+    // (protection SSRF). Ouvert UNIQUEMENT quand Supabase est le conteneur
+    // local — jamais en production.
+    dangerouslyAllowLocalIP: supabaseIsLocal,
   },
 };
 

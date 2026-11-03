@@ -2,7 +2,7 @@
 // Régénérer avec :  npm run db:types
 //
 // Produit par scripts/gen-types.mjs, qui introspecte directement le
-// catalogue Postgres (ni Docker ni jeton de compte requis).
+// catalogue Postgres (aucun jeton de compte requis).
 
 export type Json =
   | string

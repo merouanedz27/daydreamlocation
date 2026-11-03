@@ -6,34 +6,21 @@
  *
  * POURQUOI ce script plutôt que `supabase gen types` : la commande officielle
  * lance pg-meta dans un conteneur (avec `--db-url`) ou passe par l'API de
- * gestion (avec `--project-id`, qui exige un jeton de compte). Ce projet
- * n'utilise ni Docker ni jeton : on lit directement le catalogue Postgres avec
- * la connexion déjà configurée.
+ * gestion (avec `--project-id`, qui exige un jeton de compte). On lit
+ * directement le catalogue Postgres avec la connexion déjà configurée : la
+ * base locale (Docker) par défaut, dont le schéma est celui des migrations.
  *
  * Le format de sortie reproduit celui de Supabase (Row / Insert / Update +
  * helpers Tables<>), afin que le code applicatif reste identique si l'on
  * revient un jour à l'outil officiel.
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { env, exit } from "node:process";
+import { exit } from "node:process";
 import pg from "pg";
+import { dbConfig } from "./env.mjs";
 
 const OUT = "src/lib/supabase/database.types.ts";
-
-try {
-  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && !env[m[1]]) env[m[1]] = m[2];
-  }
-} catch {
-  /* .env.local absent : on se rabat sur l'environnement réel. */
-}
-
-if (!env.SUPABASE_DB_URL) {
-  console.error("SUPABASE_DB_URL absent (.env.local ou environnement).");
-  exit(2);
-}
 
 /** Correspondance type Postgres -> type TypeScript. */
 function tsType(udt) {
@@ -57,10 +44,7 @@ function tsType(udt) {
   }
 }
 
-const client = new pg.Client({
-  connectionString: env.SUPABASE_DB_URL,
-  ssl: { rejectUnauthorized: false },
-});
+const client = new pg.Client(dbConfig());
 
 const COLUMNS_SQL = `
   select c.table_name, c.column_name, c.udt_name, c.is_nullable,
@@ -198,7 +182,7 @@ try {
   out.push("// Régénérer avec :  npm run db:types");
   out.push("//");
   out.push("// Produit par scripts/gen-types.mjs, qui introspecte directement le");
-  out.push("// catalogue Postgres (ni Docker ni jeton de compte requis).");
+  out.push("// catalogue Postgres (aucun jeton de compte requis).");
   out.push("");
   out.push("export type Json =");
   out.push("  | string");

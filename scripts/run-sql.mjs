@@ -10,40 +10,22 @@
  * transaction (begin / do / select / rollback). `pg` utilise le protocole de
  * requête simple tant qu'aucun paramètre n'est passé, ce qui l'autorise.
  *
- * La chaîne de connexion vient de SUPABASE_DB_URL (.env.local) et n'est jamais
- * affichée.
+ * La chaîne de connexion vient de SUPABASE_DB_URL et n'est jamais affichée :
+ * base locale (Docker) par défaut, production avec `--prod` (voir env.mjs).
  */
 import { readFileSync } from "node:fs";
-import { argv, env, exit } from "node:process";
+import { exit } from "node:process";
 import pg from "pg";
+import { args, dbConfig } from "./env.mjs";
 
-const file = argv[2];
+const file = args[0];
 if (!file) {
-  console.error("usage: node scripts/run-sql.mjs <fichier.sql>");
-  exit(2);
-}
-
-// Charge .env.local sans dépendance externe.
-try {
-  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m && !env[m[1]]) env[m[1]] = m[2];
-  }
-} catch {
-  // .env.local absent : on se rabat sur l'environnement réel.
-}
-
-const connectionString = env.SUPABASE_DB_URL;
-if (!connectionString) {
-  console.error("SUPABASE_DB_URL absent (.env.local ou environnement).");
+  console.error("usage: node scripts/run-sql.mjs <fichier.sql> [--prod]");
   exit(2);
 }
 
 const sql = readFileSync(file, "utf8");
-const client = new pg.Client({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
+const client = new pg.Client(dbConfig());
 
 function renderTable(rows) {
   const cols = Object.keys(rows[0]);

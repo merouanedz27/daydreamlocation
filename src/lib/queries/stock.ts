@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { addDays, type IsoDate } from "@/lib/rental-range";
 import type { Tables } from "@/lib/supabase/database.types";
 import type { Purpose } from "@/lib/purpose";
+import { searchTerm } from "@/lib/orders-query";
 
 export type Category = Tables<"categories">;
 export type ArticleModel = Tables<"article_models">;
@@ -56,8 +57,11 @@ export async function getModels(options?: {
     query = query.eq("categories.slug", options.categorySlug);
   }
 
-  if (options?.search?.trim()) {
-    const term = options.search.trim();
+  // Nettoyé comme celui des commandes : une virgule ou une parenthèse tapée
+  // (« Gio, 079 ») cassait la syntaxe du `or(...)`, et la page du stock
+  // tombait en erreur.
+  const term = searchTerm(options?.search);
+  if (term) {
     // `or` avec `ilike` : la recherche porte sur ce que l'équipe a sous les
     // yeux — la référence fournisseur, le nom, la couleur.
     query = query.or(

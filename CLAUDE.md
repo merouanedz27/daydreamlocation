@@ -28,22 +28,38 @@ npm run build             # build de production
 npm run lint              # ESLint (inclut la règle RTL, voir plus bas)
 npm run typecheck         # tsc --noEmit
 
-npm run db:push           # applique les migrations sur la base en ligne
-npm run db:test           # rejoue les tests de disponibilité (rollback, sans trace)
-npm run db:advisors       # audit sécurité + performance Supabase
+# Supabase LOCAL (Docker) — développement et tests
+npm run db:start          # démarre les conteneurs (migrations + seed au 1er lancement)
+npm run db:env            # écrit les clés locales dans .env.local
+npm run db:migrate        # applique les nouvelles migrations en local
+npm run db:reset          # repart de zéro : migrations + seed + comptes de test
+npm run db:test           # rejoue les tests SQL (rollback, sans trace)
 npm run db:types          # régénère src/lib/supabase/database.types.ts
+npm run db:stop
+
+# PRODUCTION — explicite, lit .env.production.local
+npm run db:push:prod      # applique les migrations
+npm run db:advisors:prod  # audit sécurité + performance
 
 npx supabase migration new <nom>
 ```
 
-**Pas de base locale, pas de Docker** : on travaille directement sur le projet
-Supabase en ligne. `SUPABASE_DB_URL` (dans `.env.local`, jamais versionné) pointe
-sur le *session pooler*, port **5432** — le 6543 est en mode transaction et gère
-mal le DDL. Cette variable n'a PAS de préfixe `NEXT_PUBLIC_` : elle contient le
-mot de passe de la base et ne doit jamais atteindre le navigateur.
+**Deux environnements.** En développement, Supabase tourne dans Docker (API
+`http://127.0.0.1:56321`, Studio `:56323`, Postgres `:56322` — ports 563xx car
+d'autres projets occupent les 543xx et 553xx). Comptes de test :
+`owner@daydream.local` et `staff@daydream.local`, mot de passe `daydream-local`
+(`supabase/seed-local.sql`). Le stock de démonstration vient de `supabase/data/`
+et `seed.sql`.
 
-`db:types` passe par l'API de gestion (`--project-id`) et non par `--db-url`, qui
-exigerait Docker.
+La production lit `.env.production.local` (outillage) et les variables Vercel
+(application) ; les scripts n'y touchent qu'avec `--prod`. Son `SUPABASE_DB_URL`
+pointe sur le *session pooler*, port **5432** — le 6543 est en mode transaction et
+gère mal le DDL. Cette variable n'a PAS de préfixe `NEXT_PUBLIC_` : elle contient
+le mot de passe de la base et ne doit jamais atteindre le navigateur.
+
+**Toute modification du schéma = un fichier dans `supabase/migrations/`**, testé
+en local (`db:migrate` ou `db:reset`), puis appliqué en production par
+`db:push:prod`. Jamais l'inverse.
 
 ## Règles non négociables
 

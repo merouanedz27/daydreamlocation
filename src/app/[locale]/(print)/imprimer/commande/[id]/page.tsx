@@ -177,6 +177,9 @@ export default async function OrderSlipPage({
   const terms = settings.rental_terms_ar ?? null;
   const shopPhone = settings.shop_phone ?? null;
   const cancelled = order.status === "annulee";
+  // Le même QR sur les DEUX tickets : scanné sur le cintre, il vérifie à
+  // quelle commande appartient la housse.
+  const orderUrl = `${appUrl()}/${locale}/commandes/${order.id}`;
 
   const cancelledBanner = cancelled && (
     // Un bon d'une commande annulée reste imprimable — pour le dossier — mais
@@ -219,10 +222,7 @@ export default async function OrderSlipPage({
               (`dir="ltr"`) : scanné, il ouvre la commande dans l'appli. Le
               logo rapetisse pour lui laisser la place. */}
           <div dir="ltr" className="flex items-center gap-[0.6em]">
-            <OrderQr
-              value={`${appUrl()}/${locale}/commandes/${order.id}`}
-              className="size-[4.5em] shrink-0"
-            />
+            <OrderQr value={orderUrl} className="size-[4.5em] shrink-0" />
             <Image
               src={wordmark}
               alt={t("app.name")}
@@ -263,13 +263,19 @@ export default async function OrderSlipPage({
             le premier, sur une feuille pile à sa hauteur, faisait sortir une
             page blanche entre les deux. */}
         <TicketFrame index={1} frameClassName="print:break-before-page">
-          <Image
-            src={suit}
-            alt=""
-            priority
-            unoptimized
-            className="mx-auto h-auto w-[7.5em] max-w-[45%] [print-color-adjust:exact]"
-          />
+          {/* Le QR à la même place que sur le ticket du client — en pouces,
+              PAS en `em` : ce ticket a peu de texte, `fitTicket` y grossit
+              tout jusqu'à 2,2 fois et le QR envahissait la feuille. */}
+          <div dir="ltr" className="flex items-center gap-[0.6em]">
+            <OrderQr value={orderUrl} className="size-[0.7in] shrink-0" />
+            <Image
+              src={suit}
+              alt=""
+              priority
+              unoptimized
+              className="mx-auto h-auto w-[7.5em] min-w-0 max-w-[45%] [print-color-adjust:exact]"
+            />
+          </div>
           {cancelledBanner}
           <TicketRows rows={costumeRows} className="mt-[0.6em] text-[1.15em]" />
         </TicketFrame>
