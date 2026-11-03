@@ -24,6 +24,12 @@ export type ScanOutcome = { ok: boolean; message: string };
  */
 const SAME_CODE_COOLDOWN_MS = 2500;
 
+/** Au cas où le tiroir ne signale pas la fin de son ouverture (animations coupées). */
+const SETTLE_FALLBACK_MS = 600;
+
+/** Le cadre passe au vert ce temps-là après une paire acceptée. */
+const FLASH_MS = 600;
+
 type CameraState = "starting" | "ready" | "denied" | "none";
 
 /**
@@ -48,6 +54,11 @@ export function QrScanSheet({
   const [camera, setCamera] = useState<CameraState>("starting");
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
   const [typed, setTyped] = useState("");
+  // La caméra démarre quand le tiroir a FINI de s'ouvrir : la vidéo est
+  // alors à sa taille définitive.
+  const [settled, setSettled] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Lu par le rappel de la caméra, créé une fois : la dernière version du
   // formulaire, sans redémarrer la caméra à chaque scan.
   const onScanRef = useRef(onScan);
@@ -61,19 +72,32 @@ export function QrScanSheet({
     if (!ref) return;
     const result = onScanRef.current(ref);
     setOutcome(result);
-    if (result.ok) navigator.vibrate?.(60);
+    if (result.ok) {
+      navigator.vibrate?.(60);
+      setFlash(true);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlash(false), FLASH_MS);
+    }
   }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || settled) return;
+    const timer = setTimeout(() => setSettled(true), SETTLE_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [open, settled]);
+
+  function changeOpen(next: boolean) {
+    if (!next) setSettled(false);
+    onOpenChange(next);
+  }
+
+  useEffect(() => {
+    if (!open || !settled) return;
     let cancelled = false;
     let scanner: { stop(): void; destroy(): void } | null = null;
-    // Le contenu du tiroir vient d'être monté : on attend une image pour que
-    // la vidéo soit dans la page.
-    const frame = requestAnimationFrame(async () => {
+    void (async () => {
       const video = videoRef.current;
       if (!video || cancelled) return;
-      setCamera("starting");
       try {
         const { default: QrScanner } = await import("qr-scanner");
         if (cancelled) return;
@@ -95,7 +119,9 @@ export function QrScanSheet({
           {
             preferredCamera: "environment",
             maxScansPerSecond: 8,
-            highlightScanRegion: true,
+            // Pas le cadre de la bibliothèque : il se recalcule sur la
+            // position de la vidéo et sautait pendant que le tiroir glisse.
+            // Le nôtre, fixe, est dessiné par-dessus (voir plus bas).
             returnDetailedScanResult: true,
           },
         );
@@ -106,14 +132,14 @@ export function QrScanSheet({
       } catch {
         if (!cancelled) setCamera("denied");
       }
-    });
+    })();
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frame);
       scanner?.stop();
       scanner?.destroy();
+      setCamera("starting");
     };
-  }, [open]);
+  }, [open, settled]);
 
   function submitTyped(event: React.FormEvent) {
     event.preventDefault();
@@ -122,7 +148,11 @@ export function QrScanSheet({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer
+      open={open}
+      onOpenChange={changeOpen}
+      onAnimationEnd={(isOpen) => isOpen && setSettled(true)}
+    >
       <DrawerContent className="h-[88svh] max-h-[88svh]">
         <DrawerHeader className="pb-2 text-start">
           <DrawerTitle className="text-lg">{t("scanTitle")}</DrawerTitle>
@@ -131,17 +161,34 @@ export function QrScanSheet({
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4">
           <div className="bg-muted relative aspect-square w-full overflow-hidden rounded-lg">
+            {/* JAMAIS cachée (ni `hidden`, ni `invisible`) : la bibliothèque
+                prendrait une vidéo masquée pour voulue et la réduirait à
+                0 × 0 — le scan marchait alors à l'aveugle. Le message de
+                démarrage se pose PAR-DESSUS. */}
             <video
               ref={videoRef}
               muted
               playsInline
-              className={cn(
-                "size-full object-cover",
-                camera !== "ready" && "invisible",
-              )}
+              className="block size-full object-cover"
             />
+            {/* Le cadre de visée : ⅔ du carré, centré — la zone que la
+                bibliothèque lit par défaut. Ce qui est dedans est lu. */}
+            {camera === "ready" && (
+              <div
+                aria-hidden
+                className={cn(
+                  "pointer-events-none absolute inset-[16.67%] transition-colors",
+                  flash ? "text-success" : "text-gold-strong",
+                )}
+              >
+                <span className="absolute start-0 top-0 size-8 rounded-ss-lg border-s-4 border-t-4 border-current" />
+                <span className="absolute end-0 top-0 size-8 rounded-se-lg border-e-4 border-t-4 border-current" />
+                <span className="absolute start-0 bottom-0 size-8 rounded-es-lg border-s-4 border-b-4 border-current" />
+                <span className="absolute end-0 bottom-0 size-8 rounded-ee-lg border-e-4 border-b-4 border-current" />
+              </div>
+            )}
             {camera !== "ready" && (
-              <div className="text-muted-foreground absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-sm">
+              <div className="bg-muted text-muted-foreground absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-sm">
                 {camera === "starting" ? (
                   <ScanLine className="size-8 animate-pulse" aria-hidden />
                 ) : (
@@ -203,7 +250,7 @@ export function QrScanSheet({
           <Button
             type="button"
             className="h-12 text-base"
-            onClick={() => onOpenChange(false)}
+            onClick={() => changeOpen(false)}
           >
             {t("done")}
           </Button>
