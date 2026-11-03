@@ -20,6 +20,7 @@ import {
   Package,
   Plane,
   Plus,
+  ScanLine,
   Tag,
   X,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { DatePicker, toCalendarDate } from "@/components/date-picker";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { QrScanSheet, type ScanOutcome } from "@/components/qr-scan-sheet";
 import {
   FlagToggle,
   MoneyStepper,
@@ -901,6 +903,58 @@ export function OrderQuickForm({
     };
   }
 
+  // --- scan des chaussures à vendre -------------------------------------------
+  // Commande MIXTE (costume loué + chaussures achetées) : l'icône de scan de
+  // la case Chaussures ouvre le scanner de la vente au comptoir.
+  const [scanOpen, setScanOpen] = useState(false);
+
+  /** Un QR lu → la paire va dans la case Chaussures, ou en pièce en plus si elle est prise. */
+  function onScanShoes(code: string): ScanOutcome {
+    const shown = code.trim();
+    const key = shown.toUpperCase();
+    const hit = models
+      .flatMap((m) => m.units.map((u) => ({ id: u.id, ref: u.ref_code, purpose: m.purpose })))
+      .find((u) => u.ref.trim().toUpperCase() === key);
+    if (!hit) return { ok: false, message: t("orders.sale.unknownRef", { ref: shown }) };
+    // Le scan reste réservé au stock de VENTE, comme au comptoir.
+    if (hit.purpose !== "vente") {
+      return { ok: false, message: t("orders.sale.rentalRef", { ref: shown }) };
+    }
+    // Absente de `unitIndex` : vendue par une autre commande.
+    if (!unitIndex.has(hit.id)) {
+      return { ok: false, message: `${hit.ref} · ${t("orders.sale.alreadySold")}` };
+    }
+    if (pickedUnits.has(hit.id)) {
+      return { ok: false, message: t("orders.sale.alreadyInSale", { ref: hit.ref }) };
+    }
+    const { reason, taken } = unitState(hit.id, SHOES_SLOT);
+    if (!windowValid || taken) {
+      return { ok: false, message: `${hit.ref} · ${reason ?? t("orders.takenOnDates")}` };
+    }
+
+    const filled = unitSlot(hit.id)!;
+    setServerIssue(null);
+    const slots = [...store.get().slots];
+    // Case Chaussures libre : la paire y va, comme choisie dans sa liste.
+    // Déjà prise : une pièce en plus, comme « Vendre un article ».
+    if (!slots[SHOES_SLOT].name.trim()) {
+      slots[SHOES_SLOT] = { ...slots[SHOES_SLOT], ...filled };
+    } else {
+      slots.push({ ...EMPTY_SLOT, ...filled });
+    }
+    updateDraft({ slots });
+
+    const found = unitIndex.get(hit.id)!;
+    return {
+      ok: true,
+      message: t("orders.sale.added", {
+        name: found.name,
+        size: found.unit.size ?? "—",
+        price: formatMoney(found.price, locale),
+      }),
+    };
+  }
+
   /** Une clé cochée → de quoi remplir une case. */
   function slotFromKey(key: string): Partial<Slot> | null {
     if (key.startsWith(NEW_KEY)) {
@@ -1560,6 +1614,20 @@ export function OrderQuickForm({
                         Boolean(partIssue) || (!!issues.lines && index === 0)
                       }
                     />
+                    {/* Commande mixte : scanner la paire à vendre. */}
+                    {index === SHOES_SLOT && saleUnitIds.size > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setScanOpen(true)}
+                        aria-label={t("orders.sale.scan")}
+                        title={t("orders.sale.scan")}
+                        className="border-gold-strong/50 size-12 shrink-0"
+                      >
+                        <ScanLine className="text-gold-strong size-5" aria-hidden />
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <PickerField
@@ -1895,6 +1963,8 @@ export function OrderQuickForm({
           }
         />
       )}
+
+      <QrScanSheet open={scanOpen} onOpenChange={setScanOpen} onScan={onScanShoes} />
 
       {sizePicker && (
         <SizePicker
