@@ -16,6 +16,13 @@
  */
 import type { IsoDate } from "@/lib/rental-range";
 
+/**
+ * Un jour « AAAA-MM-JJ », tel que l'envoient les cases du pointage. Ici et
+ * testé : une version sans ses « \d » refusait TOUTES les dates, et chaque
+ * case cochée échouait en silence côté serveur.
+ */
+export const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 export const PAY_TYPES = ["permanent", "remplacant"] as const;
 /** Les deux valeurs de la contrainte `profiles_pay_type_valid`. */
 export type PayType = (typeof PAY_TYPES)[number];

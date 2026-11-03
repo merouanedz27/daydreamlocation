@@ -6,6 +6,8 @@ import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
 import { TicketFrame } from "@/components/ticket-fit";
 import { TicketPdfProvider } from "@/components/ticket-pdf";
+import { OrderQr } from "@/components/order-qr";
+import { appUrl } from "@/lib/email/send";
 import {
   getOrder,
   getOrderCatalogue,
@@ -213,13 +215,22 @@ export default async function OrderSlipPage({
               `/_next/image`, et le ticket du costume sortait avec DAYDREAM.
               `priority` sur les deux : une image paresseuse hors de l'écran
               n'est pas encore chargée quand on imprime. */}
-          <Image
-            src={wordmark}
-            alt={t("app.name")}
-            priority
-            unoptimized
-            className="mx-auto h-auto w-[16em] max-w-full [print-color-adjust:exact]"
-          />
+          {/* Le QR de la commande en haut à GAUCHE, sur un bon arabe aussi
+              (`dir="ltr"`) : scanné, il ouvre la commande dans l'appli. Le
+              logo rapetisse pour lui laisser la place. */}
+          <div dir="ltr" className="flex items-center gap-[0.6em]">
+            <OrderQr
+              value={`${appUrl()}/${locale}/commandes/${order.id}`}
+              className="size-[4.5em] shrink-0"
+            />
+            <Image
+              src={wordmark}
+              alt={t("app.name")}
+              priority
+              unoptimized
+              className="mx-auto h-auto w-[12em] min-w-0 max-w-full [print-color-adjust:exact]"
+            />
+          </div>
 
           {/* Téléphone et avertissements en GRAS, comme sur son modèle. */}
           <div className="mt-[0.5em] space-y-[0.15em] text-center text-[0.86em] leading-snug font-bold">

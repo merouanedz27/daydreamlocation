@@ -11,6 +11,7 @@
  * sont rejoués côté base dans `supabase/tests/pointage.sql`.
  */
 import {
+  ISO_DAY,
   calendarDays,
   isLocked,
   markKind,
@@ -78,6 +79,12 @@ eq("décocher aujourd'hui : oui", selfCanToggle("2026-10-20", true, "2026-10-20"
 eq("jour payé : non", selfCanToggle("2026-10-15", false, "2026-10-20", S, "2026-10-15"), false);
 eq("demain : non", selfCanToggle("2026-10-21", false, "2026-10-20", S, null), false);
 eq("avant le début : non", selfCanToggle("2026-10-10", false, "2026-10-20", "2026-10-12", null), false);
+
+// Le format de jour vérifié par les actions serveur : sans lui, aucune case
+// cochée n'arrive en base.
+eq("jour valide accepté", ISO_DAY.test("2026-11-03"), true);
+eq("jour sans tirets refusé", ISO_DAY.test("20261103"), false);
+eq("texte refusé", ISO_DAY.test("dddd-dd-dd"), false);
 
 if (failed) {
   console.error(`\n${failed} échec(s).`);

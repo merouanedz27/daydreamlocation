@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
-import { PAY_TYPES, type MarkKind, type PayType } from "@/lib/pointage";
+import { ISO_DAY as DAY, PAY_TYPES, type MarkKind, type PayType } from "@/lib/pointage";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -31,7 +31,6 @@ function failure(code: string | undefined): ActionResult {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DAY = /^d{4}-d{2}-d{2}$/;
 const KINDS: readonly MarkKind[] = ["absence", "presence"];
 
 /**
