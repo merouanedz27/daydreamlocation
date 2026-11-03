@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 import { AlertTriangle, CircleCheck, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,8 +28,11 @@ const SAME_CODE_COOLDOWN_MS = 2500;
 /** Au cas où le tiroir ne signale pas la fin de son ouverture (animations coupées). */
 const SETTLE_FALLBACK_MS = 600;
 
-/** Le cadre passe au vert ce temps-là après une paire acceptée. */
-const FLASH_MS = 600;
+/**
+ * Paire acceptée : le cadre passe au vert, puis le tiroir se referme de
+ * lui-même après ce délai — le temps de VOIR que le scan est pris.
+ */
+const CLOSE_AFTER_SCAN_MS = 450;
 
 type CameraState = "starting" | "ready" | "denied" | "none";
 
@@ -36,8 +40,10 @@ type CameraState = "starting" | "ready" | "denied" | "none";
  * Le scanner du comptoir : la caméra arrière, qui lit les étiquettes QR des
  * paires à vendre (le QR contient la RÉFÉRENCE, « Gio-079-01 »).
  *
- * Il reste ouvert : on scanne plusieurs paires d'affilée, chaque résultat
- * s'affiche sous l'image, « Terminé » referme. Étiquette abîmée ou caméra
+ * Une paire ACCEPTÉE referme le tiroir : l'employé revient au formulaire et
+ * voit l'article ajouté à la liste (demande du client). Un scan REFUSÉ
+ * (référence inconnue, déjà vendue…) le laisse ouvert, la raison sous
+ * l'image, pour scanner aussitôt la bonne boîte. Étiquette abîmée ou caméra
  * refusée : la référence se tape à la main, même chemin.
  */
 export function QrScanSheet({
@@ -58,27 +64,44 @@ export function QrScanSheet({
   // alors à sa taille définitive.
   const [settled, setSettled] = useState(false);
   const [flash, setFlash] = useState(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Fermeture en cours après un scan accepté : on n'en prend pas d'autre.
+  const closing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onOpenChangeRef = useRef(onOpenChange);
   // Lu par le rappel de la caméra, créé une fois : la dernière version du
   // formulaire, sans redémarrer la caméra à chaque scan.
   const onScanRef = useRef(onScan);
   useEffect(() => {
     onScanRef.current = onScan;
+    onOpenChangeRef.current = onOpenChange;
   });
+  useEffect(
+    () => () => {
+      if (closing.current) clearTimeout(closing.current);
+    },
+    [],
+  );
   const last = useRef<{ code: string; at: number } | null>(null);
 
   function handle(code: string) {
     const ref = code.trim();
-    if (!ref) return;
+    if (!ref || closing.current) return;
     const result = onScanRef.current(ref);
-    setOutcome(result);
-    if (result.ok) {
-      navigator.vibrate?.(60);
-      setFlash(true);
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlash(false), FLASH_MS);
+    if (!result.ok) {
+      setOutcome(result);
+      return;
     }
+    navigator.vibrate?.(60);
+    setFlash(true);
+    setOutcome(null);
+    toast.success(result.message);
+    closing.current = setTimeout(() => changeOpen(false), CLOSE_AFTER_SCAN_MS);
   }
+
+  // La caméra, démarrée une fois, appelle toujours la dernière version.
+  const handleRef = useRef(handle);
+  useEffect(() => {
+    handleRef.current = handle;
+  });
 
   useEffect(() => {
     if (!open || settled) return;
@@ -87,8 +110,16 @@ export function QrScanSheet({
   }, [open, settled]);
 
   function changeOpen(next: boolean) {
-    if (!next) setSettled(false);
-    onOpenChange(next);
+    if (!next) {
+      // La prochaine ouverture repart propre : pas d'ancien message, pas de
+      // cadre vert, caméra relancée après l'animation.
+      if (closing.current) clearTimeout(closing.current);
+      closing.current = null;
+      setSettled(false);
+      setFlash(false);
+      setOutcome(null);
+    }
+    onOpenChangeRef.current(next);
   }
 
   useEffect(() => {
@@ -114,7 +145,7 @@ export function QrScanSheet({
               return;
             }
             last.current = { code: result.data, at: now };
-            handle(result.data);
+            handleRef.current(result.data);
           },
           {
             preferredCamera: "environment",
