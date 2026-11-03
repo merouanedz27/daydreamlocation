@@ -256,7 +256,12 @@ function isDirty(d: QuickDraft): boolean {
   );
 }
 
-type FieldIssue = { key: string; values?: Record<string, string> };
+type FieldIssue = {
+  key: string;
+  values?: Record<string, string>;
+  /** Développement seulement : l'erreur brute, sous le message. */
+  detail?: string;
+};
 type Issues = Partial<Record<string, FieldIssue>>;
 
 /** Ordre À L'ÉCRAN : on ramène l'employé sur le premier champ fautif. */
@@ -1249,7 +1254,18 @@ export function OrderQuickForm({
           await queueProvisional();
           return;
         }
-        setGeneralError({ key: "errors.generic" });
+        // L'action a planté côté serveur (exception, page de redirection en
+        // erreur…) : la trace complète va dans la console du navigateur.
+        console.error("[commande] l'action a échoué :", error);
+        setGeneralError({
+          key: "errors.generic",
+          detail:
+            process.env.NODE_ENV === "development"
+              ? error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error)
+              : undefined,
+        });
         return;
       }
       // Redirigé : la liste s'affiche, rien d'autre à faire ici.
@@ -1292,7 +1308,10 @@ export function OrderQuickForm({
         revealFirst(fromServer);
         return;
       }
-      setGeneralError({ key: result.error, values: result.values });
+      if (result.error === "errors.generic") {
+        console.error("[commande] refusée par le serveur :", result);
+      }
+      setGeneralError({ key: result.error, values: result.values, detail: result.detail });
     });
   }
 
@@ -1842,6 +1861,11 @@ export function OrderQuickForm({
           <AlertCircle />
           <AlertDescription>
             {t(generalError.key, generalError.values)}
+            {generalError.detail && (
+              <code dir="ltr" className="mt-1 block text-xs break-all whitespace-pre-wrap">
+                {generalError.detail}
+              </code>
+            )}
           </AlertDescription>
         </Alert>
       )}

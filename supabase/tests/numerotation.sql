@@ -6,6 +6,11 @@
 -- Le compteur `private.order_counter` avance dans la transaction de la
 -- commande : une création refusée rend son numéro. Le script se termine par
 -- rollback.
+--
+-- LIMITE : ce test passe par une connexion directe, sans `pg-safeupdate`
+-- (chargé par Supabase pour les seules requêtes de l'API). Un UPDATE sans
+-- WHERE y passe, alors que l'application le voit refusé : voir
+-- 20261103203600_compteur_commandes_where.sql.
 -- =============================================================================
 
 begin;

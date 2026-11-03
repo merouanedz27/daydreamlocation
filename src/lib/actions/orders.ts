@@ -23,6 +23,8 @@ export type ActionResult =
       values?: Record<string, string>;
       /** Toutes les erreurs par champ, quand le formulaire sait les afficher. */
       fieldErrors?: Record<string, string>;
+      /** Développement seulement : l'erreur brute, affichée sous le message. */
+      detail?: string;
     };
 
 function resolveLocale(value: FormDataEntryValue | null): Locale {
@@ -184,7 +186,26 @@ function orderWriteError(error: { code?: string; message: string }): ActionResul
   if (error.message.includes("order_changed")) {
     return { ok: false, error: "errors.orderChangedOffline" };
   }
-  return { ok: false, error: "errors.generic" };
+  // Erreur imprévue : visible dans le terminal, et en développement dans la
+  // console du navigateur et sous le bouton. Jamais en production (elle
+  // pourrait nommer des tables ou des colonnes).
+  console.error("[commande] écriture refusée par la base :", error);
+  return {
+    ok: false,
+    error: "errors.generic",
+    ...(process.env.NODE_ENV === "development" && { detail: describeError(error) }),
+  };
+}
+
+/** « code — message (détails / indice) », pour lire une erreur Postgres d'un coup d'œil. */
+function describeError(error: {
+  code?: string;
+  message: string;
+  details?: string | null;
+  hint?: string | null;
+}): string {
+  const extra = [error.details, error.hint].filter(Boolean).join(" / ");
+  return `${error.code ?? "?"} — ${error.message}${extra ? ` (${extra})` : ""}`;
 }
 
 /**
