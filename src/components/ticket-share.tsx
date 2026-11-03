@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Loader2, Printer, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTicketPdf } from "@/components/ticket-pdf";
+import { shareFile } from "@/lib/share-file";
 
 /**
  * Le geste du bon : « Partager / imprimer le PDF » — le fichier (une page
@@ -22,22 +23,7 @@ export function TicketActions() {
   const ready = Boolean(file && images);
 
   async function share() {
-    if (!file) return;
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: file.name });
-      } catch {
-        // Feuille fermée sans choisir : rien à faire.
-      }
-      return;
-    }
-    // Ordinateur, ou navigateur sans partage de fichiers : on télécharge.
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    if (file) await shareFile(file);
   }
 
   // Photos ratées : pas de PDF, on imprime quand même la page elle-même.

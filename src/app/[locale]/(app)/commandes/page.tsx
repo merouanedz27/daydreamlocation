@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ClipboardCheck, Download, Plus } from "lucide-react";
+import { ClipboardCheck, Download, Plus, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { OrdersFilters } from "@/components/orders-filters";
@@ -69,6 +69,14 @@ export default async function OrdersPage({
             <Download className="size-4" aria-hidden />
             {t("orders.export")}
           </a>
+        </Button>
+        {/* La vente au comptoir : pas de bouton rond pour elle, donc visible
+            aussi sur téléphone. */}
+        <Button asChild variant="outline" className="h-11">
+          <Link href="/commandes/vente">
+            <ScanLine className="size-4" aria-hidden />
+            {t("orders.sale.nav")}
+          </Link>
         </Button>
         <Button asChild className="hidden h-11 md:inline-flex">
           <Link href="/commandes/nouvelle">

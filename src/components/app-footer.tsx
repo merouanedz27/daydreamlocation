@@ -39,6 +39,7 @@ export async function AppFooter({
   const links = [
     { href: "/commandes", label: t("nav.orders") },
     { href: "/commandes/nouvelle", label: t("orders.new") },
+    { href: "/commandes/vente", label: t("orders.sale.nav") },
     { href: "/stock", label: t("nav.stock") },
     { href: "/pressing", label: t("nav.pressing") },
     { href: "/pointage", label: t("nav.pointage") },

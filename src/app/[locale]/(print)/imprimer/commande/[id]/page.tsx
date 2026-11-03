@@ -63,7 +63,8 @@ export default async function OrderSlipPage({
     getOrderCatalogue(),
     getLabelSlots(),
   ]);
-  if (!order) notFound();
+  // Vente seule : rien n'est loué, il n'y a pas de bon de location.
+  if (!order || !order.has_rental) notFound();
 
   const t = await getTranslations();
 
@@ -79,7 +80,10 @@ export default async function OrderSlipPage({
   const fields = ticketFields(
     {
       ...order,
-      order_lines: order.order_lines.filter((line) => line.is_active),
+      // Une paire VENDUE ne figure pas sur le bon : il dit ce qui doit revenir.
+      order_lines: order.order_lines.filter(
+        (line) => line.is_active && line.line_kind !== "vente",
+      ),
     },
     {
       slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,

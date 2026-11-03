@@ -415,14 +415,17 @@ export function OrdersList({
             >
               <Highlight text={order.customer_name} />
             </Link>
-            {/* Le bon de location en un toucher, sans passer par la fiche. */}
-            <Link
-              href={`/imprimer/commande/${order.id}`}
-              aria-label={t("orders.printNamed", { name: order.customer_name })}
-              className="press text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted ms-1 flex size-9 shrink-0 items-center justify-center rounded-full"
-            >
-              <Printer className="size-4" aria-hidden />
-            </Link>
+            {/* Le bon de location en un toucher, sans passer par la fiche.
+                Vente seule : rien n'est loué, pas de bon. */}
+            {order.has_rental !== false && (
+              <Link
+                href={`/imprimer/commande/${order.id}`}
+                aria-label={t("orders.printNamed", { name: order.customer_name })}
+                className="press text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted ms-1 flex size-9 shrink-0 items-center justify-center rounded-full"
+              >
+                <Printer className="size-4" aria-hidden />
+              </Link>
+            )}
           </div>
         );
       case "customer_phone":

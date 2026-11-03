@@ -196,12 +196,15 @@ export default async function OrderPage({
           d'étiquettes ou au client. Sous le titre et non dans la barre d'action : on l'édite
           une fois par commande, ce n'est pas le geste du quotidien. */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button asChild variant="outline" className="h-11">
-          <Link href={`/imprimer/commande/${order.id}`}>
-            <Printer className="size-4" aria-hidden />
-            {t("print.slipButton")}
-          </Link>
-        </Button>
+        {/* Vente seule : rien n'est loué, pas de bon de location. */}
+        {order.has_rental && (
+          <Button asChild variant="outline" className="h-11">
+            <Link href={`/imprimer/commande/${order.id}`}>
+              <Printer className="size-4" aria-hidden />
+              {t("print.slipButton")}
+            </Link>
+          </Button>
+        )}
         {/* Modifier : sur téléphone, c'est le bouton rond en bas (à la place
             du « + ») ; sur grand écran, où il n'existe pas, ce bouton-ci. Une
             commande annulée se rétablit d'abord. */}

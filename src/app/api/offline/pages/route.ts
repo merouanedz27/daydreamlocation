@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     "/commandes/pas-rentres",
     "/commandes/impayes",
     "/commandes/nouvelle",
+    "/commandes/vente",
     "/commandes/calendrier",
     "/pointage",
     "/frais",

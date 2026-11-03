@@ -10,6 +10,7 @@ import { getBlockedUnitIds, getModel, getSoldUnits, isUnitFree } from "@/lib/que
 import { todayIso } from "@/lib/rental-range";
 import { getProfile, canManageStock } from "@/lib/auth";
 import { ModelUnits, type ModelItem, type ModelUnitRow } from "@/components/model-units";
+import { QrLabelsButton, type QrLabel } from "@/components/qr-labels";
 import { PARTS, sortParts, type Part } from "@/lib/stock-refs";
 import { formatMoney } from "@/lib/format";
 import { photoUrl } from "@/lib/storage";
@@ -91,6 +92,19 @@ export default async function ModelPage({
   const items = [...groups.values()].sort((a, b) =>
     a.ref.localeCompare(b.ref, undefined, { numeric: true }),
   );
+  // Les étiquettes QR des paires encore en boutique (vente seulement) : c'est
+  // ce que l'équipe scanne au comptoir. Le QR ne contient que la référence.
+  const qrLabels: QrLabel[] = forSale
+    ? allUnits
+        .filter((u) => u.status !== "retire" && !sold.has(u.id))
+        .sort((a, b) => a.ref_code.localeCompare(b.ref_code, undefined, { numeric: true }))
+        .map((u) => ({
+          ref: u.ref_code,
+          name: model.name_fr,
+          size: u.size?.trim() || null,
+          price: u.price_override ?? model.base_price,
+        }))
+    : [];
   for (const item of items) {
     item.units.sort((a, b) => PARTS.indexOf(a.part as Part) - PARTS.indexOf(b.part as Part));
   }
@@ -105,14 +119,17 @@ export default async function ModelPage({
           </Link>
         </Button>
 
-        {canEdit && (
-          <Button asChild variant="outline" className="h-11">
-            <Link href={`/stock/${model.id}/modifier`}>
-              <Pencil className="size-4" aria-hidden />
-              {t("common.edit")}
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {forSale && <QrLabelsButton labels={qrLabels} />}
+          {canEdit && (
+            <Button asChild variant="outline" className="h-11">
+              <Link href={`/stock/${model.id}/modifier`}>
+                <Pencil className="size-4" aria-hidden />
+                {t("common.edit")}
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Un modèle retiré reste consultable par son adresse — c'est la seule

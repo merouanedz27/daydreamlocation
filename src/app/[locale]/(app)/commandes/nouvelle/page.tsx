@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ScanLine } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { OrderQuickForm } from "@/components/order-quick-form";
 import { requireProfile } from "@/lib/auth";
@@ -36,13 +36,23 @@ export default async function NewOrderPage({
 
   return (
     <div>
-      <Link
-        href="/commandes"
-        className="text-muted-foreground hover:text-foreground -ms-2 mb-4 inline-flex min-h-11 items-center gap-1 px-2 text-sm"
-      >
-        <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
-        {t("orders.title")}
-      </Link>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <Link
+          href="/commandes"
+          className="text-muted-foreground hover:text-foreground -ms-2 inline-flex min-h-11 items-center gap-1 px-2 text-sm"
+        >
+          <ChevronLeft className="size-4 rtl:-scale-x-100" aria-hidden />
+          {t("orders.title")}
+        </Link>
+        {/* Un client qui ne fait qu'acheter : l'écran court de la vente. */}
+        <Link
+          href="/commandes/vente"
+          className="text-gold-strong inline-flex min-h-11 items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline"
+        >
+          <ScanLine className="size-4" aria-hidden />
+          {t("orders.sale.shortcut")}
+        </Link>
+      </div>
 
       <OrderQuickForm models={models} items={items} customers={customers} settings={settings} />
     </div>

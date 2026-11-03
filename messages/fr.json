@@ -264,7 +264,37 @@
     "saleTag": "Vente",
     "saleDate": "Date de vente",
     "saleOnlyHint": "Vente seule : rien à rendre, pas de caution.",
-    "saleDone": "Vendue"
+    "saleDone": "Vendue",
+    "sale": {
+      "nav": "Vente",
+      "shortcut": "Vente seule ?",
+      "title": "Vente au comptoir",
+      "items": "Articles",
+      "scan": "Scanner",
+      "pickFromList": "Liste",
+      "empty": "Scannez l'étiquette QR de la boîte, ou choisissez l'article dans la liste.",
+      "removeBlocked": "Retirez les articles qui ne peuvent plus être vendus.",
+      "handedOver": "Remis au client",
+      "more": "Client et date",
+      "addCustomer": "Client",
+      "walkIn": "Client de passage",
+      "save": "Enregistrer la vente",
+      "savedToast": "Vente enregistrée · {amount}",
+      "notForSale": "plus en vente",
+      "alreadySold": "déjà vendu",
+      "unknownRef": "Référence inconnue : {ref}",
+      "rentalRef": "{ref} est une pièce de location, pas un article à vendre.",
+      "alreadyInSale": "{ref} est déjà dans cette vente.",
+      "added": "Ajouté : {name} · {size} · {price}",
+      "scanTitle": "Scanner un article",
+      "scanHint": "Visez l'étiquette QR. Scannez plusieurs articles à la suite.",
+      "cameraStarting": "Ouverture de la caméra…",
+      "cameraDenied": "Caméra refusée. Autorisez-la dans les réglages du navigateur, ou tapez la référence.",
+      "noCamera": "Aucune caméra disponible. Tapez la référence ci-dessous.",
+      "typeRef": "Référence (ex. Gio-079-01)",
+      "addRef": "Ajouter",
+      "done": "Terminé"
+    }
   },
   "stock": {
     "parts": {
@@ -433,7 +463,11 @@
       "lockedHint": "Déjà utilisé dans une commande : ce choix ne peut plus changer."
     },
     "salePrice": "Prix de vente",
-    "sold": "Vendue"
+    "sold": "Vendue",
+    "qr": {
+      "print": "Imprimer les QR",
+      "title": "Étiquettes QR à imprimer"
+    }
   },
   "dashboard": {
     "title": "Tableau de bord",

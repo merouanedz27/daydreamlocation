@@ -42,7 +42,7 @@ export function BottomNav() {
    */
   function isActive(href: string) {
     if (href === "/commandes") {
-      return pathname === "/commandes" || /^\/commandes\/(\d+|nouvelle)(\/|$)/.test(pathname);
+      return pathname === "/commandes" || /^\/commandes\/(\d+|nouvelle|vente)(\/|$)/.test(pathname);
     }
     return pathname.startsWith(href);
   }
