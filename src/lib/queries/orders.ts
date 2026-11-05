@@ -1,7 +1,7 @@
 import { sortParts } from "@/lib/stock-refs";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { freeFrom, rentalRange, type IsoDate } from "@/lib/rental-range";
+import { freeFrom, rentalRange, todayIso, type IsoDate } from "@/lib/rental-range";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/lib/supabase/database.types";
 import {
@@ -231,6 +231,8 @@ export type Unavailability = {
   /** Premier jour où la pièce redevient louable. */
   freeFrom: IsoDate | null;
   orderNo: string | null;
+  /** Sortie et pas rentrée après la date prévue : refusée quelle que soit la fenêtre. */
+  late?: boolean;
 };
 
 /**
@@ -287,6 +289,29 @@ export async function getUnavailableUnits(
         orderNo: row.orders?.order_no ?? null,
       });
     }
+  }
+
+  // Les pièces EN RETARD, quelle que soit la fenêtre : la base refuse toute
+  // nouvelle ligne tant que « Retour Val » n'est pas coché
+  // (`private.refuse_late_unit`). Une pièce que la commande modifiée tient
+  // déjà reste permise, comme en base.
+  const [late, kept] = await Promise.all([
+    supabase.rpc("unit_bookings", { p_today: todayIso() }).eq("late", true),
+    excludeOrderId
+      ? supabase.from("order_lines").select("unit_id").eq("order_id", excludeOrderId)
+      : Promise.resolve({ data: [] as { unit_id: number | null }[], error: null }),
+  ]);
+  if (late.error) throw late.error;
+  if (kept.error) throw kept.error;
+  const keptIds = new Set((kept.data ?? []).map((r) => r.unit_id));
+  for (const row of late.data ?? []) {
+    if (row.order_id === excludeOrderId || keptIds.has(row.unit_id)) continue;
+    latest.set(row.unit_id, {
+      unitId: row.unit_id,
+      freeFrom: null,
+      orderNo: row.order_no,
+      late: true,
+    });
   }
 
   return [...latest.values()];

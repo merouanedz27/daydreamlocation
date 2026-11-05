@@ -19,6 +19,8 @@ export type OfflineBooking = {
   orderId: number;
   orderNo: string | null;
   range: string;
+  /** Sortie et pas rentrée après la date prévue : la base refuse toute nouvelle ligne. */
+  late?: boolean;
 };
 
 /** Le formulaire de commande sans réseau : stock, clients, réglages, réservations. */

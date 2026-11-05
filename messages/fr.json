@@ -294,7 +294,8 @@
       "typeRef": "Référence (ex. Gio-079-01)",
       "addRef": "Ajouter",
       "done": "Terminé"
-    }
+    },
+    "unitLate": "Pas encore rentrée (n°{no})"
   },
   "stock": {
     "parts": {
@@ -467,7 +468,15 @@
     "qr": {
       "print": "Imprimer les QR",
       "title": "Étiquettes QR à imprimer"
-    }
+    },
+    "booking": {
+      "reserved": "Réservée · n°{no} · {from} → {to}",
+      "out": "Sortie · n°{no} · retour le {date}",
+      "late": "En retard · n°{no} · prévu le {date}",
+      "lateBadge": "En retard",
+      "more": "+{n}"
+    },
+    "reservedCount": "{count, plural, =1 {1 réservée} other {{n} réservées}}"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -580,7 +589,8 @@
     "nameTooLong": "Le nom ne doit pas dépasser 80 caractères.",
     "orderChangedOffline": "La commande a été modifiée entre-temps par quelqu'un d'autre. Rouvrez-la pour repartir de sa dernière version.",
     "sizeAllReserved": "Toutes les pièces de cette taille sont réservées pour une commande à venir.",
-    "purposeLocked": "Ce modèle a déjà servi dans une commande : il ne peut plus passer de la location à la vente (ni l’inverse)."
+    "purposeLocked": "Ce modèle a déjà servi dans une commande : il ne peut plus passer de la location à la vente (ni l’inverse).",
+    "unitLateNamed": "{ref} n'est pas encore rentrée : cochez « Retour » sur sa commande avant de la relouer."
   },
   "update": {
     "available": "Nouvelle version de l'application disponible",

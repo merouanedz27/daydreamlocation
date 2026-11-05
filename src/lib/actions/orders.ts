@@ -54,6 +54,11 @@ function clientOpId(formData: FormData): string | null {
  * contrainte, sans passer par une de nos fonctions.
  */
 function unitConflict(error: { code?: string; message: string }): ActionResult | null {
+  // Pièce sortie et pas rentrée à la date prévue (`private.refuse_late_unit`).
+  const late = /unit_late:(.+)$/.exec(error.message);
+  if (late) {
+    return { ok: false, error: "errors.unitLateNamed", values: { ref: late[1].trim() } };
+  }
   const named = /unit_unavailable:(.+)$/.exec(error.message);
   if (named) {
     return {

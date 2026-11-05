@@ -6,7 +6,13 @@ import { ArrowLeft, Pencil, Shirt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ModelRestoreButton } from "@/components/model-danger-zone";
-import { getBlockedUnitIds, getModel, getSoldUnits, isUnitFree } from "@/lib/queries/stock";
+import {
+  getBlockedUnitIds,
+  getModel,
+  getSoldUnits,
+  getUnitBookings,
+  isUnitFree,
+} from "@/lib/queries/stock";
 import { todayIso } from "@/lib/rental-range";
 import { getProfile, canManageStock } from "@/lib/auth";
 import { ModelUnits, type ModelItem, type ModelUnitRow } from "@/components/model-units";
@@ -35,11 +41,13 @@ export default async function ModelPage({
   const id = Number(modelId);
   if (!Number.isFinite(id)) notFound();
 
-  const [model, profile, blocked, sold] = await Promise.all([
+  const today = todayIso();
+  const [model, profile, blocked, sold, bookings] = await Promise.all([
     getModel(id),
     getProfile(),
-    getBlockedUnitIds(todayIso()),
+    getBlockedUnitIds(today),
     getSoldUnits(),
+    getUnitBookings(today),
   ]);
   if (!model) notFound();
   const forSale = model.purpose === "vente";
@@ -74,6 +82,7 @@ export default async function ModelPage({
       // Une paire vendue garde sa fiche (son historique), marquée comme telle.
       status: sold.has(unit.id) ? "vendue" : unit.status,
       free: !sold.has(unit.id) && isUnitFree(unit, blocked),
+      bookings: bookings.get(unit.id) ?? [],
     };
     const item = groups.get(key) ?? {
       key,

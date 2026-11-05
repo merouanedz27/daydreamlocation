@@ -174,8 +174,58 @@ export async function getBlockedUnitIds(day: IsoDate): Promise<Set<number>> {
   for (const row of data ?? []) {
     if (row.unit_id !== null) ids.add(row.unit_id);
   }
+  // Une pièce EN RETARD a dépassé sa plage, mais elle n'est pas rentrée :
+  // elle n'est pas libre pour autant.
+  for (const [unitId, bookings] of await getUnitBookings(day)) {
+    if (bookings.some((b) => b.late)) ids.add(unitId);
+  }
   return ids;
 }
+
+/** Une réservation qui tient encore une pièce, pour l'indicateur du stock. */
+export type UnitBooking = {
+  orderId: number;
+  orderNo: string;
+  customer: string;
+  pickup: IsoDate;
+  returnDue: IsoDate;
+  /** « Allez Valid » coché : la pièce est chez le client. */
+  out: boolean;
+  /** Sortie, pas rentrée, retour prévu dépassé. */
+  late: boolean;
+};
+
+/**
+ * Qui tient chaque pièce : les réservations pas encore terminées (plage pas
+ * finie, ou pièce sortie et pas rentrée), la plus proche d'abord.
+ * `cache()` : la page et `getBlockedUnitIds` partagent la même lecture.
+ */
+export const getUnitBookings = cache(
+  async (today: IsoDate): Promise<Map<number, UnitBooking[]>> => {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("unit_bookings", { p_today: today });
+    if (error) throw error;
+
+    const map = new Map<number, UnitBooking[]>();
+    for (const row of data ?? []) {
+      const list = map.get(row.unit_id) ?? [];
+      list.push({
+        orderId: row.order_id,
+        orderNo: row.order_no,
+        customer: row.customer_name,
+        pickup: row.pickup_date,
+        returnDue: row.return_due_date,
+        out: row.picked_up,
+        late: row.late,
+      });
+      map.set(row.unit_id, list);
+    }
+    // Une pièce sortie passe avant ses réservations suivantes : c'est elle
+    // qu'on cherche sur le cintre.
+    for (const list of map.values()) list.sort((a, b) => Number(b.out) - Number(a.out));
+    return map;
+  },
+);
 
 /**
  * Les pièces VENDUES : une ligne de vente active les tient pour toujours,

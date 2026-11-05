@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SelectBox } from "@/components/select-box";
 import { ModelPieces } from "@/components/model-pieces";
 import { UnitEdit } from "@/components/unit-edit";
+import { UnitBookingLine } from "@/components/unit-booking-line";
 import { useOnline } from "@/components/offline-sync";
 import { Link } from "@/i18n/navigation";
 import { addUnitsOfSize, deleteUnits, removeUnitOfSize } from "@/lib/actions/stock";
@@ -28,6 +29,7 @@ import { useHold } from "@/lib/use-hold";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Part } from "@/lib/stock-refs";
+import type { UnitBooking } from "@/lib/queries/stock";
 import type { Locale } from "@/i18n/routing";
 
 /** Une pièce réelle, prête à afficher : tout est calculé côté serveur. */
@@ -41,6 +43,8 @@ export type ModelUnitRow = {
   status: string;
   /** Louable aujourd'hui : bon état ET aucune commande ne la retient. */
   free: boolean;
+  /** Les commandes qui la tiennent encore, la plus urgente d'abord. */
+  bookings: UnitBooking[];
 };
 
 /**
@@ -206,24 +210,32 @@ export function ModelUnits({
       .map((i) => i.ref)
       .join(", ") + (chosen.length > NAMES_SHOWN ? "…" : "");
 
-  const badge = (free: boolean, status: string) => (
+  const badge = (free: boolean, status: string, late = false) => (
     <Badge
       className={cn(
         "border-transparent",
-        free
-          ? "bg-success-soft text-success-foreground"
-          : status === "disponible"
-            ? "bg-gold-soft text-foreground"
-            : "bg-muted text-muted-foreground",
+        late
+          ? "bg-row-late text-destructive"
+          : free
+            ? "bg-success-soft text-success-foreground"
+            : status === "disponible"
+              ? "bg-gold-soft text-foreground"
+              : "bg-muted text-muted-foreground",
       )}
     >
-      {free
-        ? t("stock.available")
-        : status === "disponible"
-          ? t("stock.reserved")
-          : t(`stock.${UNIT_STATUS_KEY[status] ?? "available"}`)}
+      {late
+        ? t("stock.booking.lateBadge")
+        : free
+          ? t("stock.available")
+          : status === "disponible"
+            ? t("stock.reserved")
+            : t(`stock.${UNIT_STATUS_KEY[status] ?? "available"}`)}
     </Badge>
   );
+  const isLate = (units: ModelUnitRow[]) => units.some((u) => u.bookings.some((b) => b.late));
+  /** Les réservations d'un article : celles de sa première pièce tenue. */
+  const itemBookings = (units: ModelUnitRow[]) =>
+    units.find((u) => u.bookings.length > 0)?.bookings ?? [];
 
   /** Une pièce dans la liste dépliée : sa référence et son état, rien d'autre. */
   const unitLine = (unit: ModelUnitRow, nested: boolean) => (
@@ -242,7 +254,7 @@ export function ModelUnits({
         <bdi className={cn(unit.part ? "text-muted-foreground" : "font-medium")}>{unit.ref}</bdi>
         {unit.part && unit.size && <span className="tabular text-muted-foreground"> · {unit.size}</span>}
       </span>
-      {badge(unit.free, unit.status)}
+      {badge(unit.free, unit.status, isLate([unit]))}
     </button>
   );
 
@@ -432,8 +444,15 @@ export function ModelUnits({
                                   item.free,
                                   item.units.find((u) => u.status !== "disponible")?.status ??
                                     "disponible",
+                                  isLate(item.units),
                                 )}
                               </div>
+                              {!selecting && (
+                                <UnitBookingLine
+                                  bookings={itemBookings(item.units)}
+                                  className="mb-1"
+                                />
+                              )}
                               <ul className="pb-1">
                                 {item.units.map((unit) => (
                                   <li key={unit.id} className={cn("flex", selecting && "ps-11")}>
@@ -453,6 +472,9 @@ export function ModelUnits({
                               )}
                               {unitLine(item.units[0], false)}
                             </div>
+                          )}
+                          {!item.setRef && !selecting && (
+                            <UnitBookingLine bookings={item.units[0].bookings} className="mb-2" />
                           )}
                         </li>
                       );

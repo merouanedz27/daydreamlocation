@@ -36,6 +36,8 @@ export type StockModelRow = {
   photo: string | null;
   available: number;
   total: number;
+  /** Articles qu'une commande tient encore (réservés, sortis ou en retard). */
+  reserved: number;
   /** Tailles distinctes des pièces en stock, triées. */
   sizes: string[];
 };
@@ -277,6 +279,14 @@ export function StockModels({
                         total: model.total,
                       })}
                     </span>
+                    {model.reserved > 0 && (
+                      <span className="bg-row-reserved rounded px-1.5 py-0.5 text-xs font-medium">
+                        {t("stock.reservedCount", {
+                          count: model.reserved,
+                          n: formatNumber(model.reserved, locale),
+                        })}
+                      </span>
+                    )}
                     {archived && (
                       <Badge className="bg-muted text-muted-foreground border-transparent">
                         {t("stock.retired")}
@@ -400,6 +410,14 @@ export function StockModels({
                     <bdi dir="ltr">
                       {`${formatNumber(model.available, locale)} / ${formatNumber(model.total, locale)}`}
                     </bdi>
+                    {model.reserved > 0 && (
+                      <span className="text-muted-foreground block text-xs">
+                        {t("stock.reservedCount", {
+                          count: model.reserved,
+                          n: formatNumber(model.reserved, locale),
+                        })}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

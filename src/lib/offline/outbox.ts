@@ -363,8 +363,19 @@ export async function localAvailability(
       latest.set(unitId, { unitId, freeFrom: free, orderNo });
     }
   };
+  // Une pièce que la commande modifiée tient déjà ne lui est jamais refusée.
+  const kept = new Set(
+    catalog.bookings.filter((b) => b.orderId === excludeOrderId).map((b) => b.unitId),
+  );
   for (const b of catalog.bookings) {
-    if (b.orderId !== excludeOrderId) take(b.unitId, b.range, b.orderNo);
+    if (b.orderId === excludeOrderId) continue;
+    if (b.late) {
+      if (!kept.has(b.unitId)) {
+        latest.set(b.unitId, { unitId: b.unitId, freeFrom: null, orderNo: b.orderNo, late: true });
+      }
+    } else {
+      take(b.unitId, b.range, b.orderNo);
+    }
   }
   for (const item of await getOutbox()) {
     const op = item.op;

@@ -697,6 +697,110 @@ begin
         and v_rec4.lignes = 1 and v_rec4.garde_u4);
   end;
 
+  -- --- 18. Pièce EN RETARD : aucune nouvelle réservation avant son retour ----
+  declare
+    v_late_u bigint;
+    v_cut_u bigint;
+    v_late bigint;
+    v_cut bigint;
+    v_future bigint;
+    v_new bigint;
+    v_msg text;
+    v_ok boolean;
+  begin
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_model_id, 'TEST-LATE-01', '50') returning id into v_late_u;
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_model_id, 'TEST-LATE-02', '50') returning id into v_cut_u;
+
+    -- Sortie en 2020, jamais rentrée. Avant le retrait, elle n'est pas en retard.
+    insert into public.orders (customer_name, event_date)
+    values ('Retard', '2020-03-10') returning id into v_late;
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_late, v_late_u, 3000);
+
+    -- 18a. Réservation à l'avance de la même pièce, plus tard : acceptée.
+    insert into public.orders (customer_name, event_date)
+    values ('Avance', '2099-06-10') returning id into v_future;
+    begin
+      insert into public.order_lines (order_id, unit_id, unit_price)
+      values (v_future, v_late_u, 3000);
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+    insert into test_results values (
+      '18a. reservation a l avance d une piece reservee', 'accepte', v_msg, v_msg = 'accepte');
+
+    -- La pièce sort (Allez Valid) et n'est jamais rendue : elle est en retard.
+    update public.orders set picked_up = true where id = v_late;
+
+    -- 18b. Nouvelle commande sur la pièce en retard : refusée (P0006).
+    insert into public.orders (customer_name, event_date)
+    values ('Nouveau', '2098-01-10') returning id into v_new;
+    begin
+      insert into public.order_lines (order_id, unit_id, unit_price)
+      values (v_new, v_late_u, 3000);
+      v_msg := 'ACCEPTE';
+    exception when sqlstate 'P0006' then
+      v_msg := sqlerrm;
+    end;
+    insert into test_results values (
+      '18b. piece en retard refusee', 'unit_late:TEST-LATE-01', v_msg,
+      v_msg = 'unit_late:TEST-LATE-01');
+
+    -- 18c. Modifier la commande qui la tenait DÉJÀ : acceptée.
+    begin
+      perform public.update_order(
+        p_order_id := v_future, p_customer_name := 'Avance modifiee', p_customer_phone := null,
+        p_event_date := '2099-06-10', p_pickup_date := '2099-06-09',
+        p_return_due_date := '2099-06-11',
+        p_lines := jsonb_build_array(jsonb_build_object('unitId', v_late_u, 'unitPrice', 3000)));
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+    insert into test_results values (
+      '18c. modifier la commande qui tient deja la piece', 'accepte', v_msg, v_msg = 'accepte');
+
+    -- 18d. L'indicateur du stock la voit en retard.
+    select bool_or(b.late) into v_ok
+    from public.unit_bookings(current_date) b
+    where b.unit_id = v_late_u and b.order_id = v_late;
+    insert into test_results values (
+      '18d. unit_bookings signale le retard', 'true', coalesce(v_ok::text, 'absente'),
+      coalesce(v_ok, false));
+
+    -- 18e. « Retour Val » coché : la pièce redevient réservable.
+    update public.orders set returned = true where id = v_late;
+    begin
+      insert into public.order_lines (order_id, unit_id, unit_price)
+      values (v_new, v_late_u, 3000);
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+    insert into test_results values (
+      '18e. piece rentree de nouveau reservable', 'accepte', v_msg, v_msg = 'accepte');
+
+    -- 18f. Une commande en retard ANNULÉE ne bloque rien.
+    insert into public.orders (customer_name, event_date)
+    values ('Annulee', '2020-04-10') returning id into v_cut;
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_cut, v_cut_u, 3000);
+    update public.orders set picked_up = true where id = v_cut;
+    perform public.set_order_cancelled(v_cut, true);
+    begin
+      insert into public.order_lines (order_id, unit_id, unit_price)
+      values (v_new, v_cut_u, 3000);
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+    insert into test_results values (
+      '18f. commande en retard annulee : piece libre', 'accepte', v_msg, v_msg = 'accepte');
+  end;
+
 end $$;
 
 select

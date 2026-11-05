@@ -922,6 +922,12 @@ export type Database = {
         };
         Returns: number;
       };
+      unit_bookings: {
+        Args: {
+          p_today: string;
+        };
+        Returns: { unit_id: number; order_id: number; order_no: string; customer_name: string; pickup_date: string; return_due_date: string; picked_up: boolean; late: boolean }[];
+      };
       unmark_absent: {
         Args: {
           p_day: string;

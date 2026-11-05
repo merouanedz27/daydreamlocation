@@ -13,6 +13,7 @@ import {
   getCategories,
   getModels,
   getSoldUnits,
+  getUnitBookings,
 } from "@/lib/queries/stock";
 import { parsePurpose } from "@/lib/purpose";
 import { getProfile, canManageStock } from "@/lib/auth";
@@ -54,15 +55,17 @@ export default async function StockPage({
 
   // Une seule requête de disponibilité pour la page entière : la demander par
   // modèle referait un aller-retour par carte.
-  const [categories, models, profile, archivedCount, blocked, sold] = await Promise.all([
+  const today = todayIso();
+  const [categories, models, profile, archivedCount, blocked, sold, bookings] = await Promise.all([
     getCategories(),
     // Les archives montrent les deux stocks : un modèle retiré n'est plus
     // ni loué ni vendu.
     getModels({ categorySlug: categorie, search: q, archived, purpose: archived ? undefined : purpose }),
     getProfile(),
     archived ? Promise.resolve(0) : countArchivedModels(),
-    getBlockedUnitIds(todayIso()),
+    getBlockedUnitIds(today),
     forSale ? getSoldUnits() : Promise.resolve(new Map<number, number>()),
+    getUnitBookings(today),
   ]);
 
   const canEdit = canManageStock(profile);
@@ -74,6 +77,10 @@ export default async function StockPage({
     // ni dans le total ni dans les tailles.
     const units = (model.article_units ?? []).filter((u) => !sold.has(u.id));
     const stock = countStock(units, blocked);
+    // Un costume divisible compte pour UN article, comme dans `countStock`.
+    const reserved = new Set(
+      units.filter((u) => bookings.has(u.id)).map((u) => u.set_ref ?? `#${u.id}`),
+    ).size;
     return {
       id: model.id,
       name: l === "ar" && model.name_ar ? model.name_ar : model.name_fr,
@@ -88,6 +95,7 @@ export default async function StockPage({
       photo: model.photo_path ? photoUrl(model.photo_path) : null,
       available: stock.available,
       total: stock.total,
+      reserved,
       // Les tailles en stock, pièces retirées exclues : « 46 · 48 · 50 ».
       sizes: sortSizes(units.filter((u) => u.status !== "retire").map((u) => u.size)),
     };

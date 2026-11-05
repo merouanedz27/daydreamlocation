@@ -72,6 +72,22 @@ export async function GET() {
     if (!data || data.length < CHUNK) break;
   }
 
+  // Les pièces EN RETARD : leur plage peut être finie depuis longtemps, mais
+  // la base les refuse tant que « Retour Val » n'est pas coché.
+  const { data: late, error: lateError } = await supabase
+    .rpc("unit_bookings", { p_today: today })
+    .eq("late", true);
+  if (lateError) return NextResponse.json({ error: "failed" }, { status: 500 });
+  for (const row of late ?? []) {
+    bookings.push({
+      unitId: row.unit_id,
+      orderId: row.order_id,
+      orderNo: row.order_no,
+      range: "empty",
+      late: true,
+    });
+  }
+
   const catalog: OfflineCatalog = {
     userId: profile.id,
     syncedAt: new Date().toISOString(),

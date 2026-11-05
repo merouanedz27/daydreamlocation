@@ -719,6 +719,8 @@ export function OrderQuickForm({
       reason = t(
         unit.status === "nettoyage" ? "stock.cleaning" : "stock.repair",
       );
+    else if (blocked?.late)
+      reason = t("orders.unitLate", { no: blocked.orderNo ?? "?" });
     else if (blocked)
       reason = blocked.freeFrom
         ? t("orders.freeFrom", { date: formatDate(blocked.freeFrom, locale) })
