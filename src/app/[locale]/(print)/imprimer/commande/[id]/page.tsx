@@ -6,8 +6,10 @@ import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
 import { TicketFrame } from "@/components/ticket-fit";
 import { TicketPdfProvider } from "@/components/ticket-pdf";
+import { Scissors } from "lucide-react";
 import { OrderQr } from "@/components/order-qr";
 import { appUrl } from "@/lib/email/send";
+import { alterationUrl } from "@/lib/alteration-url";
 import {
   getOrder,
   getOrderCatalogue,
@@ -45,7 +47,8 @@ export async function generateMetadata(props: {
  *   les pièces et l'argent (versement, prix, reste). Il repart avec lui ;
  * - en bas, le ticket du COSTUME : les mêmes pièces et tailles, SANS argent.
  *   Il s'accroche au cintre (يتعلق في الكوستوم) : c'est lui qui dit à l'équipe
- *   à qui appartient la housse.
+ *   à qui appartient la housse. En bas, le QR de la retouche du pantalon,
+ *   s'il y en a une : le tailleur le scanne.
  *
  * CE QUI N'Y FIGURE JAMAIS : le coût et le nom du confrère d'une pièce
  * externe, ni la note interne de la commande.
@@ -127,7 +130,8 @@ export default async function OrderSlipPage({
 
   // Les mêmes champs, mis en page comme les DEUX pages de son modèle Word :
   // le client lit d'abord son nom et la date ; l'équipe, devant le cintre,
-  // lit le nom, le costume et le tailleur — soulignés, avec des puces.
+  // lit le nom et le costume — soulignés, avec des puces. Le tailleur, lui,
+  // scanne le QR de la retouche en bas du ticket du costume.
   const clientRows = [
     row("customer", { big: true }),
     row("phone"),
@@ -148,7 +152,7 @@ export default async function OrderSlipPage({
     row("costume", { big: true, underline: true, bullet: true }),
     row("jacketSize"),
     row("pantsSize", { bullet: true }),
-    row("tailor", { big: true, underline: true, bullet: true }),
+    // Pas de ligne « Tailleur » ici : le QR de la retouche, en bas, la remplace.
     row("shirt", { bullet: true }),
     row("jabador", { bullet: true }),
     row("shoes", { bullet: true }),
@@ -180,6 +184,18 @@ export default async function OrderSlipPage({
   // Le même QR sur les DEUX tickets : scanné sur le cintre, il vérifie à
   // quelle commande appartient la housse.
   const orderUrl = `${appUrl()}/${locale}/commandes/${order.id}`;
+  // Les retouches (le pantalon, en pratique) : leur QR — le même que celui
+  // de l'étiquette — en bas du ticket du costume, pour le tailleur.
+  const alterations = order.order_lines.flatMap((line) =>
+    line.is_active && line.line_kind !== "vente" && line.line_alterations
+      ? [
+          {
+            id: line.line_alterations.id,
+            name: line.model_name_snapshot ?? line.external_label ?? "",
+          },
+        ]
+      : [],
+  );
 
   const cancelledBanner = cancelled && (
     // Un bon d'une commande annulée reste imprimable — pour le dossier — mais
@@ -285,6 +301,37 @@ export default async function OrderSlipPage({
           </div>
           {cancelledBanner}
           <TicketRows rows={costumeRows} className="mt-[0.6em] text-[1.15em]" />
+
+          {/* QR de la RETOUCHE, sous le texte : scanné par le tailleur, il
+              ouvre la pièce dans son atelier. En pouces, comme le QR du haut,
+              pour que l'ajustement du texte ne le gonfle pas. */}
+          {alterations.length > 0 && (
+            // Pointillés au-dessus : la ligne de COUPE, pour détacher le QR et
+            // le donner au tailleur avec le pantalon. RESTE dans la largeur du
+            // contenu : une marge négative le faisait déborder, `fitTicket`
+            // croyait le texte trop large et le réduisait au minimum.
+            <div className="relative mt-[0.8em] border-t-2 border-dashed border-black pt-[0.6em]">
+              <Scissors
+                className="absolute top-[-0.55em] start-0 size-[1em] bg-white"
+                aria-hidden
+              />
+              <div className="space-y-[0.3em]">
+              {alterations.map((a) => (
+                <div key={a.id} className="flex items-center justify-center gap-[0.6em]">
+                  <OrderQr
+                    value={alterationUrl(appUrl(), locale, a.id)}
+                    className="block size-[0.7in] shrink-0"
+                  />
+                  <p className="flex min-w-0 items-center gap-[0.3em] font-bold">
+                    <Scissors className="size-[1em] shrink-0" aria-hidden />
+                    <span>{t("alterations.toggle")}</span>
+                    {a.name && <bdi className="min-w-0 wrap-break-word">{a.name}</bdi>}
+                  </p>
+                </div>
+              ))}
+              </div>
+            </div>
+          )}
         </TicketFrame>
       </div>
     </TicketPdfProvider>

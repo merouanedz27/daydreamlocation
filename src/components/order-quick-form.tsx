@@ -1554,7 +1554,11 @@ export function OrderQuickForm({
                     {slotLabel(index)}
                   </label>
                   <div className="-my-2 flex items-center">
-                  {slot.name.trim() && (
+                  {/* Seul le PANTALON se retouche (demande du client). Une
+                      retouche déjà posée sur une autre pièce reste visible,
+                      pour pouvoir la décocher — mais on n'en crée plus. */}
+                  {slot.name.trim() &&
+                    (part === "pantalon" || slot.alteration) && (
                     <Button
                       type="button"
                       variant="ghost"
