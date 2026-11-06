@@ -26,9 +26,9 @@ export async function generateMetadata(props: {
 /**
  * Les ÉTIQUETTES RETOUCHE : 10 par feuille 4 × 6 pouces, à découper et coller
  * sur chaque vêtement qui part chez le tailleur. Chacune porte le QR de SA
- * retouche, le client, la taille, la date et ce qu'il faut faire — PAS la
- * pièce ni sa référence (demande du client) : l'étiquette est déjà collée
- * dessus.
+ * retouche, le client, le NOM de la pièce (« Veste », pour distinguer les
+ * étiquettes d'un même client), la taille, la date et ce qu'il faut faire —
+ * jamais la référence (demande du client).
  *
  * Quelles étiquettes :
  *   ?commande=<id>   celles d'une commande (fiche commande) ;
@@ -135,14 +135,27 @@ function Label({
     <>
       {/* Case de ≈ 1,8 × 1,1 pouce : QR à gauche, client / taille / date à
           côté, la retouche dessous sur toute la largeur. */}
+      {/* La colonne à côté du QR ne dépasse pas sa hauteur : la retouche
+          garde ses trois lignes. Le NOM de la pièce passe sur deux lignes
+          plutôt que d'être coupé — c'est sa fin (« Veste », « Pantalon »)
+          qui distingue les étiquettes d'un même client. */}
       <div className="flex min-w-0 gap-[1.5mm]">
         <OrderQr value={url} className="block size-[0.56in] shrink-0" />
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="line-clamp-2 text-[9pt] font-bold break-words">
-            <bdi>{item.customer_name}</bdi>
+        <div className="min-w-0 flex-1 leading-[1.15]">
+          {/* `dir="auto"` sur la ligne : un nom arabe sur une étiquette
+              française se coupe par sa FIN, pas par son début. */}
+          <p dir="auto" className="truncate text-start text-[9pt] font-bold">
+            {item.customer_name}
           </p>
-          {item.size && <p className="mt-[0.5mm] text-[9pt] font-bold">{sizeLabel}</p>}
-          <p className="tabular mt-[0.5mm] text-[7.5pt]">{formatDate(item.event_date, locale)}</p>
+          {item.model_name && (
+            <p className="mt-[0.3mm] line-clamp-2 text-[7.5pt] break-words">
+              <bdi>{item.model_name}</bdi>
+            </p>
+          )}
+          <p className="mt-[0.3mm] flex items-baseline gap-x-[1.5mm]">
+            {item.size && <span className="text-[9pt] font-bold">{sizeLabel}</span>}
+            <span className="tabular text-[7pt]">{formatDate(item.event_date, locale)}</span>
+          </p>
         </div>
       </div>
       <p className="mt-[0.6mm] flex min-w-0 items-start gap-[1mm] text-[7.5pt] leading-[1.15] font-bold">

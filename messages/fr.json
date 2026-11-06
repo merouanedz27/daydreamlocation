@@ -1137,7 +1137,7 @@
     "scan": {
       "button": "Scanner une pièce taillée",
       "title": "Scanner les étiquettes",
-      "hint": "Visez l'étiquette QR de chaque pièce terminée. La caméra reste ouverte pour la suivante.",
+      "hint": "Visez l'étiquette QR de la pièce terminée : elle est marquée taillée et la caméra se referme.",
       "done": "Taillée ✓ — {customer} · {piece}",
       "already": "Déjà taillée — {customer} · {piece}",
       "notALabel": "Ce QR n'est pas une étiquette de retouche."

@@ -19,9 +19,9 @@ import type { Alteration } from "@/lib/queries/alterations";
 import type { Locale } from "@/i18n/routing";
 
 /**
- * Le gros bouton de l'atelier : la caméra s'ouvre, chaque étiquette scannée
- * marque sa pièce TAILLÉE. Le tiroir reste ouvert — le tailleur rend souvent
- * une pile de pièces d'un coup.
+ * Le gros bouton de l'atelier : la caméra s'ouvre, l'étiquette scannée marque
+ * sa pièce TAILLÉE, le cadre accroche le QR puis le tiroir se referme — comme
+ * le scanner de la vente. La liste derrière se met à jour.
  */
 export function AlterationScanButton({ className }: { className?: string }) {
   const t = useTranslations("alterations");
@@ -57,7 +57,6 @@ export function AlterationScanButton({ className }: { className?: string }) {
         open={open}
         onOpenChange={setOpen}
         onScan={onScan}
-        keepOpen
         manualEntry={false}
         texts={{ title: t("scan.title"), hint: t("scan.hint") }}
       />
