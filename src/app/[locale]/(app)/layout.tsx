@@ -8,6 +8,7 @@ import { CustomerMessageProvider } from "@/components/customer-message";
 import { NotificationsBell } from "@/components/notifications-bell";
 import { OfflineSync } from "@/components/offline-sync";
 import { canManageStock, requireProfile, isOwner } from "@/lib/auth";
+import { countPendingAlterations } from "@/lib/queries/alterations";
 import { getSettings } from "@/lib/queries/orders";
 import { getUnreadNotificationCount } from "@/lib/queries/notifications";
 import type { Locale } from "@/i18n/routing";
@@ -31,13 +32,15 @@ export default async function AppLayout({
 
   // En parallèle : chaque attente en série retardait l'affichage de TOUTES les
   // pages. Les réglages ne fuient pas sans session : RLS les refuse.
-  const [profile, t, settings, notificationCount] = await Promise.all([
+  const [profile, t, settings, notificationCount, pendingAlterations] = await Promise.all([
     requireProfile(locale as Locale),
     getTranslations("roles"),
     // Le message type de la boutique, pour chaque bouton 💬 des listes.
     getSettings(),
     // Le compteur seul : la liste se charge à l'ouverture de la cloche.
     getUnreadNotificationCount(),
+    // Les pièces encore chez le tailleur : le compteur du lien « Retouches ».
+    countPendingAlterations(),
   ]);
 
   return (
@@ -48,6 +51,7 @@ export default async function AppLayout({
           profile.role === "owner" || profile.role === "moderator" ? profile.role : "staff",
         )}
         showDashboard={isOwner(profile)}
+        pendingAlterations={pendingAlterations}
         notifications={
           <NotificationsBell
             locale={locale as Locale}

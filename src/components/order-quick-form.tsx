@@ -20,8 +20,7 @@ import {
   Package,
   Plane,
   Plus,
-  ScanLine,
-  Tag,
+  Scissors,
   X,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,7 +36,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { DatePicker, toCalendarDate } from "@/components/date-picker";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { QrScanSheet, type ScanOutcome } from "@/components/qr-scan-sheet";
 import {
   FlagToggle,
   MoneyStepper,
@@ -79,7 +77,6 @@ import {
   EMPTY_SLOT,
   FIXED_SLOTS,
   JABADOR_SLOT,
-  PART_SLOTS,
   SHOES_SLOT,
   SHIRT_SLOT,
   catalogSlotOf,
@@ -170,7 +167,19 @@ function sanitizeQuickDraft(value: unknown): QuickDraft | null {
   // Les pièces en plus restées vides n'ont rien à garder — et cela nettoie
   // les brouillons déjà gonflés par le bug ci-dessus.
   slots = slots.filter((s, i) => i < FIXED_SLOTS || s.name.trim());
-  return { ...EMPTY_DRAFT, ...d, v: 4, slots };
+  // Brouillon d'avant les retouches par pièce : la note « Tailleur » unique
+  // va sur la première pièce saisie, comme la saisie l'enregistrait.
+  const { tailor: legacyTailor, ...rest } = d as typeof d & { tailor?: unknown };
+  if (typeof legacyTailor === "string" && legacyTailor.trim()) {
+    const first = slots.findIndex((s) => s.name.trim());
+    if (first >= 0 && !slots[first].alteration) {
+      slots[first] = {
+        ...slots[first],
+        alteration: { id: null, note: legacyTailor.trim(), done: false },
+      };
+    }
+  }
+  return { ...EMPTY_DRAFT, ...rest, v: 4, slots };
 }
 
 /**
@@ -247,12 +256,12 @@ function withAutoPrice(d: QuickDraft): QuickDraft {
 function isDirty(d: QuickDraft): boolean {
   return (
     Boolean(
-      d.customerName || d.customerPhone || d.eventDate || d.tailor || d.price,
+      d.customerName || d.customerPhone || d.eventDate || d.price,
     ) ||
     Boolean(d.paid || d.caution || d.notes) ||
     d.pickedUp ||
     d.returned ||
-    d.slots.some((s) => s.name || s.size)
+    d.slots.some((s) => s.name || s.size || s.alteration?.note)
   );
 }
 
@@ -483,14 +492,33 @@ export function OrderQuickForm({
     return map;
   }, [models]);
 
-  /** Les paires du stock de VENTE. Leur ligne sera une vente — c'est la base qui le déduit. */
+  /**
+   * Les pièces de la commande qu'on modifie. Une ancienne commande mixte ou de
+   * vente seule garde ainsi ses articles de vente dans leurs cases.
+   */
+  const initialUnitIds = useMemo(
+    () =>
+      new Set(
+        (edit?.initial.slots ?? [])
+          .map((s) => s.unitId)
+          .filter((id): id is number => Boolean(id)),
+      ),
+    [edit?.initial],
+  );
+
+  /**
+   * Les articles de VENTE encore visibles ici. La saisie est réservée à la
+   * LOCATION, à la demande du client : la vente passe par son propre écran
+   * (`/commandes/vente`). Ne restent que ceux d'une commande qu'on modifie.
+   */
   const saleUnitIds = useMemo(() => {
     const ids = new Set<number>();
     for (const model of models) {
-      if (model.purpose === "vente") for (const unit of model.units) ids.add(unit.id);
+      if (model.purpose !== "vente") continue;
+      for (const unit of model.units) if (initialUnitIds.has(unit.id)) ids.add(unit.id);
     }
     return ids;
-  }, [models]);
+  }, [models, initialUnitIds]);
   const isSaleUnit = (id: number | null | undefined) => Boolean(id && saleUnitIds.has(id));
 
   // VENTE SEULE : tout ce qui est saisi vient du stock de vente. Rien à
@@ -507,13 +535,14 @@ export function OrderQuickForm({
       .map((slot, index) => ({ slot, index }))
       .filter(({ slot }) => slot.name.trim());
 
-    // La colonne « Tailleur » va sur le costume (sa 1re partie saisie), ou à
-    // défaut sur la 1re pièce.
-    const tailorAt = filled[0]?.index ?? -1;
-    const tailor = draft.tailor.trim() || null;
+    // La note de ligne ne porte plus la colonne « Tailleur » : chaque pièce a
+    // sa RETOUCHE, avec son étiquette QR (`line_alterations`).
+    const note = null;
 
-    const raw: DraftLine[] = filled.map(({ slot, index }) => {
-      const note = index === tailorAt ? tailor : null;
+    const raw: DraftLine[] = filled.map(({ slot }) => {
+      const alteration = slot.alteration
+        ? { id: slot.alteration.id, note: slot.alteration.note }
+        : null;
       if (slot.external) {
         return {
           kind: "external",
@@ -522,6 +551,7 @@ export function OrderQuickForm({
           cost: slot.external.cost,
           unitPrice: 0,
           note,
+          alteration,
         };
       }
       return slot.unitId
@@ -533,6 +563,7 @@ export function OrderQuickForm({
             modelName: slot.name,
             refCode: slot.ref ?? "",
             size: slot.size || null,
+            alteration,
           }
         : {
             kind: "named",
@@ -540,6 +571,7 @@ export function OrderQuickForm({
             size: slot.size.trim() || null,
             unitPrice: 0,
             note,
+            alteration,
           };
     });
     // Le prix de la tenue se répartit au prorata du prix de chaque pièce.
@@ -547,7 +579,7 @@ export function OrderQuickForm({
       slot.unitId && !slot.external ? (listPrice.get(slot.unitId) ?? 0) : 0,
     );
     return spreadOutfitPrice(raw, Number(draft.price) || 0, weights);
-  }, [draft.slots, draft.tailor, draft.price, listPrice]);
+  }, [draft.slots, draft.price, listPrice]);
 
   const total = Number(draft.price) || 0;
   const balance = total - (Number(draft.paid) || 0);
@@ -593,6 +625,12 @@ export function OrderQuickForm({
         };
       }
     });
+    // « Retouche » cochée sans rien dire au tailleur.
+    draft.slots.forEach((slot, index) => {
+      if (slot.name.trim() && slot.alteration && !slot.alteration.note.trim()) {
+        issues[`alt_${index}`] = { key: "alterations.errors.noteRequired" };
+      }
+    });
     if (draft.price.trim() && !(Number(draft.price) >= 0)) {
       issues.price = { key: "errors.numberInvalid" };
     }
@@ -630,10 +668,33 @@ export function OrderQuickForm({
 
   function setSlot(index: number, patch: Partial<Slot>) {
     setServerIssue(null);
-    const slots = store
-      .get()
-      .slots.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    const slots = store.get().slots.map((s, i) => {
+      if (i !== index) return s;
+      const next = { ...s, ...patch };
+      // Une AUTRE pièce du stock dans la case : l'étiquette déjà imprimée
+      // nommait l'ancienne. La retouche repart neuve, note gardée.
+      if (
+        "unitId" in patch &&
+        patch.unitId !== s.unitId &&
+        s.alteration?.id &&
+        !("alteration" in patch)
+      ) {
+        next.alteration = { id: null, note: s.alteration.note, done: false };
+      }
+      return next;
+    });
     updateDraft({ slots });
+  }
+
+  function toggleAlteration(index: number) {
+    const slot = store.get().slots[index];
+    setSlot(index, {
+      alteration: slot.alteration ? null : { id: null, note: "", done: false },
+    });
+    if (!slot.alteration) {
+      // Le champ apparaît : le curseur y va, le clavier s'ouvre.
+      requestAnimationFrame(() => document.getElementById(`q-alt-${index}`)?.focus());
+    }
   }
 
   function removeSlot(index: number) {
@@ -665,7 +726,6 @@ export function OrderQuickForm({
     n: number;
     open: boolean;
     /** « + Article à vendre » : la liste ne montre que le stock de VENTE. */
-    sale?: boolean;
   } | null>(null);
   const [sizePicker, setSizePicker] = useState<{
     index: number;
@@ -690,6 +750,9 @@ export function OrderQuickForm({
       const name =
         (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
       for (const unit of model.units) {
+        // Le stock de VENTE n'a pas sa place dans la saisie de location — sauf
+        // les articles de la commande qu'on modifie.
+        if (model.purpose === "vente" && !initialUnitIds.has(unit.id)) continue;
         // Une paire vendue par UNE AUTRE commande a quitté la boutique : elle
         // n'est plus proposée nulle part. Celle de la commande qu'on modifie
         // reste, sinon elle disparaîtrait de sa propre case.
@@ -703,7 +766,7 @@ export function OrderQuickForm({
       }
     }
     return map;
-  }, [models, locale, edit?.orderId]);
+  }, [models, locale, edit?.orderId, initialUnitIds]);
 
   /** Pourquoi une pièce ne peut pas être prise, pour la case `index`. */
   function unitState(id: number, index: number) {
@@ -760,7 +823,7 @@ export function OrderQuickForm({
     return sortSizes([...series, ...stock]);
   }
 
-  function pickerOptions(index: number, saleOnly = false): PickerOption[] {
+  function pickerOptions(index: number): PickerOption[] {
     const slotNo = catalogSlotOf(index);
     // Une pièce EN PLUS peut être n'importe quoi : tout est proposé.
     const extra = slotNo === null;
@@ -796,21 +859,6 @@ export function OrderQuickForm({
         featured,
       };
     };
-
-    // « + Article à vendre » : tout le stock de VENTE, toutes catégories —
-    // les libres d'abord, puis par nom et taille.
-    if (saleOnly) {
-      return [...unitIndex.entries()]
-        .filter(([id]) => isSaleUnit(id))
-        .map(([id, { name, unit }]) => ({ option: unitOption(id, true), name, size: unit.size ?? "" }))
-        .sort(
-          (a, b) =>
-            Number(Boolean(a.option.disabled)) - Number(Boolean(b.option.disabled)) ||
-            a.name.localeCompare(b.name) ||
-            a.size.localeCompare(b.size, undefined, { numeric: true }),
-        )
-        .map((r) => r.option);
-    }
 
     // Veste, gilet, pantalon, chemise, jabador et chaussures : les pièces du stock de
     // CETTE case, dans la taille choisie.
@@ -910,58 +958,6 @@ export function OrderQuickForm({
     };
   }
 
-  // --- scan des chaussures à vendre -------------------------------------------
-  // Commande MIXTE (costume loué + chaussures achetées) : l'icône de scan de
-  // la case Chaussures ouvre le scanner de la vente au comptoir.
-  const [scanOpen, setScanOpen] = useState(false);
-
-  /** Un QR lu → la paire va dans la case Chaussures, ou en pièce en plus si elle est prise. */
-  function onScanShoes(code: string): ScanOutcome {
-    const shown = code.trim();
-    const key = shown.toUpperCase();
-    const hit = models
-      .flatMap((m) => m.units.map((u) => ({ id: u.id, ref: u.ref_code, purpose: m.purpose })))
-      .find((u) => u.ref.trim().toUpperCase() === key);
-    if (!hit) return { ok: false, message: t("orders.sale.unknownRef", { ref: shown }) };
-    // Le scan reste réservé au stock de VENTE, comme au comptoir.
-    if (hit.purpose !== "vente") {
-      return { ok: false, message: t("orders.sale.rentalRef", { ref: shown }) };
-    }
-    // Absente de `unitIndex` : vendue par une autre commande.
-    if (!unitIndex.has(hit.id)) {
-      return { ok: false, message: `${hit.ref} · ${t("orders.sale.alreadySold")}` };
-    }
-    if (pickedUnits.has(hit.id)) {
-      return { ok: false, message: t("orders.sale.alreadyInSale", { ref: hit.ref }) };
-    }
-    const { reason, taken } = unitState(hit.id, SHOES_SLOT);
-    if (!windowValid || taken) {
-      return { ok: false, message: `${hit.ref} · ${reason ?? t("orders.takenOnDates")}` };
-    }
-
-    const filled = unitSlot(hit.id)!;
-    setServerIssue(null);
-    const slots = [...store.get().slots];
-    // Case Chaussures libre : la paire y va, comme choisie dans sa liste.
-    // Déjà prise : une pièce en plus, comme « Vendre un article ».
-    if (!slots[SHOES_SLOT].name.trim()) {
-      slots[SHOES_SLOT] = { ...slots[SHOES_SLOT], ...filled };
-    } else {
-      slots.push({ ...EMPTY_SLOT, ...filled });
-    }
-    updateDraft({ slots });
-
-    const found = unitIndex.get(hit.id)!;
-    return {
-      ok: true,
-      message: t("orders.sale.added", {
-        name: found.name,
-        size: found.unit.size ?? "—",
-        price: formatMoney(found.price, locale),
-      }),
-    };
-  }
-
   /** Une clé cochée → de quoi remplir une case. */
   function slotFromKey(key: string): Partial<Slot> | null {
     if (key.startsWith(NEW_KEY)) {
@@ -1045,21 +1041,21 @@ export function OrderQuickForm({
   }
 
   /**
-   * « + Autre pièce » / « + Article à vendre » : une case en plus, et sa liste
+   * « + Autre pièce » : une case en plus, et sa liste
    * ouverte d'emblée.
    *
    * Une case en plus restée VIDE est reprise au lieu d'en ajouter une autre :
    * un double toucher — ou le « clic fantôme » du téléphone pendant que la
    * liste s'ouvre — ajoutait sinon deux cases.
    */
-  function addSlotAndPick(sale = false) {
+  function addSlotAndPick() {
     const slots = store.get().slots;
     let index = slots.findIndex((s, i) => i >= FIXED_SLOTS && !s.name.trim());
     if (index === -1) {
       index = slots.length;
       updateDraft({ slots: [...slots, EMPTY_SLOT] });
     }
-    setPicker({ index, n: Date.now(), open: true, sale });
+    setPicker({ index, n: Date.now(), open: true });
   }
 
   /**
@@ -1557,6 +1553,25 @@ export function OrderQuickForm({
                   >
                     {slotLabel(index)}
                   </label>
+                  <div className="-my-2 flex items-center">
+                  {slot.name.trim() && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={Boolean(slot.alteration)}
+                      onClick={() => toggleAlteration(index)}
+                      className={cn(
+                        "h-11 gap-1.5 px-2 text-xs",
+                        slot.alteration
+                          ? "text-gold-strong font-medium"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      <Scissors className="size-4" aria-hidden />
+                      {t("alterations.toggle")}
+                    </Button>
+                  )}
                   {index >= FIXED_SLOTS && (
                     <Button
                       type="button"
@@ -1569,6 +1584,7 @@ export function OrderQuickForm({
                       <span className="sr-only">{t("orders.removeLine")}</span>
                     </Button>
                   )}
+                  </div>
                 </div>
 
                 {/* Accessoires : TEXTE LIBRE. Le patron ne les met pas en
@@ -1635,20 +1651,6 @@ export function OrderQuickForm({
                         Boolean(partIssue) || (!!issues.lines && index === 0)
                       }
                     />
-                    {/* Commande mixte : scanner la paire à vendre. */}
-                    {index === SHOES_SLOT && saleUnitIds.size > 0 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setScanOpen(true)}
-                        aria-label={t("orders.sale.scan")}
-                        title={t("orders.sale.scan")}
-                        className="border-gold-strong/50 size-12 shrink-0"
-                      >
-                        <ScanLine className="text-gold-strong size-5" aria-hidden />
-                      </Button>
-                    )}
                   </div>
                 ) : (
                   <PickerField
@@ -1710,26 +1712,45 @@ export function OrderQuickForm({
                   </p>
                 )}
 
-                {/* La colonne « Tailleur » : texte libre (« TK-525 (14CM) »),
-                    sous le costume — après sa dernière partie. */}
-                {index === PART_SLOTS.length - 1 && (
-                  <div className="mt-3">
-                    <label
-                      htmlFor="q-tailor"
-                      className="text-muted-foreground mb-1 block text-xs"
-                    >
-                      {t("orders.quick.tailor")}
-                    </label>
+                {/* RETOUCHE de la pièce : ce que le tailleur lira sur
+                    l'étiquette QR collée sur le vêtement. */}
+                {slot.name.trim() && slot.alteration && (
+                  <div className="border-gold-strong/30 bg-gold-soft/40 mt-2 rounded-md border p-2">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label
+                        htmlFor={`q-alt-${index}`}
+                        className="text-muted-foreground text-xs"
+                      >
+                        {t("alterations.noteLabel")}
+                      </label>
+                      {slot.alteration.done && (
+                        <span className="bg-success-soft text-success-foreground inline-flex items-center gap-1 rounded-full px-2 text-[11px] leading-5">
+                          <CircleCheck className="size-3" aria-hidden />
+                          {t("alterations.status.taillee")}
+                        </span>
+                      )}
+                    </div>
                     <Input
-                      id="q-tailor"
+                      id={`q-alt-${index}`}
                       data-field
-                      value={draft.tailor}
-                      onChange={(e) => updateDraft({ tailor: e.target.value })}
-                      placeholder={t("orders.quick.tailorPlaceholder")}
+                      value={slot.alteration.note}
+                      maxLength={200}
+                      onChange={(e) =>
+                        setSlot(index, {
+                          alteration: { ...slot.alteration!, note: e.target.value },
+                        })
+                      }
+                      placeholder={t("alterations.notePlaceholder")}
+                      aria-invalid={issues[`alt_${index}`] ? true : undefined}
                       enterKeyHint="next"
                       autoComplete="off"
                       className="h-12 text-base"
                     />
+                    {issues[`alt_${index}`] && (
+                      <p role="alert" className="text-destructive mt-1 text-sm">
+                        {issueText(`alt_${index}`)}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -1743,30 +1764,16 @@ export function OrderQuickForm({
           </p>
         )}
 
-        <div className={cn("mt-4 grid gap-2", saleUnitIds.size > 0 && "grid-cols-2")}>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => addSlotAndPick()}
-            className="h-11 text-base"
-          >
-            <Plus className="size-4" aria-hidden />
-            {t("orders.quick.addOther")}
-          </Button>
-          {/* Le stock de VENTE (chaussures pour commencer) : un geste à part,
-              visible, plutôt que de le chercher dans la case Chaussures. */}
-          {saleUnitIds.size > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => addSlotAndPick(true)}
-              className="border-gold-strong/50 h-11 text-base"
-            >
-              <Tag className="text-gold-strong size-4" aria-hidden />
-              {t("orders.quick.addSale")}
-            </Button>
-          )}
-        </div>
+        {/* Pas de vente ici : elle a son propre écran (`/commandes/vente`). */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => addSlotAndPick()}
+          className="mt-4 h-11 w-full text-base"
+        >
+          <Plus className="size-4" aria-hidden />
+          {t("orders.quick.addOther")}
+        </Button>
       </Section>
 
       {/* --- Paiement --------------------------------------------------------
@@ -1956,29 +1963,24 @@ export function OrderQuickForm({
           open={picker.open}
           onOpenChange={(open) => (open ? null : closePicker())}
           title={
-            picker.sale
-              ? t("orders.quick.addSale")
-              : sizedSlot(picker.index)
-                ? sizedTitle(picker.index)
-                : slotLabel(picker.index)
+            sizedSlot(picker.index)
+              ? sizedTitle(picker.index)
+              : slotLabel(picker.index)
           }
-          options={pickerOptions(picker.index, picker.sale)}
+          options={pickerOptions(picker.index)}
           selected={selectedKeys(picker.index)}
           onDone={(keys) => applyPicked(picker.index, keys)}
-          // Veste, gilet, pantalon, vente : du stock seulement.
+          // Veste, gilet, pantalon : du stock seulement.
           allowNew={
-            !picker.sale &&
             !partOfSlot(picker.index) &&
             !STOCK_ONLY_SLOTS.has(catalogSlotOf(picker.index) ?? 0)
           }
-          // Les cases fixes et la vente : un toucher choisit et referme.
+          // Les cases fixes : un toucher choisit et referme.
           // « + Autre pièce » garde ses cases à cocher et « Valider »
           // (cravate + ceinture…).
-          instant={picker.sale || picker.index < FIXED_SLOTS}
+          instant={picker.index < FIXED_SLOTS}
           emptyText={
-            picker.sale
-              ? t("orders.quick.noSaleStock")
-              : sizedSlot(picker.index)
+            sizedSlot(picker.index)
               ? draft.slots[picker.index]?.size.trim()
                 ? t("orders.quick.noPartInSize", {
                     part: slotLabel(picker.index),
@@ -1989,8 +1991,6 @@ export function OrderQuickForm({
           }
         />
       )}
-
-      <QrScanSheet open={scanOpen} onOpenChange={setScanOpen} onScan={onScanShoes} />
 
       {sizePicker && (
         <SizePicker

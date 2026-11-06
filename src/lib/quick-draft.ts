@@ -25,6 +25,19 @@ export type Slot = {
    * transformer en vêtement ordinaire et perdre ce qu'elle a coûté.
    */
   external?: { source: string | null; cost: number | null } | null;
+  /**
+   * RETOUCHE de cette pièce, chez le tailleur. `id` : celle déjà en base (son
+   * étiquette est peut-être collée) — renvoyé au serveur pour qu'une
+   * modification de la commande la garde au lieu d'en créer une autre.
+   */
+  alteration?: SlotAlteration | null;
+};
+
+export type SlotAlteration = {
+  id: string | null;
+  note: string;
+  /** Déjà taillée — l'affichage seulement ; le serveur relit le statut. */
+  done: boolean;
 };
 
 export type QuickDraft = {
@@ -40,7 +53,6 @@ export type QuickDraft = {
    * les pièces en plus.
    */
   slots: Slot[];
-  tailor: string;
   /** « Allez valide » / « Retour valide » de son formulaire AppSheet. */
   pickedUp: boolean;
   returned: boolean;
@@ -59,6 +71,7 @@ export const EMPTY_SLOT: Slot = {
   ref: null,
   stockPrice: null,
   external: null,
+  alteration: null,
 };
 export const FIXED_SLOTS = 7;
 export const SHIRT_SLOT = 3;
@@ -99,7 +112,6 @@ export const EMPTY_DRAFT: QuickDraft = {
   returnDue: "",
   datesTouched: false,
   slots: Array.from({ length: FIXED_SLOTS }, () => EMPTY_SLOT),
-  tailor: "",
   pickedUp: false,
   returned: false,
   price: "",
@@ -172,6 +184,13 @@ export type EditableOrder = {
     model_name_snapshot: string | null;
     size_snapshot: string | null;
     line_note: string | null;
+    /** Une seule par ligne (`order_line_id` unique) : PostgREST rend l'objet. */
+    line_alterations?: {
+      id: string;
+      note: string;
+      status: string;
+      done_at: string | null;
+    } | null;
     external_label: string | null;
     external_source: string | null;
     external_cost: number | null;
@@ -205,7 +224,6 @@ export function draftFromOrder(
 ): QuickDraft {
   const slots: Slot[] = EMPTY_DRAFT.slots.map((s) => ({ ...s }));
   const extra: Slot[] = [];
-  let tailor = "";
   let cursor = 0;
 
   for (const line of order.order_lines) {
@@ -247,11 +265,13 @@ export function draftFromOrder(
         : null,
     };
 
-    // « Tailleur » : la note portée par une pièce (la saisie la met sur le
-    // costume). Les notes de plusieurs pièces se rejoignent plutôt que de se
-    // perdre.
-    if (line.line_note?.trim()) {
-      tailor = tailor ? `${tailor} · ${line.line_note.trim()}` : line.line_note.trim();
+    // La retouche de la pièce. Une ancienne note « Tailleur » sans retouche
+    // (reprise ratée) en devient une plutôt que de se perdre.
+    const alt = line.line_alterations;
+    if (alt) {
+      slot.alteration = { id: alt.id, note: alt.note, done: alt.status === "taillee" };
+    } else if (line.line_note?.trim()) {
+      slot.alteration = { id: null, note: line.line_note.trim(), done: false };
     }
 
     if (index === null) {
@@ -277,7 +297,6 @@ export function draftFromOrder(
       order.pickup_date !== defaultWindow.pickup ||
       order.return_due_date !== defaultWindow.returnDue,
     slots: [...slots, ...extra],
-    tailor,
     pickedUp: order.picked_up,
     returned: order.returned,
     price: String(order.total_price),
@@ -286,4 +305,15 @@ export function draftFromOrder(
     caution: order.caution_amount ? String(order.caution_amount) : "",
     notes: order.notes ?? "",
   };
+}
+
+/**
+ * La colonne « Tailleur » de son tableur, recalculée depuis les retouches de
+ * chaque pièce : « Gio-079 : manches −2 cm · Pantalon : ourlet ✓ ». ✓ = taillée.
+ */
+export function tailorSummary(slots: Slot[]): string {
+  return slots
+    .filter((s) => s.name.trim() && s.alteration?.note.trim())
+    .map((s) => `${s.name.trim()} : ${s.alteration!.note.trim()}${s.alteration!.done ? " ✓" : ""}`)
+    .join(" · ");
 }

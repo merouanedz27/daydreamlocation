@@ -417,7 +417,13 @@ export function OrdersList({
             </Link>
             {/* Le bon de location en un toucher, sans passer par la fiche.
                 Vente seule : rien n'est loué, pas de bon. */}
-            {order.has_rental !== false && (
+            {/* Une vente seule se reconnaît d'un coup d'œil : l'équipe la
+                confondait avec une location. */}
+            {order.has_rental === false ? (
+              <Badge className="bg-gold-soft text-gold-strong ms-2 shrink-0 border-transparent">
+                {t("orders.saleTag")}
+              </Badge>
+            ) : (
               <Link
                 href={`/imprimer/commande/${order.id}`}
                 aria-label={t("orders.printNamed", { name: order.customer_name })}

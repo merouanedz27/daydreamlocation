@@ -141,28 +141,35 @@ function parseOrderForm(
 
 /** Les lignes au format attendu par `create_order` / `update_order`. */
 function toRpcLines(lines: OrderInput["lines"]) {
-  return lines.map((l) => {
-    switch (l.kind) {
-      case "unit":
-        return { unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? "" };
-      case "named":
-        return {
-          kind: "named",
-          name: l.name,
-          size: l.size ?? "",
-          unitPrice: l.unitPrice,
-          note: l.note ?? "",
-        };
-      case "external":
-        return {
-          source: l.source ?? "",
-          label: l.label,
-          cost: l.cost ?? "",
-          unitPrice: l.unitPrice,
-          note: l.note ?? "",
-        };
-    }
-  });
+  // La retouche voyage avec sa ligne : `sync_line_alterations` la rattache à
+  // la ligne insérée au même rang.
+  return lines.map((l) => ({
+    ...rpcLine(l),
+    ...(l.alteration ? { alteration: { id: l.alteration.id ?? "", note: l.alteration.note } } : {}),
+  }));
+}
+
+function rpcLine(l: OrderInput["lines"][number]) {
+  switch (l.kind) {
+    case "unit":
+      return { unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? "" };
+    case "named":
+      return {
+        kind: "named",
+        name: l.name,
+        size: l.size ?? "",
+        unitPrice: l.unitPrice,
+        note: l.note ?? "",
+      };
+    case "external":
+      return {
+        source: l.source ?? "",
+        label: l.label,
+        cost: l.cost ?? "",
+        unitPrice: l.unitPrice,
+        note: l.note ?? "",
+      };
+  }
 }
 
 /** Erreurs attendues de l'écriture d'une commande, traduites en clés i18n. */
@@ -290,6 +297,7 @@ export async function createOrder(formData: FormData): Promise<ActionResult> {
   }
 
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
 
   // E-mail « Nouvelle commande » (celui de son AppSheet), APRÈS la réponse :
   // la saisie n'attend pas le serveur de messagerie, et un échec d'envoi ne
@@ -371,6 +379,7 @@ export async function updateOrder(formData: FormData): Promise<ActionResult> {
   if (error) return orderWriteError(error);
 
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   after(() =>
     notifyOrderEvent(orderId, "order_updated", profile.id, before).catch(console.error),
   );
@@ -425,6 +434,7 @@ export async function setOrderChecks(formData: FormData): Promise<ActionResult> 
   if (!data?.length) return { ok: false, error: "errors.forbidden" };
 
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   after(() => notifyOrderEvent(orderId, "order_updated", profile.id).catch(console.error));
   return { ok: true };
@@ -509,6 +519,7 @@ export async function addOrderPayment(formData: FormData): Promise<ActionResult>
   // Le reste dû se lit à trois endroits, et le tableau de bord compte les
   // impayés : les quatre doivent bouger ensemble.
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true };
@@ -603,6 +614,7 @@ export async function setOrderCancelled(formData: FormData): Promise<ActionResul
   // La liste affiche le statut, la fiche l'affiche et change de boutons, et le
   // tableau de bord vient de changer de chiffre d'affaires.
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   revalidatePath(`/${locale}/commandes/${orderId}`);
   revalidatePath(`/${locale}/tableau-de-bord`);
   after(() =>
@@ -656,6 +668,7 @@ export async function deleteOrder(formData: FormData): Promise<ActionResult> {
   // La commande quitte la liste, le chiffre d'affaires, les échéances du
   // tableau de bord ; et ses frais perdent leur lien dans les dépenses.
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   revalidatePath(`/${locale}/tableau-de-bord`);
   redirectTo("/commandes", locale);
 }
@@ -719,6 +732,7 @@ export async function setOrdersChecks(formData: FormData): Promise<BulkResult> {
   if (error) return { ok: false, error: "errors.generic" };
 
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   return { ok: true, rows: data ?? [] };
 }
 
@@ -747,6 +761,7 @@ export async function deleteOrders(formData: FormData): Promise<BulkResult> {
   if (!data?.length) return { ok: false, error: "errors.forbidden" };
 
   revalidatePath(`/${locale}/commandes`, "layout");
+  revalidatePath(`/${locale}/retouches`, "layout");
   revalidatePath(`/${locale}/tableau-de-bord`);
   return { ok: true, rows: data };
 }

@@ -10,7 +10,11 @@
 
 import type { PickerModel, PickerUnit } from "@/lib/queries/orders";
 
-export type DraftLine =
+/** Retouche envoyée avec la ligne : `id` pour garder celle déjà en base. */
+export type LineAlteration = { id: string | null; note: string } | null;
+
+export type DraftLine = (
+
   | {
       kind: "unit";
       unitId: number;
@@ -37,7 +41,8 @@ export type DraftLine =
       cost: number | null;
       unitPrice: number;
       note: string | null;
-    };
+    }
+) & { alteration?: LineAlteration };
 
 /**
  * Résolution du prix, niveaux 2 et 3 sur 4.
@@ -86,29 +91,36 @@ export function unitIdsIn(lines: DraftLine[]): Set<number> {
 
 /** Ce qui part réellement au serveur : sans les champs d'affichage. */
 export function toPayload(lines: DraftLine[]) {
-  return lines.map((l) => {
-    switch (l.kind) {
-      case "unit":
-        return { kind: "unit" as const, unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? undefined };
-      case "named":
-        return {
-          kind: "named" as const,
-          name: l.name,
-          size: l.size ?? undefined,
-          unitPrice: l.unitPrice,
-          note: l.note ?? undefined,
-        };
-      case "external":
-        return {
-          kind: "external" as const,
-          source: l.source ?? undefined,
-          label: l.label,
-          cost: l.cost,
-          unitPrice: l.unitPrice,
-          note: l.note ?? undefined,
-        };
-    }
-  });
+  return lines.map((l) => ({ ...linePayload(l), ...alterationPayload(l.alteration) }));
+}
+
+function alterationPayload(alteration: LineAlteration | undefined) {
+  const note = alteration?.note.trim();
+  return note ? { alteration: { id: alteration?.id ?? undefined, note } } : {};
+}
+
+function linePayload(l: DraftLine) {
+  switch (l.kind) {
+    case "unit":
+      return { kind: "unit" as const, unitId: l.unitId, unitPrice: l.unitPrice, note: l.note ?? undefined };
+    case "named":
+      return {
+        kind: "named" as const,
+        name: l.name,
+        size: l.size ?? undefined,
+        unitPrice: l.unitPrice,
+        note: l.note ?? undefined,
+      };
+    case "external":
+      return {
+        kind: "external" as const,
+        source: l.source ?? undefined,
+        label: l.label,
+        cost: l.cost,
+        unitPrice: l.unitPrice,
+        note: l.note ?? undefined,
+      };
+  }
 }
 
 /**

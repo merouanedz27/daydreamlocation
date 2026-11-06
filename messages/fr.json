@@ -29,7 +29,8 @@
     "unpaid": "Impayés",
     "pointage": "Pointage",
     "fraisShort": "Frais",
-    "more": "Plus"
+    "more": "Plus",
+    "alterations": "Retouches"
   },
   "common": {
     "save": "Enregistrer",
@@ -206,8 +207,6 @@
       "shoes": "Chaussures",
       "other": "Autre pièce",
       "size": "Taille",
-      "tailor": "Tailleur",
-      "tailorPlaceholder": "Exemple : 90 CM + Slimi",
       "addOther": "Ajouter une pièce",
       "pickPart": "Choisir dans le stock",
       "noPart": "Aucun(e) {part} dans le stock.",
@@ -235,7 +234,6 @@
       "sizePantsShort": "Pantalon",
       "stepDown": "Moins {step}",
       "stepUp": "Plus {step}",
-      "addSale": "Vendre un article",
       "noSaleStock": "Aucun article à vendre en stock. Ajoutez-en dans Stock › Vente."
     },
     "callNamed": "Appeler {name}",
@@ -607,7 +605,8 @@
   "roles": {
     "owner": "Administrateur",
     "moderator": "Modérateur",
-    "staff": "Membre"
+    "staff": "Membre",
+    "tailleur": "Tailleur"
   },
   "team": {
     "title": "Équipe",
@@ -620,7 +619,7 @@
     "password": "Mot de passe",
     "passwordHint": "8 caractères minimum.",
     "role": "Rôle",
-    "roleHint": "Un membre gère les commandes et consulte le stock. Un administrateur voit en plus le bilan, les dépenses et l'équipe.",
+    "roleHint": "Un membre gère les commandes et consulte le stock. Un administrateur voit en plus le bilan, les dépenses et l'équipe. Un tailleur ne voit que les retouches.",
     "create": "Créer le compte",
     "you": "(vous)",
     "inactive": "Désactivé",
@@ -629,17 +628,20 @@
     "roleTo": {
       "owner": "Passer administrateur",
       "moderator": "Passer modérateur",
-      "staff": "Passer membre"
+      "staff": "Passer membre",
+      "tailleur": "Passer tailleur"
     },
     "roleToTitle": {
       "owner": "Passer {name} administrateur ?",
       "moderator": "Passer {name} modérateur ?",
-      "staff": "Passer {name} membre ?"
+      "staff": "Passer {name} membre ?",
+      "tailleur": "Passer {name} tailleur ?"
     },
     "roleToBody": {
       "owner": "Il verra le bilan et les dépenses, et pourra gérer l'équipe.",
       "moderator": "Il garde les commandes et gère le stock : modèles, pièces, ensembles. Pas de bilan, ni de dépenses, ni d'équipe.",
-      "staff": "Il garde les commandes et consulte le stock sans le modifier. Pas de bilan, ni de dépenses, ni d'équipe."
+      "staff": "Il garde les commandes et consulte le stock sans le modifier. Pas de bilan, ni de dépenses, ni d'équipe.",
+      "tailleur": "Il ne verra plus que l'atelier : la liste des retouches et le scan des étiquettes. Ni commandes, ni prix, ni stock."
     },
     "deactivate": "Désactiver l'accès",
     "activate": "Réactiver l'accès",
@@ -993,7 +995,8 @@
     "open": "Rechercher",
     "close": "Fermer la recherche",
     "clear": "Effacer la recherche",
-    "noMatch": "Aucun résultat pour « {q} »."
+    "noMatch": "Aucun résultat pour « {q} ».",
+    "alterations": "Client, retouche, taille, commande…"
   },
   "picker": {
     "hint": "Cochez un ou plusieurs vêtements, puis validez.",
@@ -1101,6 +1104,73 @@
       "refund": "À REMBOURSER :",
       "yes": "Y",
       "no": "N"
+    },
+    "alterationDone": {
+      "subject": "Retouche faite — {customer} ({orderNo})",
+      "title": "Une pièce revient du tailleur",
+      "by": "Marquée taillée par {name}.",
+      "order": "Commande :",
+      "piece": "Pièce :",
+      "note": "Retouche :",
+      "doneAt": "Taillée le :",
+      "openList": "Voir les retouches"
     }
+  },
+  "alterations": {
+    "title": "Retouches",
+    "hint": "Les pièces à retoucher, avec leur étiquette QR. Le tailleur scanne l'étiquette quand c'est fait.",
+    "atelierTitle": "Atelier",
+    "atelierHint": "Les pièces à retoucher, les plus urgentes d'abord. Quand une pièce est prête, scannez son étiquette.",
+    "toggle": "Retouche",
+    "noteLabel": "Retouche à faire (lue par le tailleur)",
+    "notePlaceholder": "Ex. : manches −2 cm, ourlet 98 cm",
+    "size": "T. {size}",
+    "status": {
+      "a_faire": "À retoucher",
+      "taillee": "Taillée"
+    },
+    "tabs": {
+      "label": "Retouches",
+      "pending": "Chez le tailleur",
+      "done": "Taillées"
+    },
+    "scan": {
+      "button": "Scanner une pièce taillée",
+      "title": "Scanner les étiquettes",
+      "hint": "Visez l'étiquette QR de chaque pièce terminée. La caméra reste ouverte pour la suivante.",
+      "done": "Taillée ✓ — {customer} · {piece}",
+      "already": "Déjà taillée — {customer} · {piece}",
+      "notALabel": "Ce QR n'est pas une étiquette de retouche."
+    },
+    "eventOn": "Mariage le {date}",
+    "eventIn": "{count, plural, one {Dans # jour} other {Dans # jours}}",
+    "eventToday": "Aujourd'hui",
+    "eventPast": "Passé",
+    "orderNo": "Commande n°{no}",
+    "doneOn": "Taillée le {date} par {name}",
+    "notPrinted": "Étiquette non imprimée",
+    "markDone": "Marquer taillée",
+    "reprint": "Étiquette",
+    "undo": "Annuler",
+    "confirmTitle": "Cette pièce est-elle taillée ?",
+    "confirmBody": "{customer} — {note}. L'administrateur sera prévenu par e-mail.",
+    "undoTitle": "Remettre cette pièce à retoucher ?",
+    "undoBody": "{customer} — {note}. Elle repasse dans la liste du tailleur.",
+    "printNew": "{count, plural, one {Imprimer # nouvelle étiquette} other {Imprimer # nouvelles étiquettes}}",
+    "printAll": "{count, plural, one {Réimprimer # étiquette} other {Réimprimer les # étiquettes}}",
+    "printOrderLabels": "Étiquettes retouche",
+    "emptyPending": "Aucune pièce chez le tailleur.",
+    "emptyDone": "Aucune pièce taillée ces {days} derniers jours.",
+    "backToList": "Toutes les retouches",
+    "labelsTitle": "Étiquettes retouche",
+    "labelsHint": "{count, plural, one {# étiquette} other {# étiquettes}} — 10 par feuille 4 × 6. Découpez et collez chacune sur son vêtement.",
+    "labelsEmpty": "Aucune étiquette à imprimer.",
+    "errors": {
+      "noteRequired": "Dites au tailleur quoi faire.",
+      "noteTooLong": "200 caractères au maximum.",
+      "unknownLabel": "Étiquette inconnue : la retouche a été retirée de la commande.",
+      "orderCancelled": "Cette commande est annulée."
+    },
+    "noResults": "Aucune retouche ne correspond à « {q} »."
   }
 }

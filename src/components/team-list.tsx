@@ -128,6 +128,8 @@ export function TeamList({
         {members.map((member) => {
           const self = member.id === currentId;
           const admin = member.role === "owner";
+          // Ni l'administrateur ni le tailleur ne pointent : pas de mode de paie.
+          const paid = !admin && member.role !== "tailleur";
 
           return (
             <li
@@ -159,7 +161,7 @@ export function TeamList({
                   >
                     {t(`roles.${member.role}`)}
                   </span>
-                  {member.pay_type === "remplacant" && !admin && (
+                  {member.pay_type === "remplacant" && paid && (
                     <span className="bg-warning-soft text-warning-foreground shrink-0 rounded-full px-1.5 text-[11px] leading-5">
                       {t("pointage.payType.remplacant")}
                     </span>
@@ -212,7 +214,7 @@ export function TeamList({
                         className="min-h-11"
                         onSelect={() => openRole(member, role)}
                       >
-                        {role === "staff" ? (
+                        {role === "staff" || role === "tailleur" ? (
                           <ShieldOff className="size-4" aria-hidden />
                         ) : (
                           <ShieldCheck className="size-4" aria-hidden />
@@ -221,7 +223,7 @@ export function TeamList({
                       </DropdownMenuItem>
                     ))}
 
-                    {!admin && (
+                    {paid && (
                       <DropdownMenuItem className="min-h-11" onSelect={() => togglePayType(member)}>
                         <CalendarCheck className="size-4" aria-hidden />
                         {t(

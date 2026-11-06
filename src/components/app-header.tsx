@@ -12,6 +12,7 @@ import {
   LogOut,
   Plane,
   Receipt,
+  Scissors,
   Settings,
   TrendingUp,
   Undo2,
@@ -50,11 +51,14 @@ export function AppHeader({
   fullName,
   roleLabel,
   showDashboard,
+  pendingAlterations = 0,
   notifications,
 }: {
   fullName: string;
   roleLabel: string;
   showDashboard: boolean;
+  /** Pièces encore chez le tailleur. */
+  pendingAlterations?: number;
   notifications: React.ReactNode;
 }) {
   const t = useTranslations();
@@ -84,10 +88,21 @@ export function AppHeader({
   ] as const;
 
   /** Pages hors onglets, rangées dans le menu du compte. */
-  const moreLinks = [
+  const moreLinks: {
+    href: string;
+    icon: typeof CalendarDays;
+    label: string;
+    count?: number;
+  }[] = [
     { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
+    {
+      href: "/retouches",
+      icon: Scissors,
+      label: t("nav.alterations"),
+      count: pendingAlterations,
+    },
     { href: "/commandes/impayes", icon: HandCoins, label: t("nav.unpaid") },
     ...(showDashboard
       ? [
@@ -192,6 +207,7 @@ export function AppHeader({
             fullName={fullName}
             roleLabel={roleLabel}
             showAdmin={showDashboard}
+            pendingAlterations={pendingAlterations}
             onSignOut={() => setSignOutOpen(true)}
             onInstall={installApp.available ? installApp.install : undefined}
             triggerClassName="text-nav-muted hover:bg-nav-foreground/8 hover:text-nav-foreground active:bg-nav-foreground/15 md:hidden"
@@ -232,11 +248,16 @@ export function AppHeader({
 
               <DropdownMenuSeparator />
 
-              {moreLinks.map(({ href, icon: Icon, label }) => (
+              {moreLinks.map(({ href, icon: Icon, label, count }) => (
                 <DropdownMenuItem key={href} asChild>
                   <Link href={href}>
                     <Icon className="size-4" aria-hidden />
-                    {label}
+                    <span className="flex-1">{label}</span>
+                    {count ? (
+                      <span className="bg-gold-soft text-foreground tabular rounded-full px-2 text-xs leading-5 font-medium">
+                        {count}
+                      </span>
+                    ) : null}
                   </Link>
                 </DropdownMenuItem>
               ))}

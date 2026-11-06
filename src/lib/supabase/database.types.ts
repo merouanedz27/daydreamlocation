@@ -327,6 +327,74 @@ export type Database = {
           },
         ];
       };
+      line_alterations: {
+        Row: {
+          id: string;
+          order_id: number;
+          order_line_id: number | null;
+          note: string;
+          status: string;
+          created_at: string;
+          created_by: string | null;
+          done_at: string | null;
+          done_by: string | null;
+          printed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          order_id: number;
+          order_line_id?: number | null;
+          note: string;
+          status?: string;
+          created_at?: string;
+          created_by?: string | null;
+          done_at?: string | null;
+          done_by?: string | null;
+          printed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          order_id?: number;
+          order_line_id?: number | null;
+          note?: string;
+          status?: string;
+          created_at?: string;
+          created_by?: string | null;
+          done_at?: string | null;
+          done_by?: string | null;
+          printed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "line_alterations_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "line_alterations_done_by_fkey";
+            columns: ["done_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "line_alterations_order_id_fkey";
+            columns: ["order_id"];
+            isOneToOne: false;
+            referencedRelation: "orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "line_alterations_order_line_id_fkey";
+            columns: ["order_line_id"];
+            isOneToOne: false;
+            referencedRelation: "order_lines";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       notifications: {
         Row: {
           id: number;
@@ -867,11 +935,25 @@ export type Database = {
         };
         Returns: Json;
       };
+      list_alterations: {
+        Args: {
+          p_status?: string;
+          p_id?: string;
+          p_done_since?: string;
+        };
+        Returns: { id: string; status: string; note: string; created_at: string; done_at: string; printed_at: string; done_by_name: string; order_id: number; order_no: string; order_status: string; customer_name: string; event_date: string; pickup_date: string; model_name: string; ref_code: string; size: string; piece_kind: string }[];
+      };
       mark_absent: {
         Args: {
           p_day: string;
         };
         Returns: string;
+      };
+      mark_altered: {
+        Args: {
+          p_id: string;
+        };
+        Returns: { already_done: boolean; order_id: number; order_no: string; customer_name: string; event_date: string; note: string; model_name: string; ref_code: string; size: string; done_at: string }[];
       };
       mark_present: {
         Args: {

@@ -13,7 +13,7 @@ export type Profile = Tables<"profiles">;
  * decrit `role` comme un `string` nu, et `profile.role === "ownr"` compilerait
  * sans broncher. Ce type ferme la porte.
  */
-export type Role = "owner" | "moderator" | "staff";
+export type Role = "owner" | "moderator" | "staff" | "tailleur";
 
 /**
  * Profil de l'utilisateur connecté, ou `null`.
@@ -60,7 +60,26 @@ export const getProfile = cache(async (): Promise<Profile | null> => {
 export async function requireProfile(locale: Locale): Promise<Profile> {
   const profile = await getProfile();
   if (!profile) redirectTo("/login", locale);
+  // Le TAILLEUR n'a que son atelier : toute page du magasin l'y renvoie. RLS
+  // lui refuserait de toute façon chaque donnée (`private.is_staff()`).
+  if (isTailor(profile)) redirectTo("/atelier", locale);
   return profile;
+}
+
+/**
+ * L'atelier du tailleur — ouvert aussi à l'équipe du magasin, qui peut
+ * scanner une pièce rendue par le tailleur. Même règle que
+ * `private.is_tailor_or_staff()`.
+ */
+export async function requireTailorOrStaff(locale: Locale): Promise<Profile> {
+  const profile = await getProfile();
+  if (!profile) redirectTo("/login", locale);
+  return profile;
+}
+
+/** Le tailleur : ne voit que les retouches (atelier), jamais le magasin. */
+export function isTailor(profile: Profile | null): boolean {
+  return profile?.role === "tailleur";
 }
 
 /** Exige le rôle propriétaire (dépenses, tableau de bord financier). */

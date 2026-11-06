@@ -108,7 +108,8 @@ export async function getMyPeriod(person: Person, today: IsoDate): Promise<Worke
 
 /**
  * L'équipe du propriétaire : employés et modérateurs actifs — pas les
- * administrateurs, qui ne pointent pas. `profiles_read` ne montre toutes les
+ * administrateurs, qui ne pointent pas, ni le tailleur, qui n'est pas payé
+ * à la journée. `profiles_read` ne montre toutes les
  * lignes qu'à un administrateur.
  */
 export async function getTeamPeriods(today: IsoDate): Promise<WorkerPeriod[]> {
@@ -117,7 +118,7 @@ export async function getTeamPeriods(today: IsoDate): Promise<WorkerPeriod[]> {
     .from("profiles")
     .select("id, full_name, work_start_date, pay_type, daily_rate")
     .eq("is_active", true)
-    .neq("role", "owner")
+    .in("role", ["staff", "moderator"])
     .order("full_name");
   if (error) throw error;
   return periodsFor(data ?? [], today);

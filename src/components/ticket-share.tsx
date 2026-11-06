@@ -17,13 +17,20 @@ import { shareFile } from "@/lib/share-file";
  * Le bouton attend que les photos soient prêtes (une seconde à l'ouverture) :
  * c'est ce qui garantit que l'aperçu et le PDF sont identiques.
  */
-export function TicketActions() {
+export function TicketActions({ onUse }: { onUse?: () => void } = {}) {
   const t = useTranslations("print");
   const { file, images, failed } = useTicketPdf();
   const ready = Boolean(file && images);
 
   async function share() {
-    if (file) await shareFile(file);
+    if (!file) return;
+    onUse?.();
+    await shareFile(file);
+  }
+
+  function print() {
+    onUse?.();
+    window.print();
   }
 
   // Photos ratées : pas de PDF, on imprime quand même la page elle-même.
@@ -31,7 +38,7 @@ export function TicketActions() {
     return (
       <Button
         type="button"
-        onClick={() => window.print()}
+        onClick={print}
         className="h-10 text-sm"
       >
         <Printer className="size-5" aria-hidden />
@@ -61,7 +68,7 @@ export function TicketActions() {
 
       <Button
         type="button"
-        onClick={() => window.print()}
+        onClick={print}
         className="h-10 min-w-0 flex-1 text-sm lg:w-40 lg:flex-none"
       >
         <Printer className="size-4" aria-hidden />

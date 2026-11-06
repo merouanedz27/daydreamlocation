@@ -16,6 +16,7 @@ import {
   User,
   Users,
   X,
+  Scissors,
 } from "lucide-react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export function AccountSheet({
   fullName,
   roleLabel,
   showAdmin,
+  pendingAlterations,
   onSignOut,
   onInstall,
   triggerClassName,
@@ -60,6 +62,8 @@ export function AccountSheet({
   fullName: string;
   roleLabel: string;
   showAdmin: boolean;
+  /** Pièces encore chez le tailleur : le compteur du lien « Retouches ». */
+  pendingAlterations?: number;
   onSignOut: () => void;
   /** Absent quand l'application est déjà installée ou ne peut pas l'être. */
   onInstall?: () => void;
@@ -76,10 +80,21 @@ export function AccountSheet({
   // Ce qui n'a pas trouvé place dans les cinq onglets de la barre basse (ceux
   // de son AppSheet) : le stock pour tous, et pour le propriétaire le bilan
   // et l'administration.
-  const links = [
+  const links: {
+    href: string;
+    icon: typeof CalendarDays;
+    label: string;
+    count?: number;
+  }[] = [
     { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
+    {
+      href: "/retouches",
+      icon: Scissors,
+      label: t("nav.alterations"),
+      count: pendingAlterations,
+    },
     { href: "/commandes/impayes", icon: HandCoins, label: t("nav.unpaid") },
     ...(showAdmin
       ? [
@@ -142,7 +157,7 @@ export function AccountSheet({
                 {t("nav.more")}
               </p>
               <ul className="space-y-0.5">
-                {links.map(({ href, icon: Icon, label }) => {
+                {links.map(({ href, icon: Icon, label, count }) => {
                   const active = pathname.startsWith(href);
                   return (
                     <li key={href}>
@@ -167,6 +182,11 @@ export function AccountSheet({
                             aria-hidden
                           />
                           <span className="min-w-0 flex-1 truncate">{label}</span>
+                          {count ? (
+                            <span className="bg-gold-soft text-foreground tabular rounded-full px-2 text-xs leading-5 font-medium">
+                              {count}
+                            </span>
+                          ) : null}
                           <ChevronRight
                             className="text-muted-foreground size-4 shrink-0 rtl:-scale-x-100"
                             aria-hidden

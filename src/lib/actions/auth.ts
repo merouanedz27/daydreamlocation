@@ -69,7 +69,7 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
    */
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_active")
+    .select("is_active, role")
     .eq("id", data.user.id)
     .single();
 
@@ -79,7 +79,8 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
   }
 
   // `redirect` lève une exception par conception : rien ne s'exécute après.
-  redirectTo("/commandes", locale);
+  // Le tailleur n'a que son atelier.
+  redirectTo(profile.role === "tailleur" ? "/atelier" : "/commandes", locale);
 }
 
 export async function signOut(formData: FormData): Promise<void> {

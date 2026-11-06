@@ -334,6 +334,13 @@ export type Order = Tables<"orders">;
  */
 export type OrderDetailLine = OrderLine & {
   article_units: { ref_code: string; model_id: number } | null;
+  /** La retouche de la pièce, chez le tailleur — une au plus par ligne. */
+  line_alterations: {
+    id: string;
+    note: string;
+    status: string;
+    done_at: string | null;
+  } | null;
 };
 
 export type OrderDetail = Order & {
@@ -348,7 +355,8 @@ async function fetchOrder(id: number): Promise<OrderDetail | null> {
     .from("orders")
     .select(
       `*, profiles ( full_name ),
-       order_lines ( *, article_units ( ref_code, model_id ) )`,
+       order_lines ( *, article_units ( ref_code, model_id ),
+         line_alterations ( id, note, status, done_at ) )`,
     )
     .eq("id", id)
     // Ordre d'affichage stable : sans `order`, PostgREST ne promet rien sur

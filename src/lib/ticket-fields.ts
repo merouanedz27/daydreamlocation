@@ -1,6 +1,7 @@
 import {
   draftFromOrder,
   splitCostumeSize,
+  tailorSummary,
   type EditableOrder,
   type Slot,
 } from "@/lib/quick-draft";
@@ -85,7 +86,7 @@ export function ticketFields(
     jacketSize: jacketSize || null,
     vestSize: vestSize || null,
     pantsSize: pantsSize || null,
-    tailor: draft.tailor || null,
+    tailor: tailorSummary(draft.slots) || null,
     shirt: piece(shirt),
     jabador: piece(jabador),
     shoes: piece(shoes, true, !hideRefs.shoes),

@@ -47,7 +47,7 @@ npx supabase migration new <nom>
 **Deux environnements.** En développement, Supabase tourne dans Docker (API
 `http://127.0.0.1:56321`, Studio `:56323`, Postgres `:56322` — ports 563xx car
 d'autres projets occupent les 543xx et 553xx). Comptes de test :
-`owner@daydream.local` et `staff@daydream.local`, mot de passe `daydream-local`
+`owner@daydream.local`, `staff@daydream.local` et `tailleur@daydream.local`, mot de passe `daydream-local`
 (`supabase/seed-local.sql`). Le stock de démonstration vient de `supabase/data/`
 et `seed.sql`.
 
@@ -107,6 +107,9 @@ src/app/[locale]/(app)/stock                modèles, pièces, ensembles
 src/app/[locale]/(app)/tableau-de-bord      CA / dépenses / bénéfice   (owner)
 src/app/[locale]/(app)/depenses             (owner)
 src/app/[locale]/(app)/frais                ajout de frais par toute l'équipe ; chacun ne relit que les siens
+src/app/[locale]/(app)/retouches            pièces chez le tailleur, impression des étiquettes QR
+src/app/[locale]/(atelier)/atelier          l'écran du TAILLEUR : sa liste + scan « taillée »
+src/app/[locale]/(print)/imprimer/retouches étiquettes QR, 10 par feuille 4 × 6
 
 src/components/ui/          shadcn (généré, ne pas éditer à la main sans raison)
 src/components/             composants métier
@@ -136,6 +139,11 @@ supabase/migrations/
   `EXCLUDE` interdit de la vendre deux fois. Une commande sans aucune location (`has_rental = false`)
   n'a rien à rendre : « Allez Valid » coche aussi le retour.
 
+- **retouche** (`line_alterations`) — ajustement d'UNE pièce d'une commande, lu par le tailleur sur
+  une étiquette QR collée au vêtement. `a_faire` → `taillee` quand il la scanne (e-mail aux
+  administrateurs). Liée à `order_id` + `order_line_id` nullable : `update_order` réinsère les lignes,
+  `sync_line_alterations` rattache la retouche par son `id`, que le formulaire renvoie.
+
 **Ni la caution ni le versement ne sont du chiffre d'affaires.** La recette est `total_price`.
 
 ## Règles métier issues de son tableur actuel
@@ -152,5 +160,8 @@ supabase/migrations/
 
 - `staff` — lit le stock, crée et modifie les commandes.
 - `owner` — tout, plus les dépenses et le tableau de bord financier.
+- `tailleur` — l'atelier SEUL (`/atelier`) : la liste des retouches et le scan. `private.is_staff()`
+  l'exclut, donc aucune policy ne lui ouvre une table ; il ne passe que par `list_alterations()` et
+  `mark_altered()`, qui ne rendent ni prix ni téléphone.
 
 Pas d'inscription publique : les comptes sont créés par le propriétaire.

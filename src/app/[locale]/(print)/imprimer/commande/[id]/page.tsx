@@ -222,7 +222,10 @@ export default async function OrderSlipPage({
               (`dir="ltr"`) : scanné, il ouvre la commande dans l'appli. Le
               logo rapetisse pour lui laisser la place. */}
           <div dir="ltr" className="flex items-center gap-[0.6em]">
-            <OrderQr value={orderUrl} className="size-[4.5em] shrink-0" />
+            {/* La RÉFÉRENCE : sa taille réelle passe au ticket du costume. */}
+            <div data-qr-master className="shrink-0">
+              <OrderQr value={orderUrl} className="block size-[4.5em]" />
+            </div>
             <Image
               src={wordmark}
               alt={t("app.name")}
@@ -263,11 +266,15 @@ export default async function OrderSlipPage({
             le premier, sur une feuille pile à sa hauteur, faisait sortir une
             page blanche entre les deux. */}
         <TicketFrame index={1} frameClassName="print:break-before-page">
-          {/* Le QR à la même place que sur le ticket du client — en pouces,
-              PAS en `em` : ce ticket a peu de texte, `fitTicket` y grossit
-              tout jusqu'à 2,2 fois et le QR envahissait la feuille. */}
+          {/* Le QR à la même place ET à la même taille que sur le ticket du
+              client : `--order-qr-size` est sa taille réelle, mesurée par
+              `fitTicket`. PAS en `em` : ce ticket a peu de texte, `fitTicket` y
+              grossit tout jusqu'à 2,2 fois et le QR envahissait la feuille. */}
           <div dir="ltr" className="flex items-center gap-[0.6em]">
-            <OrderQr value={orderUrl} className="size-[0.7in] shrink-0" />
+            <OrderQr
+              value={orderUrl}
+              className="size-[var(--order-qr-size,0.7in)] shrink-0"
+            />
             <Image
               src={suit}
               alt=""

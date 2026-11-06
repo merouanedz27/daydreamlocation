@@ -77,7 +77,8 @@ export async function getOrdersTable(
       `${ROW_COLUMNS},
        order_lines ( id, unit_id, model_name_snapshot, size_snapshot, external_label,
          external_source, external_cost, line_note, is_active,
-         article_units ( ref_code, part, article_models ( categories ( slug ) ) ) ),
+         article_units ( ref_code, part, article_models ( categories ( slug ) ) ),
+         line_alterations ( id, note, status, done_at ) ),
        profiles ( full_name )`,
       { count: "exact" },
     );
@@ -109,6 +110,7 @@ export async function getOrdersTable(
       external_source: string | null;
       external_cost: number | null;
       line_note: string | null;
+      line_alterations: { id: string; note: string; status: string; done_at: string | null } | null;
       is_active: boolean;
       article_units: {
         ref_code: string;

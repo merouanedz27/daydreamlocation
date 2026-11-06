@@ -50,12 +50,27 @@ export function QrScanSheet({
   open,
   onOpenChange,
   onScan,
+  keepOpen = false,
+  manualEntry = true,
+  texts,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onScan: (ref: string) => ScanOutcome;
+  /** Synchrone (la vente, catalogue en mémoire) ou asynchrone (l'atelier, serveur). */
+  onScan: (ref: string) => ScanOutcome | Promise<ScanOutcome>;
+  /**
+   * L'atelier scanne une pile de pièces d'affilée : un scan accepté ne
+   * referme pas le tiroir, il s'affiche en vert sous la caméra.
+   */
+  keepOpen?: boolean;
+  /** `false` : pas de saisie à la main (un identifiant d'étiquette ne se tape pas). */
+  manualEntry?: boolean;
+  /** Titre et aide du tiroir, à la place de ceux de la vente. */
+  texts?: { title: string; hint: string };
 }) {
   const t = useTranslations("orders.sale");
+  // Un scan en cours d'envoi au serveur : on n'en prend pas un autre.
+  const pending = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [camera, setCamera] = useState<CameraState>("starting");
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
@@ -82,16 +97,29 @@ export function QrScanSheet({
   );
   const last = useRef<{ code: string; at: number } | null>(null);
 
-  function handle(code: string) {
+  async function handle(code: string) {
     const ref = code.trim();
-    if (!ref || closing.current) return;
-    const result = onScanRef.current(ref);
+    if (!ref || closing.current || pending.current) return;
+    pending.current = true;
+    let result: ScanOutcome;
+    try {
+      result = await onScanRef.current(ref);
+    } finally {
+      pending.current = false;
+    }
     if (!result.ok) {
+      setFlash(false);
       setOutcome(result);
       return;
     }
     navigator.vibrate?.(60);
     setFlash(true);
+    if (keepOpen) {
+      // Le cadre vert un instant, le message reste : on passe à la pièce suivante.
+      setOutcome(result);
+      setTimeout(() => setFlash(false), 900);
+      return;
+    }
     setOutcome(null);
     toast.success(result.message);
     closing.current = setTimeout(() => changeOpen(false), CLOSE_AFTER_SCAN_MS);
@@ -145,7 +173,7 @@ export function QrScanSheet({
               return;
             }
             last.current = { code: result.data, at: now };
-            handleRef.current(result.data);
+            void handleRef.current(result.data);
           },
           {
             preferredCamera: "environment",
@@ -174,7 +202,7 @@ export function QrScanSheet({
 
   function submitTyped(event: React.FormEvent) {
     event.preventDefault();
-    handle(typed);
+    void handle(typed);
     setTyped("");
   }
 
@@ -186,8 +214,8 @@ export function QrScanSheet({
     >
       <DrawerContent className="h-[88svh] max-h-[88svh]">
         <DrawerHeader className="pb-2 text-start">
-          <DrawerTitle className="text-lg">{t("scanTitle")}</DrawerTitle>
-          <DrawerDescription>{t("scanHint")}</DrawerDescription>
+          <DrawerTitle className="text-lg">{texts?.title ?? t("scanTitle")}</DrawerTitle>
+          <DrawerDescription>{texts?.hint ?? t("scanHint")}</DrawerDescription>
         </DrawerHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4">
@@ -254,6 +282,7 @@ export function QrScanSheet({
           </p>
 
           {/* Étiquette abîmée, caméra refusée : la référence à la main. */}
+          {manualEntry && (
           <form onSubmit={submitTyped} className="flex gap-2">
             <Input
               value={typed}
@@ -275,6 +304,7 @@ export function QrScanSheet({
               {t("addRef")}
             </Button>
           </form>
+          )}
         </div>
 
         <DrawerFooter>

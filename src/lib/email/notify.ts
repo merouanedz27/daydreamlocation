@@ -2,7 +2,7 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { appUrl, emailConfigured, sendMails, type Mail } from "@/lib/email/send";
-import { formatDate, formatLongDay, formatMoney } from "@/lib/format";
+import { formatDate, formatLongDay, formatMoney, formatTime } from "@/lib/format";
 import { getLabelSlots } from "@/lib/queries/orders";
 import type { EditableOrder } from "@/lib/quick-draft";
 import { normalizeSearch } from "@/lib/search";
@@ -213,7 +213,8 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
         .from("orders")
         .select(
           `*, profiles ( full_name ),
-           order_lines ( *, article_units ( ref_code, part, article_models ( categories ( slug ) ) ) )`,
+           order_lines ( *, article_units ( ref_code, part, article_models ( categories ( slug ) ) ),
+             line_alterations ( id, note, status, done_at ) )`,
         )
         .eq("id", orderId)
         .order("id", { referencedTable: "order_lines", ascending: true })
@@ -369,4 +370,67 @@ export async function sendTomorrowDigest(day: string): Promise<number> {
     }),
   );
   return sendMails(mails);
+}
+
+/* --- 4. Une pièce revient du tailleur ----------------------------------- */
+
+export type AlterationDone = {
+  orderId: number;
+  orderNo: string;
+  customerName: string;
+  eventDate: string;
+  note: string;
+  piece: string | null;
+  size: string | null;
+  doneAt: string;
+  doneBy: string;
+};
+
+/**
+ * Le tailleur a scanné une étiquette : la retouche est faite. À tous les
+ * administrateurs, quelle que soit leur case « Nouvelle commande » — c'est un
+ * signal d'atelier, pas une commande. Rien n'est envoyé sur un second scan
+ * (l'action ne nous appelle pas).
+ */
+export async function notifyAlterationDone(done: AlterationDone): Promise<void> {
+  if (!emailConfigured()) return;
+  try {
+    const recipients = await getRecipients();
+    if (recipients.length === 0) return;
+
+    const mails: Mail[] = await Promise.all(
+      recipients.map(async (r) => {
+        const loc = r.email_locale;
+        const t = await getTranslations({ locale: loc, namespace: "email" });
+        const piece = [done.piece, done.size].filter(Boolean).join(" · ") || null;
+        const subject = oneLine(
+          t("alterationDone.subject", { customer: done.customerName, orderNo: done.orderNo }),
+        );
+        const { html, text } = layout(loc, {
+          title: t("alterationDone.title"),
+          intro: t("alterationDone.by", { name: done.doneBy }),
+          table: [
+            [t("order.customer"), done.customerName],
+            [t("alterationDone.order"), done.orderNo],
+            [t("order.date"), formatDate(done.eventDate, loc)],
+            [t("alterationDone.piece"), piece],
+            [t("alterationDone.note"), done.note],
+            [
+              t("alterationDone.doneAt"),
+              `${formatDate(done.doneAt, loc)} ${formatTime(done.doneAt, loc)}`,
+            ],
+          ],
+          links: [
+            [t("openOrder"), `${appUrl()}/${loc}/commandes/${done.orderId}`],
+            [t("alterationDone.openList"), `${appUrl()}/${loc}/retouches`],
+          ],
+          footer: t("footer"),
+        });
+        return { to: r.email, subject, html, text };
+      }),
+    );
+    await sendMails(mails);
+  } catch (error) {
+    console.error("[email] retouche faite", error);
+  }
 }

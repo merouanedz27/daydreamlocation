@@ -7,6 +7,7 @@
 --
 --   owner@daydream.local  /  daydream-local   (propriétaire : tout)
 --   staff@daydream.local  /  daydream-local   (équipe)
+--   tailleur@daydream.local / daydream-local  (tailleur : l'atelier seul)
 --
 -- Même écriture que scripts/create-account.mjs : utilisateur + identité +
 -- profil, colonnes de jetons à '' (GoTrue refuse NULL), e-mail confirmé.
@@ -15,7 +16,8 @@
 with accounts (id, email, full_name, role) as (
   values
     ('00000000-0000-4000-8000-000000000001'::uuid, 'owner@daydream.local', 'Propriétaire (test)', 'owner'),
-    ('00000000-0000-4000-8000-000000000002'::uuid, 'staff@daydream.local', 'Équipe (test)', 'staff')
+    ('00000000-0000-4000-8000-000000000002'::uuid, 'staff@daydream.local', 'Équipe (test)', 'staff'),
+    ('00000000-0000-4000-8000-000000000003'::uuid, 'tailleur@daydream.local', 'Tailleur (test)', 'tailleur')
 ),
 users as (
   insert into auth.users (
@@ -48,6 +50,7 @@ on conflict (provider, provider_id) do nothing;
 insert into public.profiles (id, full_name, role, is_active)
 values
   ('00000000-0000-4000-8000-000000000001', 'Propriétaire (test)', 'owner', true),
-  ('00000000-0000-4000-8000-000000000002', 'Équipe (test)', 'staff', true)
+  ('00000000-0000-4000-8000-000000000002', 'Équipe (test)', 'staff', true),
+  ('00000000-0000-4000-8000-000000000003', 'Tailleur (test)', 'tailleur', true)
 on conflict (id) do update
    set full_name = excluded.full_name, role = excluded.role, is_active = true;

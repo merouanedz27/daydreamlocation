@@ -10,6 +10,7 @@ import {
   Pencil,
   Phone,
   Printer,
+  Scissors,
   Shirt,
   Store,
   StickyNote,
@@ -205,6 +206,16 @@ export default async function OrderPage({
             </Link>
           </Button>
         )}
+        {/* Les étiquettes QR des pièces à retoucher : une par vêtement. */}
+        {order.status !== "annulee" &&
+          order.order_lines.some((l) => l.line_alterations?.status === "a_faire") && (
+            <Button asChild variant="outline" className="h-11">
+              <Link href={`/imprimer/retouches?commande=${order.id}`}>
+                <Scissors className="size-4" aria-hidden />
+                {t("alterations.printOrderLabels")}
+              </Link>
+            </Button>
+          )}
         {/* Modifier : sur téléphone, c'est le bouton rond en bas (à la place
             du « + ») ; sur grand écran, où il n'existe pas, ce bouton-ci. Une
             commande annulée se rétablit d'abord. */}
@@ -390,6 +401,8 @@ export default async function OrderPage({
                       cost: t("orders.externalCost"),
                       view: t("orders.viewInStock"),
                       sold: t("orders.saleTag"),
+                      alterationPending: t("alterations.status.a_faire"),
+                      alterationDone: t("alterations.status.taillee"),
                     }}
                   />
                 ))}
@@ -616,9 +629,12 @@ function PieceRow({
     cost: string;
     view: string;
     sold: string;
+    alterationPending: string;
+    alterationDone: string;
   };
 }) {
   const unit = line.article_units;
+  const alteration = line.line_alterations;
   const external = !unit && line.external_label !== null;
 
   const details = unit ? (
@@ -651,8 +667,29 @@ function PieceRow({
         <p className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
           {details}
         </p>
-        {line.line_note && (
-          <p className="text-muted-foreground mt-1 text-xs italic">{line.line_note}</p>
+        {/* La RETOUCHE de la pièce et où elle en est. L'ancienne note libre
+            (`line_note`) n'est plus montrée : elle a été reprise en retouche. */}
+        {alteration && (
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 leading-5",
+                alteration.status === "taillee"
+                  ? "bg-success-soft text-success-foreground"
+                  : "bg-warning-soft text-warning-foreground font-medium",
+              )}
+            >
+              {alteration.status === "taillee" ? (
+                <Check className="size-3" aria-hidden />
+              ) : (
+                <Scissors className="size-3" aria-hidden />
+              )}
+              {alteration.status === "taillee"
+                ? `${labels.alterationDone}${alteration.done_at ? ` · ${formatDate(alteration.done_at, locale)}` : ""}`
+                : labels.alterationPending}
+            </span>
+            <bdi className="text-muted-foreground min-w-0 break-words">{alteration.note}</bdi>
+          </p>
         )}
         {/* Le coût payé au confrère sert au bénéfice : il ne regarde que le
             propriétaire, comme les dépenses et le tableau de bord. */}

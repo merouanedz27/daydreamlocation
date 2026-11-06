@@ -77,11 +77,28 @@ const isoDate = z
  *                connaît pas.
  * - `external` — une pièce sous-louée chez un confrère (« FETHI LOC »).
  */
+/**
+ * Retouche d'une pièce, chez le tailleur. `id` : celle déjà en base, gardée
+ * à la modification (son étiquette est peut-être collée). La base vérifie
+ * qu'elle appartient bien à CETTE commande.
+ */
+const lineAlteration = z
+  .object({
+    id: z.string().uuid().optional(),
+    note: z
+      .string()
+      .trim()
+      .min(1, { message: "alterations.errors.noteRequired" })
+      .max(200, { message: "alterations.errors.noteTooLong" }),
+  })
+  .optional();
+
 const unitLine = z.object({
   kind: z.literal("unit"),
   unitId: z.number().int().positive(),
   unitPrice: money,
   note: optionalText,
+  alteration: lineAlteration,
 });
 
 const externalLine = z.object({
@@ -91,6 +108,7 @@ const externalLine = z.object({
   cost: money.optional().nullable(),
   unitPrice: money,
   note: optionalText,
+  alteration: lineAlteration,
 });
 
 const namedLine = z.object({
@@ -99,6 +117,7 @@ const namedLine = z.object({
   size: optionalText,
   unitPrice: money,
   note: optionalText,
+  alteration: lineAlteration,
 });
 
 export const draftLineSchema = z.discriminatedUnion("kind", [unitLine, namedLine, externalLine]);
