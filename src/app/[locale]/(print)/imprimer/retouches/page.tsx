@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Scissors } from "lucide-react";
 import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketFrame } from "@/components/ticket-fit";
 import { TicketPdfProvider } from "@/components/ticket-pdf";
-import { OrderQr } from "@/components/order-qr";
+import { AlterationLabel } from "@/components/alteration-label";
 import { AlterationLabelsActions } from "@/components/alteration-board";
 import { appUrl } from "@/lib/email/send";
 import { alterationUrl, isUuid } from "@/lib/alteration-url";
@@ -106,9 +105,19 @@ export default async function AlterationLabelsPage({
                 {Array.from({ length: PER_SHEET }, (_, i) => sheet[i] ?? null).map((item, i) => (
                   <div
                     key={item?.id ?? `empty-${i}`}
-                    className="flex min-h-0 min-w-0 flex-col overflow-hidden border-e border-b border-dashed border-neutral-400 p-[1.5mm]"
+                    className="flex min-h-0 min-w-0 flex-col justify-center overflow-hidden border-e border-b border-dashed border-neutral-400 p-[1.5mm]"
                   >
-                    {item && <Label item={item} url={alterationUrl(origin, locale, item.id)} locale={l} sizeLabel={t("size", { size: item.size ?? "" })} />}
+                    {item && (
+                      <AlterationLabel
+                        url={alterationUrl(origin, locale, item.id)}
+                        customerName={item.customer_name}
+                        modelName={item.model_name}
+                        sizeLabel={item.size ? t("size", { size: item.size }) : null}
+                        eventDate={item.event_date}
+                        note={item.note}
+                        locale={l}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -117,51 +126,5 @@ export default async function AlterationLabelsPage({
         </div>
       )}
     </TicketPdfProvider>
-  );
-}
-
-function Label({
-  item,
-  url,
-  locale,
-  sizeLabel,
-}: {
-  item: Alteration;
-  url: string;
-  locale: Locale;
-  sizeLabel: string;
-}) {
-  return (
-    <>
-      {/* Case de ≈ 1,8 × 1,1 pouce : QR à gauche, client / taille / date à
-          côté, la retouche dessous sur toute la largeur. */}
-      {/* La colonne à côté du QR ne dépasse pas sa hauteur : la retouche
-          garde ses trois lignes. Le NOM de la pièce passe sur deux lignes
-          plutôt que d'être coupé — c'est sa fin (« Veste », « Pantalon »)
-          qui distingue les étiquettes d'un même client. */}
-      <div className="flex min-w-0 gap-[1.5mm]">
-        <OrderQr value={url} className="block size-[0.56in] shrink-0" />
-        <div className="min-w-0 flex-1 leading-[1.15]">
-          {/* `dir="auto"` sur la ligne : un nom arabe sur une étiquette
-              française se coupe par sa FIN, pas par son début. */}
-          <p dir="auto" className="truncate text-start text-[9pt] font-bold">
-            {item.customer_name}
-          </p>
-          {item.model_name && (
-            <p className="mt-[0.3mm] line-clamp-2 text-[7.5pt] break-words">
-              <bdi>{item.model_name}</bdi>
-            </p>
-          )}
-          <p className="mt-[0.3mm] flex items-baseline gap-x-[1.5mm]">
-            {item.size && <span className="text-[9pt] font-bold">{sizeLabel}</span>}
-            <span className="tabular text-[7pt]">{formatDate(item.event_date, locale)}</span>
-          </p>
-        </div>
-      </div>
-      <p className="mt-[0.6mm] flex min-w-0 items-start gap-[1mm] text-[7.5pt] leading-[1.15] font-bold">
-        <Scissors className="mt-[0.3mm] size-[7pt] shrink-0" aria-hidden />
-        <bdi className="line-clamp-3 min-w-0 break-words">{item.note}</bdi>
-      </p>
-    </>
   );
 }

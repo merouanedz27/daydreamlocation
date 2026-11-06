@@ -8,6 +8,7 @@ import { TicketFrame } from "@/components/ticket-fit";
 import { TicketPdfProvider } from "@/components/ticket-pdf";
 import { Scissors } from "lucide-react";
 import { OrderQr } from "@/components/order-qr";
+import { AlterationLabel } from "@/components/alteration-label";
 import { appUrl } from "@/lib/email/send";
 import { alterationUrl } from "@/lib/alteration-url";
 import {
@@ -191,7 +192,9 @@ export default async function OrderSlipPage({
       ? [
           {
             id: line.line_alterations.id,
-            name: line.model_name_snapshot ?? line.external_label ?? "",
+            name: line.model_name_snapshot ?? line.external_label ?? null,
+            size: line.size_snapshot,
+            note: line.line_alterations.note,
           },
         ]
       : [],
@@ -310,25 +313,26 @@ export default async function OrderSlipPage({
             // le donner au tailleur avec le pantalon. RESTE dans la largeur du
             // contenu : une marge négative le faisait déborder, `fitTicket`
             // croyait le texte trop large et le réduisait au minimum.
-            <div className="relative mt-[0.8em] border-t-2 border-dashed border-black pt-[0.6em]">
+            <div dir="ltr" className="relative mt-[0.8em] border-t-2 border-dashed border-black pt-[0.6em]">
               <Scissors
                 className="absolute top-[-0.55em] start-0 size-[1em] bg-white"
                 aria-hidden
               />
-              <div className="space-y-[0.3em]">
-              {alterations.map((a) => (
-                <div key={a.id} className="flex items-center justify-center gap-[0.6em]">
-                  <OrderQr
-                    value={alterationUrl(appUrl(), locale, a.id)}
-                    className="block size-[0.7in] shrink-0"
+              {/* La MÊME étiquette que sur la feuille des retouches, à la
+                  largeur d'une de ses cases, calée à GAUCHE (bon arabe aussi). */}
+              <div className="w-[1.8in] max-w-full space-y-[2mm]">
+                {alterations.map((a) => (
+                  <AlterationLabel
+                    key={a.id}
+                    url={alterationUrl(appUrl(), locale, a.id)}
+                    customerName={order.customer_name}
+                    modelName={a.name}
+                    sizeLabel={a.size ? t("alterations.size", { size: a.size }) : null}
+                    eventDate={order.event_date}
+                    note={a.note}
+                    locale={l}
                   />
-                  <p className="flex min-w-0 items-center gap-[0.3em] font-bold">
-                    <Scissors className="size-[1em] shrink-0" aria-hidden />
-                    <span>{t("alterations.toggle")}</span>
-                    {a.name && <bdi className="min-w-0 wrap-break-word">{a.name}</bdi>}
-                  </p>
-                </div>
-              ))}
+                ))}
               </div>
             </div>
           )}
