@@ -57,15 +57,26 @@ export async function AlterationsView({
 
       <AlterationScanButton />
 
+      {/* Deux gestes : les NOUVELLES étiquettes seules (s'il y en a) et
+          TOUTES les pièces à faire — sinon, une fois les premières imprimées,
+          on ne pouvait plus sortir que la dernière arrivée. */}
       {mode === "staff" && pending.length > 0 && (
-        <Button asChild variant="outline" className="h-12 w-full gap-2">
-          <Link href={unprinted ? "/imprimer/retouches?nouvelles=1" : "/imprimer/retouches"}>
-            <Printer className="size-5" aria-hidden />
-            {unprinted
-              ? t("printNew", { count: unprinted })
-              : t("printAll", { count: pending.length })}
-          </Link>
-        </Button>
+        <div className="space-y-2">
+          {unprinted > 0 && (
+            <Button asChild className="h-12 w-full gap-2">
+              <Link href="/imprimer/retouches?nouvelles=1">
+                <Printer className="size-5" aria-hidden />
+                {t("printNew", { count: unprinted })}
+              </Link>
+            </Button>
+          )}
+          <Button asChild variant="outline" className="h-12 w-full gap-2">
+            <Link href="/imprimer/retouches">
+              <Printer className="size-5" aria-hidden />
+              {t("printAll", { count: pending.length })}
+            </Link>
+          </Button>
+        </div>
       )}
 
       <AlterationTabs base={base} pending={pending.length} done={done?.length ?? null} />

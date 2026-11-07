@@ -366,6 +366,13 @@ export function AlterationLabelsActions({ ids }: { ids: string[] }) {
       onUse={() => {
         if (marked || ids.length === 0) return;
         setMarked(true);
+        // L'action rafraîchit la page : avec `?nouvelles=1`, la liste
+        // relue serait VIDE (elles viennent d'être imprimées) et la feuille
+        // disparaîtrait. On fige donc la sélection dans l'adresse.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("nouvelles");
+        url.searchParams.set("ids", ids.join(","));
+        window.history.replaceState(window.history.state, "", url);
         void markLabelsPrinted({ ids, locale });
       }}
     />

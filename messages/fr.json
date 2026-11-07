@@ -1157,7 +1157,7 @@
     "undoTitle": "Remettre cette pièce à retoucher ?",
     "undoBody": "{customer} — {note}. Elle repasse dans la liste du tailleur.",
     "printNew": "{count, plural, one {Imprimer # nouvelle étiquette} other {Imprimer # nouvelles étiquettes}}",
-    "printAll": "{count, plural, one {Réimprimer # étiquette} other {Réimprimer les # étiquettes}}",
+    "printAll": "{count, plural, one {Imprimer l’étiquette (#)} other {Imprimer toutes les étiquettes (#)}}",
     "printOrderLabels": "Étiquettes retouche",
     "emptyPending": "Aucune pièce chez le tailleur.",
     "emptyDone": "Aucune pièce taillée ces {days} derniers jours.",
