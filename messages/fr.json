@@ -1122,6 +1122,8 @@
     "atelierTitle": "Atelier",
     "atelierHint": "Les pièces à retoucher, les plus urgentes d'abord. Quand une pièce est prête, scannez son étiquette.",
     "toggle": "Retouche",
+    "pantsTitle": "Retouche pantalon",
+    "pantsHint": "À remplir en premier : le tailleur la lit sur l’étiquette QR.",
     "noteLabel": "Retouche à faire (lue par le tailleur)",
     "notePlaceholder": "Ex. : manches −2 cm, ourlet 98 cm",
     "size": "T. {size}",
@@ -1167,6 +1169,7 @@
     "labelsEmpty": "Aucune étiquette à imprimer.",
     "errors": {
       "noteRequired": "Dites au tailleur quoi faire.",
+      "pantsRequired": "Choisissez le pantalon à retoucher.",
       "noteTooLong": "200 caractères au maximum.",
       "unknownLabel": "Étiquette inconnue : la retouche a été retirée de la commande.",
       "orderCancelled": "Cette commande est annulée."

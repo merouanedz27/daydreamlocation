@@ -77,6 +77,7 @@ import {
   EMPTY_SLOT,
   FIXED_SLOTS,
   JABADOR_SLOT,
+  PART_SLOTS,
   SHOES_SLOT,
   SHIRT_SLOT,
   catalogSlotOf,
@@ -273,16 +274,23 @@ type FieldIssue = {
 };
 type Issues = Partial<Record<string, FieldIssue>>;
 
+/**
+ * La case du PANTALON — la seule pièce qui se retouche. Elle a son bloc à
+ * elle, juste sous la date : le patron commence sa saisie par la retouche.
+ */
+const PANTS_SLOT = PART_SLOTS.indexOf("pantalon");
+
 /** Ordre À L'ÉCRAN : on ramène l'employé sur le premier champ fautif. */
 const FIELD_TARGETS = [
-  ["customer_name", "q-name"],
-  ["customer_phone", "q-phone"],
   ["event_date", "q-date"],
   ["pickup_date", "q-pickup"],
   ["return_due_date", "q-return"],
+  [`alt_${PANTS_SLOT}`, `q-alt-${PANTS_SLOT}`],
+  [`part_${PANTS_SLOT}`, `q-slot-${PANTS_SLOT}`],
+  ["customer_name", "q-name"],
+  ["customer_phone", "q-phone"],
   ["part_0", "q-slot-0"],
   ["part_1", "q-slot-1"],
-  ["part_2", "q-slot-2"],
   ["part_3", "q-slot-3"],
   ["part_4", "q-slot-4"],
   ["lines", "q-slot-0"],
@@ -631,6 +639,12 @@ export function OrderQuickForm({
         issues[`alt_${index}`] = { key: "alterations.errors.noteRequired" };
       }
     });
+    // Retouche tapée en premier, pantalon jamais choisi : elle serait perdue
+    // (seules les cases nommées partent en lignes).
+    const pants = draft.slots[PANTS_SLOT];
+    if (pants && !pants.name.trim() && pants.alteration?.note.trim()) {
+      issues[`alt_${PANTS_SLOT}`] = { key: "alterations.errors.pantsRequired" };
+    }
     if (draft.price.trim() && !(Number(draft.price) >= 0)) {
       issues.price = { key: "errors.numberInvalid" };
     }
@@ -695,6 +709,19 @@ export function OrderQuickForm({
       // Le champ apparaît : le curseur y va, le clavier s'ouvre.
       requestAnimationFrame(() => document.getElementById(`q-alt-${index}`)?.focus());
     }
+  }
+
+  /**
+   * La note de retouche du pantalon, toujours ouverte : la taper CRÉE la
+   * retouche, la vider la retire (le « décocher » d'avant).
+   */
+  function setPantsNote(note: string) {
+    const prev = store.get().slots[PANTS_SLOT]?.alteration ?? null;
+    setSlot(PANTS_SLOT, {
+      alteration: note.trim()
+        ? { id: prev?.id ?? null, note, done: prev?.done ?? false }
+        : null,
+    });
   }
 
   function removeSlot(index: number) {
@@ -1028,7 +1055,7 @@ export function OrderQuickForm({
   }
 
   function openPicker(index: number) {
-    setPicker({ index, n: Date.now(), open: true });
+    setPicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }));
   }
 
   function closePicker() {
@@ -1055,7 +1082,7 @@ export function OrderQuickForm({
       index = slots.length;
       updateDraft({ slots: [...slots, EMPTY_SLOT] });
     }
-    setPicker({ index, n: Date.now(), open: true });
+    setPicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }));
   }
 
   /**
@@ -1287,7 +1314,10 @@ export function OrderQuickForm({
           },
         });
         window.scrollTo({ top: 0, behavior: "smooth" });
-        document.getElementById("q-name")?.focus({ preventScroll: true });
+        // Le client suivant commence, lui aussi, par la retouche.
+        document
+          .getElementById(`q-alt-${PANTS_SLOT}`)
+          ?.focus({ preventScroll: true });
         return;
       }
 
@@ -1320,6 +1350,151 @@ export function OrderQuickForm({
     if (!(target instanceof HTMLInputElement)) return;
     event.preventDefault();
     focusNextField(target);
+  }
+
+  /** La saisie d'une case : texte libre, taille puis pièce, ou liste. */
+  function slotField(index: number) {
+    const slot = draft.slots[index];
+    const part = partOfSlot(index);
+    const partIssue = issueText(`part_${index}`);
+    return (
+      <>
+        {/* Accessoires : TEXTE LIBRE. Le patron ne les met pas en
+            stock — « Ceinture + cravate rouge » se tape, ne se choisit
+            pas. Une ancienne commande dont l'accessoire est une pièce
+            du stock garde sa liste, pour ne pas perdre la pièce. */}
+        {index === ACCESSORIES_SLOT && !slot.unitId ? (
+          <Input
+            id={`q-slot-${index}`}
+            value={slot.name}
+            placeholder={t("orders.quick.accessoryPlaceholder")}
+            autoComplete="off"
+            enterKeyHint="next"
+            onChange={(e) =>
+              setSlot(index, {
+                name: e.target.value,
+                unitId: null,
+                ref: null,
+                stockPrice: null,
+                external: null,
+              })
+            }
+            className="h-12 text-base"
+          />
+        ) : sizedSlot(index) ? (
+          // La TAILLE d'abord, puis la pièce du stock dans cette taille.
+          <div className="flex gap-2">
+            <button
+              type="button"
+              id={`q-size-${index}`}
+              aria-label={`${t("stock.size")} · ${slotLabel(index)}`}
+              onClick={() =>
+                setSizePicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }))
+              }
+              data-invalid={partIssue ? true : undefined}
+              className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 data-[invalid=true]:border-destructive flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-md border outline-none focus-visible:ring-[3px]"
+            >
+              <span className="text-muted-foreground text-xs leading-none">
+                {t("stock.size")}
+              </span>
+              {slot.size ? (
+                <span className="tabular mt-0.5 max-w-full truncate px-1 text-base font-medium">
+                  {slot.size}
+                </span>
+              ) : (
+                <Plus
+                  className="text-muted-foreground mt-0.5 size-4"
+                  aria-hidden
+                />
+              )}
+            </button>
+            <PickerField
+              id={`q-slot-${index}`}
+              className="min-w-0 flex-1"
+              value={slot.name}
+              placeholder={t(
+                part || index === SHOES_SLOT
+                  ? "orders.quick.pickPart"
+                  : "orders.quick.pickPlaceholder",
+              )}
+              onOpen={() => openPicker(index)}
+              onClear={() => applyPicked(index, [])}
+              invalid={
+                Boolean(partIssue) || (!!issues.lines && index === 0)
+              }
+            />
+          </div>
+        ) : (
+          <PickerField
+            id={`q-slot-${index}`}
+            value={slot.name}
+            placeholder={t("orders.quick.pickPlaceholder")}
+            onOpen={() => openPicker(index)}
+            onClear={() => applyPicked(index, [])}
+            // Une ancienne saisie avec sa taille à part (avant les
+            // listes) : on la montre plutôt que de la perdre de vue.
+            secondary={
+              !slot.unitId && slot.size ? (
+                <span className="text-muted-foreground">
+                  {t("orders.quick.size")} {slot.size}
+                </span>
+              ) : undefined
+            }
+          />
+        )}
+      </>
+    );
+  }
+
+  /** Sous une case : son erreur, et d'où vient la pièce (stock, prise…). */
+  function slotStatus(index: number) {
+    const slot = draft.slots[index];
+    const partIssue = issueText(`part_${index}`);
+    const taken = slot.unitId ? busy.get(slot.unitId) : undefined;
+    return (
+      <>
+        {partIssue && (
+          <p role="alert" className="text-destructive mt-1.5 text-sm">
+            {partIssue}
+          </p>
+        )}
+
+        {slot.unitId && (
+          <p
+            className={cn(
+              "mt-1.5 flex items-center gap-1.5 text-xs",
+              taken
+                ? "text-warning-foreground font-medium"
+                : "text-success",
+            )}
+          >
+            {taken ? (
+              <AlertTriangle
+                className="size-3.5 shrink-0"
+                aria-hidden
+              />
+            ) : (
+              <Package className="size-3.5 shrink-0" aria-hidden />
+            )}
+            {t("orders.quick.fromStock")} <bdi>{slot.ref}</bdi>
+            {slot.size && ` · ${t("stock.size")} ${slot.size}`}
+            {isSaleUnit(slot.unitId) && (
+              <span className="text-gold-strong font-medium">
+                {` · ${t("orders.saleTag")}`}
+              </span>
+            )}
+            {taken &&
+              ` · ${
+                taken.freeFrom
+                  ? t("orders.freeFrom", {
+                      date: formatDate(taken.freeFrom, locale),
+                    })
+                  : t("orders.takenOnDates")
+              }`}
+          </p>
+        )}
+      </>
+    );
   }
 
   const windowLabel = windowValid
@@ -1358,55 +1533,23 @@ export function OrderQuickForm({
         </Alert>
       )}
 
-      {/* --- Client ---------------------------------------------------------- */}
-      <Section id="q-client" title={t("orders.customer")}>
+      {/* --- Date ------------------------------------------------------------
+          EN PREMIER : sans elle, aucune pièce du stock ne se choisit. */}
+      <Section
+        id="q-when"
+        title={
+          <>
+            {saleOnly ? t("orders.saleDate") : t("orders.eventDate")}
+            <RequiredMark />
+          </>
+        }
+        invalid={!!issues.event_date}
+      >
         <FieldGroup>
-          <Field data-invalid={!!issues.customer_name || undefined}>
-            <FieldLabel htmlFor="q-name">
-              {t("orders.customerName")}
-              <RequiredMark />
-            </FieldLabel>
-            <SuggestInput
-              id="q-name"
-              value={draft.customerName}
-              onValueChange={(v) => updateDraft({ customerName: v })}
-              options={customerOptions}
-              invalid={!!issues.customer_name}
-              enterKeyHint="next"
-              autoCapitalize="words"
-              aria-required
-            />
-            {issues.customer_name && (
-              <FieldError>{issueText("customer_name")}</FieldError>
-            )}
-          </Field>
-
-          <Field data-invalid={!!issues.customer_phone || undefined}>
-            <FieldLabel htmlFor="q-phone">
-              {t("orders.quick.phoneOptional")}
-            </FieldLabel>
-            <Input
-              id="q-phone"
-              data-field
-              type="tel"
-              inputMode="tel"
-              dir="ltr"
-              value={draft.customerPhone}
-              onChange={(e) => updateDraft({ customerPhone: e.target.value })}
-              enterKeyHint="next"
-              autoComplete="off"
-              className="h-12 text-base"
-              aria-invalid={!!issues.customer_phone || undefined}
-            />
-            {issues.customer_phone && (
-              <FieldError>{issueText("customer_phone")}</FieldError>
-            )}
-          </Field>
-
           <Field data-invalid={!!issues.event_date || undefined}>
-            <FieldLabel htmlFor="q-date">
+            {/* Le titre de la section le dit déjà, à l'écran. */}
+            <FieldLabel htmlFor="q-date" className="sr-only">
               {saleOnly ? t("orders.saleDate") : t("orders.eventDate")}
-              <RequiredMark />
             </FieldLabel>
             <DatePicker
               id="q-date"
@@ -1487,6 +1630,124 @@ export function OrderQuickForm({
               </Field>
             </div>
           )}
+        </FieldGroup>
+      </Section>
+
+      {/* --- Retouche pantalon -----------------------------------------------
+          Le patron commence par elle (sa colonne « Tailleur »). Seul le
+          pantalon se retouche : sa note est toujours ouverte, puis on choisit
+          le pantalon lui-même — taille, puis pièce du stock. */}
+      {(!saleOnly || draft.slots[PANTS_SLOT]?.name.trim()) &&
+        (() => {
+          const pants = draft.slots[PANTS_SLOT];
+          const altIssue = issueText(`alt_${PANTS_SLOT}`);
+          return (
+            <Section
+              id="q-retouche"
+              title={
+                <span className="flex items-center gap-2">
+                  <Scissors className="text-gold-strong size-5" aria-hidden />
+                  {t("alterations.pantsTitle")}
+                </span>
+              }
+              invalid={!!altIssue}
+            >
+              <p className="text-muted-foreground -mt-2 mb-4 text-sm">
+                {t("alterations.pantsHint")}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label
+                      htmlFor={`q-alt-${PANTS_SLOT}`}
+                      className="text-sm font-medium"
+                    >
+                      {t("alterations.noteLabel")}
+                    </label>
+                    {pants.alteration?.done && (
+                      <span className="bg-success-soft text-success-foreground inline-flex items-center gap-1 rounded-full px-2 text-[11px] leading-5">
+                        <CircleCheck className="size-3" aria-hidden />
+                        {t("alterations.status.taillee")}
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    id={`q-alt-${PANTS_SLOT}`}
+                    data-field
+                    value={pants.alteration?.note ?? ""}
+                    maxLength={200}
+                    onChange={(e) => setPantsNote(e.target.value)}
+                    placeholder={t("alterations.notePlaceholder")}
+                    aria-invalid={altIssue ? true : undefined}
+                    enterKeyHint="next"
+                    autoComplete="off"
+                    className="h-12 text-base"
+                  />
+                  {altIssue && (
+                    <p role="alert" className="text-destructive mt-1.5 text-sm">
+                      {altIssue}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    htmlFor={`q-slot-${PANTS_SLOT}`}
+                    className="mb-1.5 block text-sm font-medium"
+                  >
+                    {slotLabel(PANTS_SLOT)}
+                  </label>
+                  {slotField(PANTS_SLOT)}
+                  {slotStatus(PANTS_SLOT)}
+                </div>
+              </div>
+            </Section>
+          );
+        })()}
+
+      {/* --- Client ---------------------------------------------------------- */}
+      <Section id="q-client" title={t("orders.customer")}>
+        <FieldGroup>
+          <Field data-invalid={!!issues.customer_name || undefined}>
+            <FieldLabel htmlFor="q-name">
+              {t("orders.customerName")}
+              <RequiredMark />
+            </FieldLabel>
+            <SuggestInput
+              id="q-name"
+              value={draft.customerName}
+              onValueChange={(v) => updateDraft({ customerName: v })}
+              options={customerOptions}
+              invalid={!!issues.customer_name}
+              enterKeyHint="next"
+              autoCapitalize="words"
+              aria-required
+            />
+            {issues.customer_name && (
+              <FieldError>{issueText("customer_name")}</FieldError>
+            )}
+          </Field>
+
+          <Field data-invalid={!!issues.customer_phone || undefined}>
+            <FieldLabel htmlFor="q-phone">
+              {t("orders.quick.phoneOptional")}
+            </FieldLabel>
+            <Input
+              id="q-phone"
+              data-field
+              type="tel"
+              inputMode="tel"
+              dir="ltr"
+              value={draft.customerPhone}
+              onChange={(e) => updateDraft({ customerPhone: e.target.value })}
+              enterKeyHint="next"
+              autoComplete="off"
+              className="h-12 text-base"
+              aria-invalid={!!issues.customer_phone || undefined}
+            />
+            {issues.customer_phone && (
+              <FieldError>{issueText("customer_phone")}</FieldError>
+            )}
+          </Field>
 
           {/* « Allez valide » / « Retour valide » : les deux cases ✗/✓ de son
               formulaire. Le plus souvent laissées à ✗ — on les coche sur la
@@ -1541,9 +1802,8 @@ export function OrderQuickForm({
 
         <div className="space-y-4">
           {draft.slots.map((slot, index) => {
-            const part = partOfSlot(index);
-            const partIssue = issueText(`part_${index}`);
-            const taken = slot.unitId ? busy.get(slot.unitId) : undefined;
+            // Le pantalon a son bloc « Retouche pantalon », sous la date.
+            if (index === PANTS_SLOT) return null;
             return (
               <div key={index}>
                 <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -1554,11 +1814,10 @@ export function OrderQuickForm({
                     {slotLabel(index)}
                   </label>
                   <div className="-my-2 flex items-center">
-                  {/* Seul le PANTALON se retouche (demande du client). Une
+                  {/* Seul le PANTALON se retouche (son bloc, plus haut). Une
                       retouche déjà posée sur une autre pièce reste visible,
                       pour pouvoir la décocher — mais on n'en crée plus. */}
-                  {slot.name.trim() &&
-                    (part === "pantalon" || slot.alteration) && (
+                  {slot.name.trim() && slot.alteration && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -1591,130 +1850,8 @@ export function OrderQuickForm({
                   </div>
                 </div>
 
-                {/* Accessoires : TEXTE LIBRE. Le patron ne les met pas en
-                    stock — « Ceinture + cravate rouge » se tape, ne se choisit
-                    pas. Une ancienne commande dont l'accessoire est une pièce
-                    du stock garde sa liste, pour ne pas perdre la pièce. */}
-                {index === ACCESSORIES_SLOT && !slot.unitId ? (
-                  <Input
-                    id={`q-slot-${index}`}
-                    value={slot.name}
-                    placeholder={t("orders.quick.accessoryPlaceholder")}
-                    autoComplete="off"
-                    enterKeyHint="next"
-                    onChange={(e) =>
-                      setSlot(index, {
-                        name: e.target.value,
-                        unitId: null,
-                        ref: null,
-                        stockPrice: null,
-                        external: null,
-                      })
-                    }
-                    className="h-12 text-base"
-                  />
-                ) : sizedSlot(index) ? (
-                  // La TAILLE d'abord, puis la pièce du stock dans cette taille.
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      id={`q-size-${index}`}
-                      aria-label={`${t("stock.size")} · ${slotLabel(index)}`}
-                      onClick={() =>
-                        setSizePicker({ index, n: Date.now(), open: true })
-                      }
-                      data-invalid={partIssue ? true : undefined}
-                      className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 data-[invalid=true]:border-destructive flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-md border outline-none focus-visible:ring-[3px]"
-                    >
-                      <span className="text-muted-foreground text-xs leading-none">
-                        {t("stock.size")}
-                      </span>
-                      {slot.size ? (
-                        <span className="tabular mt-0.5 max-w-full truncate px-1 text-base font-medium">
-                          {slot.size}
-                        </span>
-                      ) : (
-                        <Plus
-                          className="text-muted-foreground mt-0.5 size-4"
-                          aria-hidden
-                        />
-                      )}
-                    </button>
-                    <PickerField
-                      id={`q-slot-${index}`}
-                      className="min-w-0 flex-1"
-                      value={slot.name}
-                      placeholder={t(
-                        part || index === SHOES_SLOT
-                          ? "orders.quick.pickPart"
-                          : "orders.quick.pickPlaceholder",
-                      )}
-                      onOpen={() => openPicker(index)}
-                      onClear={() => applyPicked(index, [])}
-                      invalid={
-                        Boolean(partIssue) || (!!issues.lines && index === 0)
-                      }
-                    />
-                  </div>
-                ) : (
-                  <PickerField
-                    id={`q-slot-${index}`}
-                    value={slot.name}
-                    placeholder={t("orders.quick.pickPlaceholder")}
-                    onOpen={() => openPicker(index)}
-                    onClear={() => applyPicked(index, [])}
-                    // Une ancienne saisie avec sa taille à part (avant les
-                    // listes) : on la montre plutôt que de la perdre de vue.
-                    secondary={
-                      !slot.unitId && slot.size ? (
-                        <span className="text-muted-foreground">
-                          {t("orders.quick.size")} {slot.size}
-                        </span>
-                      ) : undefined
-                    }
-                  />
-                )}
-
-                {partIssue && (
-                  <p role="alert" className="text-destructive mt-1.5 text-sm">
-                    {partIssue}
-                  </p>
-                )}
-
-                {slot.unitId && (
-                  <p
-                    className={cn(
-                      "mt-1.5 flex items-center gap-1.5 text-xs",
-                      taken
-                        ? "text-warning-foreground font-medium"
-                        : "text-success",
-                    )}
-                  >
-                    {taken ? (
-                      <AlertTriangle
-                        className="size-3.5 shrink-0"
-                        aria-hidden
-                      />
-                    ) : (
-                      <Package className="size-3.5 shrink-0" aria-hidden />
-                    )}
-                    {t("orders.quick.fromStock")} <bdi>{slot.ref}</bdi>
-                    {slot.size && ` · ${t("stock.size")} ${slot.size}`}
-                    {isSaleUnit(slot.unitId) && (
-                      <span className="text-gold-strong font-medium">
-                        {` · ${t("orders.saleTag")}`}
-                      </span>
-                    )}
-                    {taken &&
-                      ` · ${
-                        taken.freeFrom
-                          ? t("orders.freeFrom", {
-                              date: formatDate(taken.freeFrom, locale),
-                            })
-                          : t("orders.takenOnDates")
-                      }`}
-                  </p>
-                )}
+                {slotField(index)}
+                {slotStatus(index)}
 
                 {/* RETOUCHE de la pièce : ce que le tailleur lira sur
                     l'étiquette QR collée sur le vêtement. */}
