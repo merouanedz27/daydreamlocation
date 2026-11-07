@@ -1123,7 +1123,7 @@
     "atelierHint": "Les pièces à retoucher, les plus urgentes d'abord. Quand une pièce est prête, scannez son étiquette.",
     "toggle": "Retouche",
     "pantsTitle": "Retouche pantalon",
-    "pantsHint": "À remplir en premier : le tailleur la lit sur l’étiquette QR.",
+    "pantsHint": "À remplir en premier. Le pantalon se choisit plus bas, dans la tenue.",
     "noteLabel": "Retouche à faire (lue par le tailleur)",
     "notePlaceholder": "Ex. : manches −2 cm, ourlet 98 cm",
     "size": "T. {size}",

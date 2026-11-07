@@ -282,15 +282,15 @@ const PANTS_SLOT = PART_SLOTS.indexOf("pantalon");
 
 /** Ordre À L'ÉCRAN : on ramène l'employé sur le premier champ fautif. */
 const FIELD_TARGETS = [
+  [`alt_${PANTS_SLOT}`, `q-alt-${PANTS_SLOT}`],
+  ["customer_name", "q-name"],
+  ["customer_phone", "q-phone"],
   ["event_date", "q-date"],
   ["pickup_date", "q-pickup"],
   ["return_due_date", "q-return"],
-  [`alt_${PANTS_SLOT}`, `q-alt-${PANTS_SLOT}`],
-  [`part_${PANTS_SLOT}`, `q-slot-${PANTS_SLOT}`],
-  ["customer_name", "q-name"],
-  ["customer_phone", "q-phone"],
   ["part_0", "q-slot-0"],
   ["part_1", "q-slot-1"],
+  ["part_2", "q-slot-2"],
   ["part_3", "q-slot-3"],
   ["part_4", "q-slot-4"],
   ["lines", "q-slot-0"],
@@ -642,8 +642,14 @@ export function OrderQuickForm({
     // Retouche tapée en premier, pantalon jamais choisi : elle serait perdue
     // (seules les cases nommées partent en lignes).
     const pants = draft.slots[PANTS_SLOT];
-    if (pants && !pants.name.trim() && pants.alteration?.note.trim()) {
-      issues[`alt_${PANTS_SLOT}`] = { key: "alterations.errors.pantsRequired" };
+    // L'erreur va sous la case Pantalon, dans la tenue : c'est là qu'on agit.
+    if (
+      pants &&
+      !pants.name.trim() &&
+      pants.alteration?.note.trim() &&
+      !issues[`part_${PANTS_SLOT}`]
+    ) {
+      issues[`part_${PANTS_SLOT}`] = { key: "alterations.errors.pantsRequired" };
     }
     if (draft.price.trim() && !(Number(draft.price) >= 0)) {
       issues.price = { key: "errors.numberInvalid" };
@@ -1533,23 +1539,116 @@ export function OrderQuickForm({
         </Alert>
       )}
 
-      {/* --- Date ------------------------------------------------------------
-          EN PREMIER : sans elle, aucune pièce du stock ne se choisit. */}
-      <Section
-        id="q-when"
-        title={
-          <>
-            {saleOnly ? t("orders.saleDate") : t("orders.eventDate")}
-            <RequiredMark />
-          </>
-        }
-        invalid={!!issues.event_date}
-      >
+      {/* --- Retouche pantalon -----------------------------------------------
+          EN TOUT PREMIER : le patron commence par elle (sa colonne
+          « Tailleur »). Une simple note, sans date ni pièce : le pantalon,
+          lui, se choisit à sa place dans la tenue, sous la veste. */}
+      {(!saleOnly || draft.slots[PANTS_SLOT]?.alteration) &&
+        (() => {
+          const pants = draft.slots[PANTS_SLOT];
+          const altIssue = issueText(`alt_${PANTS_SLOT}`);
+          return (
+            <Section
+              id="q-retouche"
+              title={
+                <span className="flex items-center gap-2">
+                  <Scissors className="text-gold-strong size-5" aria-hidden />
+                  {t("alterations.pantsTitle")}
+                </span>
+              }
+              invalid={!!altIssue}
+            >
+              <p className="text-muted-foreground -mt-2 mb-4 text-sm">
+                {t("alterations.pantsHint")}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <label
+                      htmlFor={`q-alt-${PANTS_SLOT}`}
+                      className="text-sm font-medium"
+                    >
+                      {t("alterations.noteLabel")}
+                    </label>
+                    {pants.alteration?.done && (
+                      <span className="bg-success-soft text-success-foreground inline-flex items-center gap-1 rounded-full px-2 text-[11px] leading-5">
+                        <CircleCheck className="size-3" aria-hidden />
+                        {t("alterations.status.taillee")}
+                      </span>
+                    )}
+                  </div>
+                  <Input
+                    id={`q-alt-${PANTS_SLOT}`}
+                    data-field
+                    value={pants.alteration?.note ?? ""}
+                    maxLength={200}
+                    onChange={(e) => setPantsNote(e.target.value)}
+                    placeholder={t("alterations.notePlaceholder")}
+                    aria-invalid={altIssue ? true : undefined}
+                    enterKeyHint="next"
+                    autoComplete="off"
+                    className="h-12 text-base"
+                  />
+                  {altIssue && (
+                    <p role="alert" className="text-destructive mt-1.5 text-sm">
+                      {altIssue}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Section>
+          );
+        })()}
+
+      {/* --- Client ---------------------------------------------------------- */}
+      <Section id="q-client" title={t("orders.customer")}>
         <FieldGroup>
+          <Field data-invalid={!!issues.customer_name || undefined}>
+            <FieldLabel htmlFor="q-name">
+              {t("orders.customerName")}
+              <RequiredMark />
+            </FieldLabel>
+            <SuggestInput
+              id="q-name"
+              value={draft.customerName}
+              onValueChange={(v) => updateDraft({ customerName: v })}
+              options={customerOptions}
+              invalid={!!issues.customer_name}
+              enterKeyHint="next"
+              autoCapitalize="words"
+              aria-required
+            />
+            {issues.customer_name && (
+              <FieldError>{issueText("customer_name")}</FieldError>
+            )}
+          </Field>
+
+          <Field data-invalid={!!issues.customer_phone || undefined}>
+            <FieldLabel htmlFor="q-phone">
+              {t("orders.quick.phoneOptional")}
+            </FieldLabel>
+            <Input
+              id="q-phone"
+              data-field
+              type="tel"
+              inputMode="tel"
+              dir="ltr"
+              value={draft.customerPhone}
+              onChange={(e) => updateDraft({ customerPhone: e.target.value })}
+              enterKeyHint="next"
+              autoComplete="off"
+              className="h-12 text-base"
+              aria-invalid={!!issues.customer_phone || undefined}
+            />
+            {issues.customer_phone && (
+              <FieldError>{issueText("customer_phone")}</FieldError>
+            )}
+          </Field>
+
           <Field data-invalid={!!issues.event_date || undefined}>
-            {/* Le titre de la section le dit déjà, à l'écran. */}
-            <FieldLabel htmlFor="q-date" className="sr-only">
+            <FieldLabel htmlFor="q-date">
               {saleOnly ? t("orders.saleDate") : t("orders.eventDate")}
+              <RequiredMark />
             </FieldLabel>
             <DatePicker
               id="q-date"
@@ -1630,124 +1729,6 @@ export function OrderQuickForm({
               </Field>
             </div>
           )}
-        </FieldGroup>
-      </Section>
-
-      {/* --- Retouche pantalon -----------------------------------------------
-          Le patron commence par elle (sa colonne « Tailleur »). Seul le
-          pantalon se retouche : sa note est toujours ouverte, puis on choisit
-          le pantalon lui-même — taille, puis pièce du stock. */}
-      {(!saleOnly || draft.slots[PANTS_SLOT]?.name.trim()) &&
-        (() => {
-          const pants = draft.slots[PANTS_SLOT];
-          const altIssue = issueText(`alt_${PANTS_SLOT}`);
-          return (
-            <Section
-              id="q-retouche"
-              title={
-                <span className="flex items-center gap-2">
-                  <Scissors className="text-gold-strong size-5" aria-hidden />
-                  {t("alterations.pantsTitle")}
-                </span>
-              }
-              invalid={!!altIssue}
-            >
-              <p className="text-muted-foreground -mt-2 mb-4 text-sm">
-                {t("alterations.pantsHint")}
-              </p>
-              <div className="space-y-3">
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <label
-                      htmlFor={`q-alt-${PANTS_SLOT}`}
-                      className="text-sm font-medium"
-                    >
-                      {t("alterations.noteLabel")}
-                    </label>
-                    {pants.alteration?.done && (
-                      <span className="bg-success-soft text-success-foreground inline-flex items-center gap-1 rounded-full px-2 text-[11px] leading-5">
-                        <CircleCheck className="size-3" aria-hidden />
-                        {t("alterations.status.taillee")}
-                      </span>
-                    )}
-                  </div>
-                  <Input
-                    id={`q-alt-${PANTS_SLOT}`}
-                    data-field
-                    value={pants.alteration?.note ?? ""}
-                    maxLength={200}
-                    onChange={(e) => setPantsNote(e.target.value)}
-                    placeholder={t("alterations.notePlaceholder")}
-                    aria-invalid={altIssue ? true : undefined}
-                    enterKeyHint="next"
-                    autoComplete="off"
-                    className="h-12 text-base"
-                  />
-                  {altIssue && (
-                    <p role="alert" className="text-destructive mt-1.5 text-sm">
-                      {altIssue}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    htmlFor={`q-slot-${PANTS_SLOT}`}
-                    className="mb-1.5 block text-sm font-medium"
-                  >
-                    {slotLabel(PANTS_SLOT)}
-                  </label>
-                  {slotField(PANTS_SLOT)}
-                  {slotStatus(PANTS_SLOT)}
-                </div>
-              </div>
-            </Section>
-          );
-        })()}
-
-      {/* --- Client ---------------------------------------------------------- */}
-      <Section id="q-client" title={t("orders.customer")}>
-        <FieldGroup>
-          <Field data-invalid={!!issues.customer_name || undefined}>
-            <FieldLabel htmlFor="q-name">
-              {t("orders.customerName")}
-              <RequiredMark />
-            </FieldLabel>
-            <SuggestInput
-              id="q-name"
-              value={draft.customerName}
-              onValueChange={(v) => updateDraft({ customerName: v })}
-              options={customerOptions}
-              invalid={!!issues.customer_name}
-              enterKeyHint="next"
-              autoCapitalize="words"
-              aria-required
-            />
-            {issues.customer_name && (
-              <FieldError>{issueText("customer_name")}</FieldError>
-            )}
-          </Field>
-
-          <Field data-invalid={!!issues.customer_phone || undefined}>
-            <FieldLabel htmlFor="q-phone">
-              {t("orders.quick.phoneOptional")}
-            </FieldLabel>
-            <Input
-              id="q-phone"
-              data-field
-              type="tel"
-              inputMode="tel"
-              dir="ltr"
-              value={draft.customerPhone}
-              onChange={(e) => updateDraft({ customerPhone: e.target.value })}
-              enterKeyHint="next"
-              autoComplete="off"
-              className="h-12 text-base"
-              aria-invalid={!!issues.customer_phone || undefined}
-            />
-            {issues.customer_phone && (
-              <FieldError>{issueText("customer_phone")}</FieldError>
-            )}
-          </Field>
 
           {/* « Allez valide » / « Retour valide » : les deux cases ✗/✓ de son
               formulaire. Le plus souvent laissées à ✗ — on les coche sur la
@@ -1802,8 +1783,8 @@ export function OrderQuickForm({
 
         <div className="space-y-4">
           {draft.slots.map((slot, index) => {
-            // Le pantalon a son bloc « Retouche pantalon », sous la date.
-            if (index === PANTS_SLOT) return null;
+            // La retouche du pantalon se tape dans son bloc, tout en haut.
+            const isPants = index === PANTS_SLOT;
             return (
               <div key={index}>
                 <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -1817,7 +1798,7 @@ export function OrderQuickForm({
                   {/* Seul le PANTALON se retouche (son bloc, plus haut). Une
                       retouche déjà posée sur une autre pièce reste visible,
                       pour pouvoir la décocher — mais on n'en crée plus. */}
-                  {slot.name.trim() && slot.alteration && (
+                  {!isPants && slot.name.trim() && slot.alteration && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -1855,7 +1836,17 @@ export function OrderQuickForm({
 
                 {/* RETOUCHE de la pièce : ce que le tailleur lira sur
                     l'étiquette QR collée sur le vêtement. */}
-                {slot.name.trim() && slot.alteration && (
+                {/* Pantalon : un rappel de la note tapée en haut. */}
+                {isPants && slot.alteration?.note.trim() && (
+                  <p className="text-gold-strong mt-1.5 flex items-center gap-1.5 text-xs font-medium">
+                    <Scissors className="size-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 truncate">
+                      {slot.alteration.note.trim()}
+                    </span>
+                  </p>
+                )}
+
+                {!isPants && slot.name.trim() && slot.alteration && (
                   <div className="border-gold-strong/30 bg-gold-soft/40 mt-2 rounded-md border p-2">
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <label
