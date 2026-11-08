@@ -97,8 +97,9 @@ export async function createOrder(page: Page, name: string, day: number) {
   await pickStockSize(page, PANTALON);
   await pickFirstUnit(page, PANTALON);
   await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
-  await expect(page).toHaveURL(/\/fr\/commandes(\?.*)?$/, { timeout: 30_000 });
+  // Larges : en dev, la 1re soumission et la 1re fiche se compilent.
+  await expect(page).toHaveURL(/\/fr\/commandes(\?.*)?$/, { timeout: 60_000 });
   await page.getByRole("link", { name: new RegExp(name) }).first().click();
-  await expect(page).toHaveURL(/\/fr\/commandes\/\d+$/);
+  await expect(page).toHaveURL(/\/fr\/commandes\/\d+$/, { timeout: 60_000 });
   return page.url();
 }

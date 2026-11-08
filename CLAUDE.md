@@ -42,7 +42,23 @@ npm run db:push:prod      # applique les migrations
 npm run db:advisors:prod  # audit sécurité + performance
 
 npx supabase migration new <nom>
+
+# Tests de bout en bout (Playwright, téléphone 390 px, Supabase LOCAL)
+npm run test:e2e          # db:reset puis tous les écrans (~20 min, `next dev`)
+E2E_NO_RESET=1 npx playwright test e2e/order-create.spec.ts   # un fichier, sans reset
 ```
+
+**Tests E2E** : `e2e/`. Ils écrivent dans la base, donc `global-setup` refuse de
+tourner si `.env.local` ne pointe pas sur le Supabase local. Toujours `next dev`,
+jamais `next start` : en mode production, Next charge `.env.production.local`
+(base, SMTP et push de PRODUCTION). Une erreur JavaScript ou console fait
+échouer le test.
+
+**Version stable** : tag `v1.0.0-stable` et branche `stable` — 47/47 E2E verts,
+schéma à `20261108100000_tailor_undo_alteration.sql`. Revenir en arrière :
+redéployer ce tag sur Vercel (ou `git checkout v1.0.0-stable`). Le code revient,
+**pas la base** : une migration appliquée après le tag reste en place, donc toute
+nouvelle migration doit rester compatible avec ce code.
 
 **Deux environnements.** En développement, Supabase tourne dans Docker (API
 `http://127.0.0.1:56321`, Studio `:56323`, Postgres `:56322` — ports 563xx car

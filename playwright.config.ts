@@ -18,7 +18,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 90_000,
+  timeout: 180_000,
   expect: { timeout: 15_000 },
   reporter: [["list"], ["html", { open: "never", outputFolder: "e2e/.report" }]],
   use: {
@@ -47,7 +47,7 @@ export default defineConfig({
     reuseExistingServer: Boolean(process.env.E2E_REUSE),
     // Premier démarrage après un cache `.next` vide : plusieurs minutes.
     timeout: 600_000,
-    stdout: "ignore",
+    stdout: process.env.E2E_SERVER_LOG ? "pipe" : "ignore",
     stderr: "pipe",
   },
 });

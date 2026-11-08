@@ -90,7 +90,16 @@ const eslintConfig = defineConfig([
     files: ["src/i18n/**", "src/components/ui/**", "src/proxy.ts"],
     rules: { "no-restricted-imports": "off" },
   },
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    // Sorties générées de Playwright (rapport HTML minifié, traces, sessions).
+    "e2e/.report/**",
+    "e2e/.results/**",
+    "e2e/.auth/**",
+  ]),
 ]);
 
 export default eslintConfig;
