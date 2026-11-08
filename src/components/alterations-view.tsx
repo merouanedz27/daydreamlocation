@@ -17,8 +17,8 @@ import { matchesSearch } from "@/lib/search";
 /**
  * La liste des retouches — la MÊME page pour l'atelier du tailleur
  * (`/atelier`) et pour le magasin (`/retouches`). Le magasin voit en plus
- * l'impression des étiquettes, le lien vers chaque commande et l'annulation
- * d'un scan.
+ * l'impression des étiquettes et le lien vers chaque commande. Les deux
+ * peuvent annuler un scan (le tailleur, les siens seulement).
  */
 export async function AlterationsView({
   mode,

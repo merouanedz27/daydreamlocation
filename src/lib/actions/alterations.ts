@@ -88,27 +88,28 @@ export async function markAltered(input: { id: string; locale: string }): Promis
 export type AlterationResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Un scan par erreur : la pièce repart « à faire ». Réservé à l'équipe du
- * magasin (RLS de `line_alterations`) — le tailleur ne défait pas son propre
- * signalement, il prévient le magasin.
+ * Un scan par erreur : la pièce repart « à faire ».
+ *
+ * Par la fonction `undo_altered` — le tailleur n'a aucune policy sur les
+ * tables. Il ne défait que SES propres scans ; l'équipe du magasin, tous.
  */
 export async function undoAltered(input: { id: string; locale: string }): Promise<AlterationResult> {
   const locale = resolveLocale(input.locale);
   const profile = await getProfile();
-  if (!profile || isTailor(profile)) return { ok: false, error: "errors.forbidden" };
+  if (!profile) return { ok: false, error: "errors.forbidden" };
 
   const parsed = idSchema.safeParse(input.id);
   if (!parsed.success) return { ok: false, error: "errors.generic" };
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("line_alterations")
-    .update({ status: "a_faire", done_at: null, done_by: null })
-    .eq("id", parsed.data)
-    .select("order_id");
-  if (error || !data?.length) return { ok: false, error: "errors.generic" };
+  const { data, error } = await supabase.rpc("undo_altered", { p_id: parsed.data });
+  if (error) {
+    if (error.code === "42501") return { ok: false, error: "errors.forbidden" };
+    if (error.code === "P0002") return { ok: false, error: "alterations.errors.unknownLabel" };
+    return { ok: false, error: "errors.generic" };
+  }
 
-  revalidate(locale, data[0].order_id);
+  revalidate(locale, data ?? undefined);
   return { ok: true };
 }
 

@@ -114,7 +114,8 @@ export function AlterationTabs({
  * pouce, par le tailleur : QUI, QUOI, QUELLE retouche, POUR QUAND.
  *
  * `staff` ajoute ce que le magasin seul voit : le lien vers la commande,
- * « étiquette pas encore imprimée », réimpression et annulation d'un scan.
+ * « étiquette pas encore imprimée », réimpression, et l'annulation de
+ * n'importe quel scan — le tailleur n'annule que les siens (`done_by_me`).
  */
 export function AlterationList({
   items,
@@ -236,7 +237,7 @@ export function AlterationList({
                     </Link>
                   </Button>
                 )}
-                {mode === "staff" && done && (
+                {done && (mode === "staff" || item.done_by_me) && (
                   <Button
                     type="button"
                     variant="ghost"

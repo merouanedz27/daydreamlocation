@@ -941,7 +941,7 @@ export type Database = {
           p_id?: string;
           p_done_since?: string;
         };
-        Returns: { id: string; status: string; note: string; created_at: string; done_at: string; printed_at: string; done_by_name: string; order_id: number; order_no: string; order_status: string; customer_name: string; event_date: string; pickup_date: string; model_name: string; ref_code: string; size: string; piece_kind: string }[];
+        Returns: { id: string; status: string; note: string; created_at: string; done_at: string; printed_at: string; done_by_name: string; done_by_me: boolean; order_id: number; order_no: string; order_status: string; customer_name: string; event_date: string; pickup_date: string; model_name: string; ref_code: string; size: string; piece_kind: string }[];
       };
       mark_absent: {
         Args: {
@@ -1001,6 +1001,12 @@ export type Database = {
           p_unit_ids: number[];
           p_in: boolean;
           p_cost?: number;
+        };
+        Returns: number;
+      };
+      undo_altered: {
+        Args: {
+          p_id: string;
         };
         Returns: number;
       };

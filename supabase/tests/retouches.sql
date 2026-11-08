@@ -171,6 +171,38 @@ begin
     'select count(*) from public.list_alterations(''a_faire'') where order_id = %s', v_order));
   insert into test_results values ('14. plus dans la liste a faire', '0', n::text, n = 0);
 
+  -- 5b. Annuler un scan : le tailleur défait le SIEN, pas celui du magasin.
+  v_text := pg_temp.text_as(v_tail, format(
+    'select done_by_me::text from public.list_alterations(p_id => %L)', v_alt));
+  insert into test_results values ('14a. done_by_me pour le tailleur', 'true', coalesce(v_text, 'NULL'), v_text = 'true');
+
+  v_text := pg_temp.text_as(v_tail, format(
+    'select (public.undo_altered(%L) = %s)::text', v_alt, v_order));
+  insert into test_results values ('14b. tailleur annule son scan', 'true', coalesce(v_text, 'NULL'), v_text = 'true');
+
+  select status || '|' || (done_at is null)::text || '|' || (done_by is null)::text into v_text
+  from public.line_alterations where id = v_alt;
+  insert into test_results values ('14c. repart a faire', 'a_faire|true|true', v_text, v_text = 'a_faire|true|true');
+
+  -- Le magasin la marque : le tailleur ne peut plus l'annuler.
+  perform pg_temp.text_as(v_staff, format(
+    'select already_done::text from public.mark_altered(%L)', v_alt));
+  v_text := pg_temp.text_as(v_tail, format(
+    'select done_by_me::text from public.list_alterations(p_id => %L)', v_alt));
+  insert into test_results values ('14d. done_by_me faux (scan du magasin)', 'false', coalesce(v_text, 'NULL'), v_text = 'false');
+
+  v_text := pg_temp.text_as(v_tail, format('select public.undo_altered(%L)::text', v_alt));
+  insert into test_results values ('14e. tailleur refuse sur scan du magasin', 'NULL', coalesce(v_text, 'NULL'), v_text is null);
+  select status into v_text from public.line_alterations where id = v_alt;
+  insert into test_results values ('14f. reste taillee', 'taillee', v_text, v_text = 'taillee');
+
+  -- Le magasin annule n'importe quel scan, puis le tailleur remarque (suite du test).
+  perform pg_temp.text_as(v_staff, format('select public.undo_altered(%L)::text', v_alt));
+  select status into v_text from public.line_alterations where id = v_alt;
+  insert into test_results values ('14g. magasin annule', 'a_faire', v_text, v_text = 'a_faire');
+  perform pg_temp.text_as(v_tail, format(
+    'select already_done::text from public.mark_altered(%L)', v_alt));
+
   -- 6. Un compte désactivé ne passe plus.
   update public.profiles set is_active = false where id = v_tail;
   v_text := pg_temp.text_as(v_tail, format(
