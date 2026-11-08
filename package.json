@@ -23,7 +23,9 @@
     "test:refs": "node --experimental-strip-types scripts/test-stock-refs.mjs",
     "test:ranges": "node --experimental-strip-types scripts/test-rental-range.mjs",
     "test:format": "node --experimental-strip-types scripts/test-format.mjs",
-    "test:pointage": "node --experimental-strip-types scripts/test-pointage.mjs"
+    "test:pointage": "node --experimental-strip-types scripts/test-pointage.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -58,6 +60,7 @@
     "zod": "^4.6.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@serwist/turbopack": "9.5.12",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

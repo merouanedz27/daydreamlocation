@@ -50,3 +50,8 @@ next-env.d.ts
 .claude/skills/supabase/
 .claude/skills/supabase-postgres-best-practices/
 docs/
+
+# Playwright (tests de bout en bout)
+e2e/.auth/
+e2e/.results/
+e2e/.report/
