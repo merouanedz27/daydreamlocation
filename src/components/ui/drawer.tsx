@@ -4,10 +4,52 @@ import * as React from "react"
 import { cn } from "cn"
 import { Drawer as DrawerPrimitive } from "vaul"
 
+/**
+ * Filet de sécurité contre la page « gelée ». Radix pose
+ * `pointer-events: none` sur <body> le temps d'un tiroir ouvert ; si deux
+ * tiroirs se croisent (l'un se ferme, l'autre s'ouvre) ou si l'un est démonté
+ * en pleine animation, cette valeur peut rester — plus rien ne réagit au
+ * toucher. Une fois tout fermé, on la retire.
+ */
+const OPEN_DIALOG =
+  '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]'
+
+function releaseBodyIfIdle() {
+  if (typeof document === "undefined") return
+  if (document.querySelector(OPEN_DIALOG)) return
+  if (document.body.style.pointerEvents === "none") {
+    document.body.style.pointerEvents = ""
+  }
+}
+
+/** Après l'animation de fermeture (≈ 500 ms chez vaul). */
+function releaseSoon() {
+  window.setTimeout(releaseBodyIfIdle, 600)
+}
+
 function Drawer({
+  open,
+  onAnimationEnd,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+  // Tiroir contrôlé qui passe à fermé (même s'il est démonté avant la fin).
+  React.useEffect(() => {
+    if (open === false) releaseSoon()
+  }, [open])
+  // Démonté en plein milieu (changement de `key`, navigation…).
+  React.useEffect(() => () => releaseSoon(), [])
+
+  return (
+    <DrawerPrimitive.Root
+      data-slot="drawer"
+      open={open}
+      onAnimationEnd={(isOpen) => {
+        onAnimationEnd?.(isOpen)
+        if (!isOpen) releaseBodyIfIdle()
+      }}
+      {...props}
+    />
+  )
 }
 
 function DrawerTrigger({

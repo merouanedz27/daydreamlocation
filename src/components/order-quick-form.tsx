@@ -766,6 +766,12 @@ export function OrderQuickForm({
     open: boolean;
   } | null>(null);
 
+  // Les noms des clients, normalisés une fois — pas à chaque lettre tapée.
+  const customerIndex = useMemo(
+    () => customers.map((c) => ({ c, n: normalizeSearch(c.name) })),
+    [customers],
+  );
+
   const pickedUnits = new Set(draft.slots.map((s) => s.unitId).filter(Boolean));
 
   /** Pièces du stock par id, avec leur nom affiché et leur prix. */
@@ -1060,8 +1066,21 @@ export function OrderQuickForm({
     setPicker((p) => (p ? { ...p, open: false } : p));
   }
 
+  /**
+   * UN SEUL tiroir à la fois. Taille choisie, le tiroir des tailles est encore
+   * en train de se refermer quand l'employé touche la pièce : deux tiroirs
+   * Radix se croisaient alors, et la liste des pièces ne répondait plus au
+   * toucher (le bug « taille d'abord → impossible de choisir la pièce »).
+   * Ouvrir l'un retire donc l'autre aussitôt, sans attendre son animation.
+   */
   function openPicker(index: number) {
+    setSizePicker(null);
     setPicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }));
+  }
+
+  function openSizePicker(index: number) {
+    setPicker(null);
+    setSizePicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }));
   }
 
   function closePicker() {
@@ -1088,6 +1107,7 @@ export function OrderQuickForm({
       index = slots.length;
       updateDraft({ slots: [...slots, EMPTY_SLOT] });
     }
+    setSizePicker(null);
     setPicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }));
   }
 
@@ -1127,17 +1147,13 @@ export function OrderQuickForm({
   const customerOptions: SuggestOption[] = (() => {
     const q = normalizeSearch(draft.customerName);
     if (q.length < 2) return [];
-    return customers
+    return customerIndex
       .filter(
-        (c) =>
-          normalizeSearch(c.name).includes(q) &&
-          !(
-            normalizeSearch(c.name) === q &&
-            (c.phone ?? "") === draft.customerPhone
-          ),
+        ({ c, n }) =>
+          n.includes(q) && !(n === q && (c.phone ?? "") === draft.customerPhone),
       )
       .slice(0, MAX_SUGGESTIONS)
-      .map((c) => ({
+      .map(({ c }) => ({
         key: `${c.name}|${c.phone ?? ""}`,
         primary: <HighlightText text={c.name} q={draft.customerName} />,
         secondary: c.phone ? <bdi dir="ltr">{c.phone}</bdi> : undefined,
@@ -1354,6 +1370,10 @@ export function OrderQuickForm({
     if (event.key !== "Enter" || event.defaultPrevented) return;
     const target = event.target;
     if (!(target instanceof HTMLInputElement)) return;
+    // Les tiroirs (taille, liste) sont rendus en portail : React fait remonter
+    // leur « Entrée » jusqu'ici. On ne touche qu'aux champs du formulaire même,
+    // sinon le focus partait derrière le tiroir ouvert.
+    if (!event.currentTarget.contains(target)) return;
     event.preventDefault();
     focusNextField(target);
   }
@@ -1394,9 +1414,7 @@ export function OrderQuickForm({
               type="button"
               id={`q-size-${index}`}
               aria-label={`${t("stock.size")} · ${slotLabel(index)}`}
-              onClick={() =>
-                setSizePicker((p) => ({ index, n: (p?.n ?? 0) + 1, open: true }))
-              }
+              onClick={() => openSizePicker(index)}
               data-invalid={partIssue ? true : undefined}
               className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 data-[invalid=true]:border-destructive flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-md border outline-none focus-visible:ring-[3px]"
             >
@@ -2091,9 +2109,15 @@ export function OrderQuickForm({
 
       {picker && (
         <ListPicker
-          key={picker.n}
+          // Préfixé : la liste et le tiroir des tailles comptent tous deux à
+          // partir de 1 — deux clés « 1 » côte à côte faisaient confondre les
+          // deux tiroirs à React (doublon ou tiroir perdu à l'écran).
+          key={`list-${picker.n}`}
           open={picker.open}
           onOpenChange={(open) => (open ? null : closePicker())}
+          // Fermée pour de bon : démontée. Sinon toute la liste du stock était
+          // recalculée à chaque lettre tapée dans le formulaire.
+          onClosed={() => setPicker((p) => (p && !p.open ? null : p))}
           title={
             sizedSlot(picker.index)
               ? sizedTitle(picker.index)
@@ -2126,7 +2150,7 @@ export function OrderQuickForm({
 
       {sizePicker && (
         <SizePicker
-          key={sizePicker.n}
+          key={`size-${sizePicker.n}`}
           open={sizePicker.open}
           onOpenChange={(open) =>
             open ? null : setSizePicker({ ...sizePicker, open: false })
@@ -2135,6 +2159,7 @@ export function OrderQuickForm({
           sizes={slotSizes(sizePicker.index)}
           value={draft.slots[sizePicker.index]?.size ?? ""}
           onPick={(value) => pickSize(sizePicker.index, value)}
+          onClosed={() => setSizePicker((p) => (p && !p.open ? null : p))}
         />
       )}
 

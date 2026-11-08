@@ -62,9 +62,12 @@ export function ListPicker({
   allowNew = true,
   instant = false,
   emptyText,
+  onClosed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Fin de l'animation de fermeture : le parent peut démonter la liste. */
+  onClosed?: () => void;
   title: string;
   options: PickerOption[];
   selected: string[];
@@ -89,11 +92,22 @@ export function ListPicker({
   const deferredQuery = useDeferredValue(query);
   const q = normalizeSearch(deferredQuery);
 
+  // Normalisé UNE fois par liste, pas à chaque lettre tapée : sur un stock de
+  // plusieurs centaines de pièces, c'est ce qui figeait un téléphone modeste.
+  const indexed = useMemo(
+    () =>
+      options.map((o, i) => ({
+        o,
+        i,
+        n: normalizeSearch(o.search ?? o.label),
+        l: normalizeSearch(o.label),
+      })),
+    [options],
+  );
+
   const visible = useMemo(() => {
     if (!q) return options.filter((o) => o.featured || picked.includes(o.key));
-    const hits = options
-      .map((o, i) => ({ o, i, n: normalizeSearch(o.search ?? o.label) }))
-      .filter(({ n }) => n.includes(q));
+    const hits = indexed.filter(({ n }) => n.includes(q));
     // Ce qui COMMENCE par la recherche d'abord, puis les choix habituels,
     // puis l'ordre alphabétique d'origine.
     hits.sort(
@@ -103,9 +117,9 @@ export function ListPicker({
         a.i - b.i,
     );
     return hits.map(({ o }) => o);
-  }, [options, q, picked]);
+  }, [options, indexed, q, picked]);
 
-  const exact = q && options.some((o) => normalizeSearch(o.label) === q);
+  const exact = q && indexed.some(({ l }) => l === q);
   const typed = query.trim();
   // Les valeurs nouvelles déjà cochées restent visibles, recherche effacée.
   const customs = picked.filter((k) => k.startsWith(NEW_KEY));
@@ -121,7 +135,12 @@ export function ListPicker({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      onAnimationEnd={(isOpen) => (isOpen ? null : onClosed?.())}
+      repositionInputs={false}
+    >
       <DrawerContent className="h-[88svh] max-h-[88svh]">
         <DrawerHeader className="pb-2 text-start">
           <DrawerTitle className="text-lg">{title}</DrawerTitle>
@@ -276,6 +295,7 @@ export function SizePicker({
   sizes,
   value,
   onPick,
+  onClosed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -283,12 +303,19 @@ export function SizePicker({
   sizes: string[];
   value: string;
   onPick: (value: string) => void;
+  /** Fin de l'animation de fermeture : le parent peut démonter le tiroir. */
+  onClosed?: () => void;
 }) {
   const t = useTranslations();
   const [other, setOther] = useState(sizes.includes(value) ? "" : value);
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} repositionInputs={false}>
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      onAnimationEnd={(isOpen) => (isOpen ? null : onClosed?.())}
+      repositionInputs={false}
+    >
       <DrawerContent>
         <DrawerHeader className="pb-2 text-start">
           <DrawerTitle className="text-lg">{title}</DrawerTitle>
@@ -318,7 +345,11 @@ export function SizePicker({
         <form
           className="mt-3 flex gap-2 px-4"
           onSubmit={(e) => {
+            // Le tiroir est rendu dans un portail, mais React fait quand même
+            // remonter l'événement au <form> de la commande qui l'englobe :
+            // sans ce stopPropagation, « OK » soumettait toute la commande.
             e.preventDefault();
+            e.stopPropagation();
             if (other.trim()) onPick(other.trim());
           }}
         >

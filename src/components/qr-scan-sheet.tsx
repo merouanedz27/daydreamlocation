@@ -279,6 +279,8 @@ export function QrScanSheet({
 
   function submitTyped(event: React.FormEvent) {
     event.preventDefault();
+    // Portail : sans cela, la soumission remonte au <form> de la vente.
+    event.stopPropagation();
     void handle(typed);
     setTyped("");
   }
