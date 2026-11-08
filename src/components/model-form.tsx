@@ -96,7 +96,17 @@ export function ModelForm({
   }
 
   return (
-    <form action={onSubmit} noValidate>
+    <form
+      // `onSubmit` et non `action` : React 19 VIDE un formulaire `action` dès
+      // que l'action se termine — même sur une erreur. La catégorie (Select)
+      // revenait alors à vide, la section « Parties » disparaissait avec son
+      // message, et « Enregistrer » semblait ne rien faire, saisie perdue.
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(new FormData(event.currentTarget));
+      }}
+      noValidate
+    >
       <input type="hidden" name="locale" value={locale} />
       {model && <input type="hidden" name="id" value={model.id} />}
 
