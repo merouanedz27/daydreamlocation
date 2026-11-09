@@ -426,7 +426,9 @@ export async function setOrderChecks(formData: FormData): Promise<ActionResult> 
     .eq("id", orderId)
     .select("id");
 
-  if (error) return { ok: false, error: "errors.generic" };
+  // Décocher « Retour Val » rend à la commande toute sa plage : si la pièce a
+  // été relouée entre-temps, la contrainte d'exclusion refuse — on le dit.
+  if (error) return unitConflict(error) ?? { ok: false, error: "errors.generic" };
 
   // Une écriture refusée par la RLS ne lève pas d'erreur : elle ne touche
   // simplement aucune ligne. Sans ce contrôle, l'écran afficherait une case
@@ -729,7 +731,12 @@ export async function setOrdersChecks(formData: FormData): Promise<BulkResult> {
     .neq("status", "annulee")
     .select("id, picked_up, returned, status");
 
-  if (error) return { ok: false, error: "errors.generic" };
+  if (error) {
+    return {
+      ok: false,
+      error: error.code === EXCLUSION_VIOLATION ? "errors.unitUnavailable" : "errors.generic",
+    };
+  }
 
   revalidatePath(`/${locale}/commandes`, "layout");
   revalidatePath(`/${locale}/retouches`, "layout");
