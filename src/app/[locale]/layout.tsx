@@ -26,10 +26,15 @@ const inter = Inter({
 // l'application affiche des chiffres occidentaux (prix, dates, tailles) et des
 // références latines (« Gio-079-01 »). Sans lui, tous ces caractères tombaient
 // sur la police système — c'était le cas avec Tajawal.
+//
+// PAS de préchargement : sinon chaque page FRANÇAISE téléchargeait aussi
+// Cairo, qu'elle n'affiche jamais. Le navigateur ne la charge qu'en arabe,
+// dès qu'un texte la demande (`--font-sans`, plus bas).
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
   variable: "--font-cairo",
   display: "swap",
+  preload: false,
 });
 
 export function generateStaticParams() {

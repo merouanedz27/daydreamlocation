@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { startTransition as deferRender, useEffect, useRef, useState, useTransition } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -189,13 +189,17 @@ export function OrdersList({
         busy = true;
         setLoading(true);
         const more = await loadMoreOrders(filters, rows.length);
-        if (!more.length) setExhausted(true);
-        // Pas de doublon si une commande a été créée entre deux tranches.
-        setRows((current) => {
-          const seen = new Set(current.map((r) => r.id));
-          return [...current, ...more.filter((r) => !seen.has(r.id))];
+        // En arrière-plan : le rendu de la tranche s'interrompt si le doigt
+        // touche une case pendant ce temps — le toucher passe d'abord.
+        deferRender(() => {
+          if (!more.length) setExhausted(true);
+          // Pas de doublon si une commande a été créée entre deux tranches.
+          setRows((current) => {
+            const seen = new Set(current.map((r) => r.id));
+            return [...current, ...more.filter((r) => !seen.has(r.id))];
+          });
+          setLoading(false);
         });
-        setLoading(false);
       },
       { root: scroller.current, rootMargin: "0px 0px 200px 0px" },
     );

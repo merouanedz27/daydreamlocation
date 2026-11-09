@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ClipboardCheck, Download, Plus, ScanLine } from "lucide-react";
@@ -5,9 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { OrdersFilters } from "@/components/orders-filters";
 import { OrdersList } from "@/components/orders-list";
+import { ListSkeleton } from "@/components/list-skeleton";
 import { getOrdersTable } from "@/lib/queries/orders-list";
 import { getProfile, isOwner } from "@/lib/auth";
-import { ORDERS_PARAM_KEYS, parseOrdersQuery, type OrdersParams } from "@/lib/orders-query";
+import {
+  ORDERS_FIRST_BATCH,
+  ORDERS_PARAM_KEYS,
+  parseOrdersQuery,
+  type OrdersParams,
+  type OrdersQuery,
+} from "@/lib/orders-query";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -42,8 +50,6 @@ export default async function OrdersPage({
   for (const key of ORDERS_PARAM_KEYS) {
     if (raw[key]) exportParams.set(key, raw[key]);
   }
-  const [{ rows, total }, profile] = await Promise.all([getOrdersTable(query), getProfile()]);
-
   // Toute la liste repart de zéro quand un filtre ou le tri change.
   const listKey = ORDERS_PARAM_KEYS.map((key) => raw[key] ?? "").join("|");
 
@@ -88,14 +94,29 @@ export default async function OrdersPage({
 
       <OrdersFilters />
 
-      <OrdersList
-        key={listKey}
-        initialRows={rows}
-        total={total}
-        sort={query.sort}
-        ascending={query.ascending}
-        isOwner={isOwner(profile)}
-      />
+      {/* EN FLUX : boutons et filtres s'affichent tout de suite, sans
+          attendre la base ; la liste les rejoint dès qu'elle est prête. */}
+      <Suspense key={listKey} fallback={<ListSkeleton rows={8} />}>
+        <OrdersSection query={query} listKey={listKey} />
+      </Suspense>
     </div>
+  );
+}
+
+/** La première tranche de la liste — seule partie de l'écran qui attend la base. */
+async function OrdersSection({ query, listKey }: { query: OrdersQuery; listKey: string }) {
+  const [{ rows, total }, profile] = await Promise.all([
+    getOrdersTable(query, 0, ORDERS_FIRST_BATCH),
+    getProfile(),
+  ]);
+  return (
+    <OrdersList
+      key={listKey}
+      initialRows={rows}
+      total={total}
+      sort={query.sort}
+      ascending={query.ascending}
+      isOwner={isOwner(profile)}
+    />
   );
 }
