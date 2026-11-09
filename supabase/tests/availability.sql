@@ -801,6 +801,70 @@ begin
       '18f. commande en retard annulee : piece libre', 'accepte', v_msg, v_msg = 'accepte');
   end;
 
+  -- --- 19. « Retour Val » coché : la pièce est libre dès son retour réel ----
+  declare
+    v_ret_u bigint;
+    v_ret bigint;
+    v_next bigint;
+    v_range text;
+    v_msg text;
+  begin
+    insert into public.article_units (model_id, ref_code, size)
+    values (v_model_id, 'TEST-RET-01', '50') returning id into v_ret_u;
+
+    -- Mariage le 10/06/2099 : plage [09/06, 13/06). Rendue en avance le 09.
+    insert into public.orders (customer_name, event_date)
+    values ('Rendu tot', '2099-06-10') returning id into v_ret;
+    insert into public.order_lines (order_id, unit_id, unit_price)
+    values (v_ret, v_ret_u, 3000);
+    update public.orders set picked_up = true where id = v_ret;
+    update public.orders set returned = true, actual_return_date = '2099-06-09'
+    where id = v_ret;
+
+    -- 19a. La plage se termine au retour réel.
+    select rental_range::text into v_range from public.order_lines where order_id = v_ret;
+    insert into test_results values (
+      '19a. retour reel : plage raccourcie', 'empty', v_range, v_range = 'empty');
+
+    -- Rendue le 11 : [09/06, 11/06).
+    update public.orders set actual_return_date = '2099-06-11' where id = v_ret;
+    select rental_range::text into v_range from public.order_lines where order_id = v_ret;
+    insert into test_results values (
+      '19b. retour le 11 : libre des le 11', '[2099-06-09,2099-06-11)', v_range,
+      v_range = '[2099-06-09,2099-06-11)');
+
+    -- 19c. Un autre client la prend le jour même du retour.
+    insert into public.orders (customer_name, event_date, pickup_date, return_due_date)
+    values ('Suivant', '2099-06-12', '2099-06-11', '2099-06-12') returning id into v_next;
+    begin
+      insert into public.order_lines (order_id, unit_id, unit_price)
+      values (v_next, v_ret_u, 3000);
+      v_msg := 'accepte';
+    exception when others then
+      v_msg := sqlerrm;
+    end;
+    insert into test_results values (
+      '19c. reloue le jour du retour', 'accepte', v_msg, v_msg = 'accepte');
+
+    -- 19d. Décocher le retour rendrait la plage complète : la base refuse.
+    begin
+      update public.orders set returned = false where id = v_ret;
+      v_msg := 'accepte';
+    exception when exclusion_violation then
+      v_msg := 'refuse';
+    end;
+    insert into test_results values (
+      '19d. retour decoche sur piece relouee : refuse', 'refuse', v_msg, v_msg = 'refuse');
+
+    -- 19e. Sans relocation, décocher rend la plage complète.
+    delete from public.order_lines where order_id = v_next;
+    update public.orders set returned = false where id = v_ret;
+    select rental_range::text into v_range from public.order_lines where order_id = v_ret;
+    insert into test_results values (
+      '19e. retour decoche : plage complete', '[2099-06-09,2099-06-13)', v_range,
+      v_range = '[2099-06-09,2099-06-13)');
+  end;
+
 end $$;
 
 select

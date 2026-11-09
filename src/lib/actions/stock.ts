@@ -613,7 +613,11 @@ async function unitUsage(
     if (line.unit_id === null) continue;
     used.add(line.unit_id);
     const range = parseDateRange(line.rental_range);
-    if (line.is_active && (!range || range.upper > today)) booked.add(line.unit_id);
+    // « empty » : commande rentrée le jour même du retrait, elle ne bloque rien.
+    // Sans borne (vente) : elle bloque toujours.
+    if (line.is_active && line.rental_range !== "empty" && (!range || range.upper > today)) {
+      booked.add(line.unit_id);
+    }
   }
   return { used, booked };
 }
