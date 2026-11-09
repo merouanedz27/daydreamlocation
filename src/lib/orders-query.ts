@@ -19,14 +19,6 @@
 export const ORDERS_BATCH = 40;
 
 /**
- * La PREMIÈRE tranche, rendue par le serveur : un écran et demi de téléphone.
- * Chaque ligne fait 22 cellules, envoyées deux fois (HTML + données React)
- * puis « hydratées » : 40 lignes pesaient ~400 Ko et figeaient un téléphone
- * modeste au chargement. La suite arrive au défilement, par `ORDERS_BATCH`.
- */
-export const ORDERS_FIRST_BATCH = 15;
-
-/**
  * LISTE BLANCHE des colonnes triables.
  *
  * `order()` reçoit un identifiant SQL : on ne lui passe JAMAIS la valeur brute
