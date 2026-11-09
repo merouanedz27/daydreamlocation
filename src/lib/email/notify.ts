@@ -8,6 +8,13 @@ import type { EditableOrder } from "@/lib/quick-draft";
 import { normalizeSearch } from "@/lib/search";
 import { ticketFields } from "@/lib/ticket-fields";
 import { fillTemplate, parseEmailTexts, type EmailTexts } from "@/lib/notification-settings";
+import { todayIso } from "@/lib/rental-range";
+import {
+  backupCounts,
+  buildBackupWorkbook,
+  readBackupData,
+  type BackupCounts,
+} from "@/lib/backup/workbook";
 import type { Locale } from "@/i18n/routing";
 
 /*
@@ -433,4 +440,68 @@ export async function notifyAlterationDone(done: AlterationDone): Promise<void> 
   } catch (error) {
     console.error("[email] retouche faite", error);
   }
+}
+
+/* --- 5. La sauvegarde du mois ------------------------------------------- */
+
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/**
+ * Le 1er du mois (vercel.json) : TOUT l'historique — commandes, pièces de
+ * chaque commande, stock, dépenses — dans un `.xlsx` joint, à TOUS les
+ * administrateurs. Si la base disparaît, le dernier e-mail suffit.
+ *
+ * Les données sont lues une fois ; le classeur est écrit une fois par langue
+ * de destinataire. Une erreur REMONTE : la tâche planifiée doit échouer (et
+ * Vercel le signaler) plutôt que de taire une sauvegarde manquée.
+ */
+export async function sendMonthlyBackup(): Promise<{ sent: number; counts: BackupCounts | null }> {
+  if (!emailConfigured()) return { sent: 0, counts: null };
+  const recipients = await getRecipients();
+  if (recipients.length === 0) return { sent: 0, counts: null };
+
+  const data = await readBackupData();
+  const counts = backupCounts(data);
+  const today = todayIso();
+  const filename = `daydream-sauvegarde-${today}.xlsx`;
+
+  const workbooks = new Map<Locale, Buffer>();
+  for (const loc of new Set(recipients.map((r) => r.email_locale))) {
+    const buffer = await buildBackupWorkbook(data, loc);
+    console.info(`[sauvegarde] ${loc} : ${Math.round(buffer.length / 1024)} Ko`);
+    workbooks.set(loc, buffer);
+  }
+
+  const mails: Mail[] = await Promise.all(
+    recipients.map(async (r) => {
+      const loc = r.email_locale;
+      const t = await getTranslations({ locale: loc, namespace: "email" });
+      const date = formatDate(today, loc);
+      const { html, text } = layout(loc, {
+        title: t("backup.title"),
+        intro: t("backup.intro", { date }),
+        table: [
+          [t("backup.counts.orders"), String(counts.orders)],
+          [t("backup.counts.lines"), String(counts.lines)],
+          [t("backup.counts.models"), String(counts.models)],
+          [t("backup.counts.units"), String(counts.units)],
+          [t("backup.counts.ensembles"), String(counts.ensembles)],
+          [t("backup.counts.expenses"), String(counts.expenses)],
+        ],
+        body: escapeHtml(t("backup.keep")),
+        links: [[t("openApp"), `${appUrl()}/${loc}/commandes`]],
+        footer: t("footer"),
+      });
+      return {
+        to: r.email,
+        subject: oneLine(t("backup.subject", { date })),
+        html,
+        text,
+        attachments: [{ filename, content: workbooks.get(loc)!, contentType: XLSX_TYPE }],
+      };
+    }),
+  );
+  const sent = await sendMails(mails);
+  if (sent === 0) throw new Error("[sauvegarde] aucun e-mail n'est parti");
+  return { sent, counts };
 }

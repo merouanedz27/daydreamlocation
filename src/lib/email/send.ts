@@ -34,7 +34,13 @@ function transport(): Transporter {
   return cached;
 }
 
-export type Mail = { to: string; subject: string; html: string; text: string };
+export type Mail = {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
+};
 
 /**
  * Un e-mail PAR destinataire : personne ne voit l'adresse des autres.
