@@ -124,6 +124,15 @@ begin
   v_count := pg_temp.count_as(v_moderator);
   insert into test_results values ('moderator ne voit pas le résumé du staff', '1', v_count::text, v_count = 1);
 
+  insert into public.notifications (
+    recipient_id, kind, title_key, body_key, payload, dedupe_key
+  ) values (
+    v_staff, 'alterations_done', 'notifications.alterationsDoneTitle', 'notifications.alterationsDoneBody',
+    '{"orderNo": "C-1", "customerName": "Test", "count": 2}'::jsonb, 'alterations_done:test'
+  );
+  v_count := pg_temp.count_as(v_staff);
+  insert into test_results values ('retouches terminées acceptée', '3', v_count::text, v_count = 3);
+
   -- Réglages des notifications : le propriétaire seul les modifie.
   perform set_config('request.jwt.claims', json_build_object(
     'sub', v_staff::text, 'role', 'authenticated'

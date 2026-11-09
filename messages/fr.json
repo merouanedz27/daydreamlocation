@@ -743,6 +743,10 @@
         "label": "Résumé du soir (22 h)",
         "hint": "Mariages de demain, retours prévus et retours en retard."
       },
+      "alterations_done": {
+        "label": "Retouches terminées",
+        "hint": "Quand le tailleur a scanné le dernier pantalon d'une commande."
+      },
       "noteActor": "La personne qui fait l'action n'est jamais notifiée.",
       "notePush": "Le push n'arrive que sur les appareils où il a été activé depuis la cloche."
     },
@@ -1047,6 +1051,8 @@
     "returnLateBody": "{orderNo} · {customerName}",
     "dailySummaryTitle": "Programme de demain",
     "dailySummaryBody": "{tomorrow, plural, =0 {Aucun mariage demain} one {# mariage demain} other {# mariages demain}} · {due, plural, =0 {aucun retour prévu} one {# retour prévu} other {# retours prévus}} · {late, plural, =0 {aucun retard} one {# retour en retard} other {# retours en retard}}",
+    "alterationsDoneTitle": "Retouches terminées",
+    "alterationsDoneBody": "{orderNo} · {customerName} · {count, plural, one {# pantalon prêt} other {# pantalons prêts}}",
     "notConfigured": "L'envoi d'e-mails n'est pas encore configuré sur le serveur : rien ne partira tant que les réglages SMTP manquent.",
     "compose": "Écrire aux administrateurs",
     "subject": "Objet",

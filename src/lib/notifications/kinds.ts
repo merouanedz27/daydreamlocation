@@ -17,7 +17,8 @@ export type NotificationKind =
   | "tomorrow"
   | "return_due"
   | "return_late"
-  | "daily_summary";
+  | "daily_summary"
+  | "alterations_done";
 
 export const COPY: Record<NotificationKind, { title: string; body: string }> = {
   order_created: { title: "orderCreatedTitle", body: "orderCreatedBody" },
@@ -28,6 +29,7 @@ export const COPY: Record<NotificationKind, { title: string; body: string }> = {
   return_due: { title: "returnDueTitle", body: "returnDueBody" },
   return_late: { title: "returnLateTitle", body: "returnLateBody" },
   daily_summary: { title: "dailySummaryTitle", body: "dailySummaryBody" },
+  alterations_done: { title: "alterationsDoneTitle", body: "alterationsDoneBody" },
 };
 
 export function copyOf(kind: string): { title: string; body: string } {

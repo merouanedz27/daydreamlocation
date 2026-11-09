@@ -743,6 +743,10 @@
         "label": "ملخص المساء (22:00)",
         "hint": "أعراس الغد، الإرجاعات المنتظرة والمتأخرة."
       },
+      "alterations_done": {
+        "label": "اكتملت التعديلات",
+        "hint": "عندما يمسح الخيّاط آخر سروال في الطلبية."
+      },
       "noteActor": "الشخص الذي قام بالعملية لا يتلقى إشعارًا أبدًا.",
       "notePush": "لا يصل الإشعار الفوري إلا إلى الأجهزة التي فُعّل عليها من الجرس."
     },
@@ -1047,6 +1051,8 @@
     "returnLateBody": "{orderNo} · {customerName}",
     "dailySummaryTitle": "برنامج الغد",
     "dailySummaryBody": "{tomorrow, plural, =0 {لا أعراس غدًا} one {عرس واحد غدًا} two {عرسان غدًا} few {# أعراس غدًا} many {# عرسًا غدًا} other {# عرس غدًا}} · {due, plural, =0 {لا إرجاع اليوم} one {إرجاع واحد اليوم} other {# إرجاعات اليوم}} · {late, plural, =0 {لا تأخير} one {إرجاع واحد متأخر} other {# إرجاعات متأخرة}}",
+    "alterationsDoneTitle": "اكتملت التعديلات",
+    "alterationsDoneBody": "{orderNo} · {customerName} · {count, plural, one {سروال واحد جاهز} two {سروالان جاهزان} few {# سراويل جاهزة} many {# سروالًا جاهزًا} other {# سروال جاهز}}",
     "notConfigured": "إرسال البريد غير مُعدّ بعد على الخادم: لن يُرسل شيء ما دامت إعدادات SMTP ناقصة.",
     "compose": "مراسلة المسؤولين",
     "subject": "الموضوع",

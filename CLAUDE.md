@@ -158,7 +158,8 @@ supabase/migrations/
 - **retouche** (`line_alterations`) — ajustement d'UNE pièce d'une commande — **le pantalon
   seulement** (la saisie n'offre la case que sur lui) — lu par le tailleur sur une étiquette QR
   collée au vêtement, et sur le même QR imprimé en bas du ticket du costume (bon, page 2). `a_faire` → `taillee` quand il la scanne (e-mail aux
-  administrateurs). Liée à `order_id` + `order_line_id` nullable : `update_order` réinsère les lignes,
+  administrateurs ; au DERNIER pantalon de la commande, notification cloche + push à toute
+  l'équipe — `alterations_done`). Liée à `order_id` + `order_line_id` nullable : `update_order` réinsère les lignes,
   `sync_line_alterations` rattache la retouche par son `id`, que le formulaire renvoie.
 
 **Ni la caution ni le versement ne sont du chiffre d'affaires.** La recette est `total_price`.
