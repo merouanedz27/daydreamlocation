@@ -17,6 +17,7 @@ export const RULE_KINDS = [
   "order_cancelled",
   "order_restored",
   "daily_summary",
+  "alterations_done",
 ] as const;
 export type RuleKind = (typeof RULE_KINDS)[number];
 

@@ -256,6 +256,86 @@ export async function notifyDailySummary(today: string, tomorrow: string): Promi
 }
 
 /**
+ * Le tailleur vient de scanner une pièce : si c'était la DERNIÈRE retouche à
+ * faire de la commande, toute l'équipe du magasin le sait (cloche + push).
+ * Une notification par commande, pas par pantalon — l'e-mail aux
+ * administrateurs, lui, part à chaque scan.
+ *
+ * La clé de déduplication porte le dernier `done_at` : deux « derniers » scans
+ * simultanés donnent la même clé (une seule alerte) ; un scan annulé puis
+ * refait en produit une nouvelle.
+ *
+ * Ne lève jamais : le scan est déjà enregistré, l'alerte n'est qu'un plus.
+ */
+export async function notifyAlterationsDone(orderId: number, actorId?: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const rule = await getRule(admin, "alterations_done");
+    if (!rule.bell && !rule.push) return;
+
+    const [alterations, order, allMembers] = await Promise.all([
+      admin
+        .from("line_alterations")
+        .select("status, done_at")
+        .eq("order_id", orderId)
+        .not("order_line_id", "is", null),
+      admin
+        .from("orders")
+        .select("order_no, customer_name, event_date, status")
+        .eq("id", orderId)
+        .maybeSingle(),
+      getActiveMemberIds(admin),
+    ]);
+    if (alterations.error) throw alterations.error;
+    if (order.error) throw order.error;
+
+    const rows = alterations.data ?? [];
+    if (!rows.length || rows.some((a) => a.status !== "taillee" || !a.done_at)) return;
+    if (!order.data || order.data.status === "annulee") return;
+
+    const members = allMembers.filter((id) => id !== actorId);
+    if (!members.length) return;
+
+    const version = rows.map((a) => a.done_at!).sort().at(-1)!;
+    const payload = {
+      orderNo: order.data.order_no,
+      customerName: order.data.customer_name,
+      eventDate: order.data.event_date,
+      count: rows.length,
+    } satisfies Json;
+
+    if (!rule.bell) {
+      await sendPushForNotification({ recipientIds: members, kind: "alterations_done", payload, orderId });
+      return;
+    }
+
+    const { data: inserted, error } = await admin
+      .from("notifications")
+      .upsert(
+        rowsFor(members, "alterations_done", {
+          orderId,
+          payload,
+          dedupeKey: `alterations_done:order:${orderId}:${version}`,
+        }),
+        { onConflict: "recipient_id,dedupe_key", ignoreDuplicates: true },
+      )
+      .select("recipient_id");
+    if (error) throw error;
+
+    if (!rule.push) return;
+    // Seuls les destinataires d'une ligne NOUVELLE : un second scan ne renvoie rien.
+    await sendPushForNotification({
+      recipientIds: (inserted ?? []).map(({ recipient_id }) => recipient_id),
+      kind: "alterations_done",
+      payload,
+      orderId,
+    });
+  } catch (error) {
+    console.error("[notifications] retouches", error);
+  }
+}
+
+/**
  * Ménage du soir : les notifications lues de plus de 60 jours, toutes celles
  * de plus de 120 jours, et les appareils muets depuis 90 jours (la cloche
  * rafraîchit `last_seen_at` à chaque ouverture de l'app).

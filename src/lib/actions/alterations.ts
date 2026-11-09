@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isTailor } from "@/lib/auth";
 import { notifyAlterationDone } from "@/lib/email/notify";
+import { notifyAlterationsDone } from "@/lib/notifications/service";
 import { routing, type Locale } from "@/i18n/routing";
 
 function resolveLocale(value: unknown): Locale {
@@ -75,6 +76,8 @@ export async function markAltered(input: { id: string; locale: string }): Promis
         doneBy: profile.full_name,
       }),
     );
+    // Dernier pantalon de la commande : cloche + push à toute l'équipe.
+    after(() => notifyAlterationsDone(row.order_id, profile.id));
   }
 
   return {
