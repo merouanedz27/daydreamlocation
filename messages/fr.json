@@ -1114,6 +1114,20 @@
       "note": "Retouche :",
       "doneAt": "Taillée le :",
       "openList": "Voir les retouches"
+    },
+    "backup": {
+      "subject": "Sauvegarde DayDream du {date}",
+      "title": "Sauvegarde mensuelle",
+      "intro": "Le fichier Excel joint contient tout l'historique au {date} : commandes, pièces de chaque commande, stock et dépenses.",
+      "keep": "Gardez cet e-mail : si l'application ou la base de données venait à disparaître, ce fichier permet de tout retrouver. Les photos n'y figurent pas.",
+      "counts": {
+        "orders": "Commandes :",
+        "lines": "Pièces louées ou vendues :",
+        "models": "Modèles :",
+        "units": "Pièces du stock :",
+        "ensembles": "Ensembles :",
+        "expenses": "Dépenses :"
+      }
     }
   },
   "alterations": {
@@ -1175,5 +1189,24 @@
       "orderCancelled": "Cette commande est annulée."
     },
     "noResults": "Aucune retouche ne correspond à « {q} »."
+  },
+  "backup": {
+    "sheets": {
+      "orders": "Commandes",
+      "lines": "Pièces des commandes",
+      "models": "Modèles",
+      "units": "Pièces",
+      "ensembles": "Ensembles",
+      "expenses": "Dépenses"
+    },
+    "columns": {
+      "notes": "Notes",
+      "createdAt": "Saisie le",
+      "active": "Active",
+      "part": "Élément",
+      "status": "Statut",
+      "purchaseDate": "Date d'achat",
+      "createdBy": "Saisie par"
+    }
   }
 }

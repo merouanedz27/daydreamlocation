@@ -1,5 +1,5 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { sendTomorrowDigest } from "@/lib/email/notify";
 import { notifyDailySummary, pruneNotifications } from "@/lib/notifications/service";
 import { addDays, todayIso } from "@/lib/rental-range";
@@ -17,16 +17,8 @@ import { addDays, todayIso } from "@/lib/rental-range";
  */
 export const dynamic = "force-dynamic";
 
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const given = Buffer.from(request.headers.get("authorization") ?? "");
-  const expected = Buffer.from(`Bearer ${secret}`);
-  return given.length === expected.length && timingSafeEqual(given, expected);
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) {
+  if (!cronAuthorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
