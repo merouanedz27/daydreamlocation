@@ -203,6 +203,20 @@ begin
   perform pg_temp.text_as(v_tail, format(
     'select already_done::text from public.mark_altered(%L)', v_alt));
 
+  -- 5c. Le magasin retire la pièce taillée de la liste ; le tailleur ne le peut pas.
+  n := pg_temp.run_as(v_tail, format(
+    'update public.line_alterations set hidden_at = now() where id = %L', v_alt));
+  insert into test_results values ('14h. tailleur ne retire PAS', '<= 0', n::text, n <= 0);
+  n := pg_temp.run_as(v_staff, format(
+    'update public.line_alterations set hidden_at = now() where id = %L', v_alt));
+  insert into test_results values ('14i. magasin retire la piece', '1', n::text, n = 1);
+  n := pg_temp.run_as(v_staff, format(
+    'select count(*) from public.list_alterations(''taillee'') where id = %L', v_alt));
+  insert into test_results values ('14j. absente de l''onglet Taillees', '0', n::text, n = 0);
+  n := pg_temp.run_as(v_tail, format(
+    'select count(*) from public.list_alterations(p_id => %L)', v_alt));
+  insert into test_results values ('14k. toujours lue par son id (QR)', '1', n::text, n = 1);
+
   -- 6. Un compte désactivé ne passe plus.
   update public.profiles set is_active = false where id = v_tail;
   v_text := pg_temp.text_as(v_tail, format(
@@ -229,6 +243,8 @@ begin
     v_order, 'Client RET', v_lines));
   select status || '|' || coalesce(done_at::text, 'null') into v_text from public.line_alterations where id = v_alt;
   insert into test_results values ('17. note changee : a refaire', 'a_faire|null', coalesce(v_text, 'NULL'), v_text = 'a_faire|null');
+  select coalesce(hidden_at::text, 'null') into v_text from public.line_alterations where id = v_alt;
+  insert into test_results values ('17a. note changee : revient dans la liste', 'null', v_text, v_text = 'null');
 
   -- 9. Une retouche ajoutée sur la chemise, la veste décochée.
   v_lines := jsonb_build_array(
