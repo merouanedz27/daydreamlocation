@@ -338,6 +338,7 @@ export type Database = {
           created_by: string | null;
           done_at: string | null;
           done_by: string | null;
+          hidden_at: string | null;
           printed_at: string | null;
         };
         Insert: {
@@ -350,6 +351,7 @@ export type Database = {
           created_by?: string | null;
           done_at?: string | null;
           done_by?: string | null;
+          hidden_at?: string | null;
           printed_at?: string | null;
         };
         Update: {
@@ -362,6 +364,7 @@ export type Database = {
           created_by?: string | null;
           done_at?: string | null;
           done_by?: string | null;
+          hidden_at?: string | null;
           printed_at?: string | null;
         };
         Relationships: [

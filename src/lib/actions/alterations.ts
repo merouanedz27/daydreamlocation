@@ -117,6 +117,36 @@ export async function undoAltered(input: { id: string; locale: string }): Promis
 }
 
 /**
+ * Le magasin retire des pièces TAILLÉES de l'onglet « Taillées ». Pas une
+ * suppression : la retouche reste sur la commande et son QR répond toujours.
+ * Le tailleur ne le peut pas (et n'a de toute façon aucune policy).
+ */
+export async function hideAlterations(input: {
+  ids: string[];
+  locale: string;
+}): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const locale = resolveLocale(input.locale);
+  const profile = await getProfile();
+  if (!profile || isTailor(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const parsed = idsSchema.safeParse(input.ids);
+  if (!parsed.success) return { ok: false, error: "errors.generic" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("line_alterations")
+    .update({ hidden_at: new Date().toISOString() })
+    .in("id", parsed.data)
+    .eq("status", "taillee")
+    .is("hidden_at", null)
+    .select("id");
+  if (error) return { ok: false, error: "errors.generic" };
+
+  revalidate(locale);
+  return { ok: true, count: data?.length ?? 0 };
+}
+
+/**
  * Les étiquettes viennent d'être imprimées : « Imprimer les nouvelles » ne
  * les reprendra plus. Une réimpression à l'unité reste possible.
  */

@@ -261,6 +261,8 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
       {
         slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
         categoryOfUnit: (unitId) => categoryByUnit.get(unitId) ?? null,
+        // Les noms seuls, comme sur le bon : les références noyaient l'e-mail.
+        withRefs: false,
       },
     );
 

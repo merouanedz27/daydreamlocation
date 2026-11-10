@@ -4,16 +4,23 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { CircleCheck, Printer, ScanLine, Scissors, Undo2 } from "lucide-react";
+import { CircleCheck, Printer, ScanLine, Scissors, Trash2, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SelectBox } from "@/components/select-box";
 import { QrScanSheet, type ScanOutcome } from "@/components/qr-scan-sheet";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { markAltered, markLabelsPrinted, undoAltered } from "@/lib/actions/alterations";
+import {
+  hideAlterations,
+  markAltered,
+  markLabelsPrinted,
+  undoAltered,
+} from "@/lib/actions/alterations";
 import { TicketActions } from "@/components/ticket-share";
 import { alterationIdFrom } from "@/lib/alteration-url";
 import { formatDate, formatNumber, formatTime } from "@/lib/format";
 import { daysBetween, todayIso } from "@/lib/rental-range";
+import { useHold } from "@/lib/use-hold";
 import { cn } from "@/lib/utils";
 import type { Alteration } from "@/lib/queries/alterations";
 import type { Locale } from "@/i18n/routing";
@@ -116,6 +123,11 @@ export function AlterationTabs({
  * `staff` ajoute ce que le magasin seul voit : le lien vers la commande,
  * « étiquette pas encore imprimée », réimpression, et l'annulation de
  * n'importe quel scan — le tailleur n'annule que les siens (`done_by_me`).
+ *
+ * Onglet « Taillées », magasin seulement : supprimer une pièce de la liste
+ * (corbeille), ou plusieurs — appui long pour sélectionner, « tout
+ * sélectionner », puis Supprimer. Toujours confirmé. La retouche reste sur la
+ * commande (`hideAlterations`).
  */
 export function AlterationList({
   items,
@@ -125,19 +137,83 @@ export function AlterationList({
   mode: "tailor" | "staff";
 }) {
   const t = useTranslations("alterations");
+  const tRoot = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
   const router = useRouter();
   const [confirm, setConfirm] = useState<Alteration | null>(null);
   const [undo, setUndo] = useState<Alteration | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Ce que la confirmation va supprimer — une pièce, ou la sélection. */
+  const [removing, setRemoving] = useState<Alteration[] | null>(null);
   const today = todayIso();
+
+  // Seules les pièces TAILLÉES, côté magasin, se suppriment de la liste.
+  const removable = items.filter((i) => mode === "staff" && i.status === "taillee");
+  const removableIds = new Set(removable.map((i) => i.id));
+  // La sélection ne garde que ce qui est encore affiché (recherche, rafraîchissement).
+  const chosen = removable.filter((i) => selected.has(i.id));
+  const selecting = chosen.length > 0;
+  const allSelected = removable.length > 0 && chosen.length === removable.length;
+
+  function toggleOne(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  const clear = () => setSelected(new Set());
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(removable.map((i) => i.id)));
+  const hold = useHold<Alteration>(removable.length > 0, selecting, (i) => toggleOne(i.id));
 
   if (items.length === 0) return null;
 
   return (
     <>
+      {selecting && (
+        // La barre de la sélection, au-dessus de la liste, sous le pouce.
+        <div
+          role="toolbar"
+          aria-label={t("selectedCount", { count: chosen.length })}
+          className="bg-gold-soft sticky top-2 z-10 flex items-center gap-1.5 rounded-lg p-1.5"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={clear}
+            aria-label={tRoot("orders.clearSelection")}
+            className="size-11"
+          >
+            <X className="size-5" aria-hidden />
+          </Button>
+          <SelectBox
+            checked={allSelected}
+            indeterminate={!allSelected}
+            onChange={toggleAll}
+            label={tRoot("orders.selectAll")}
+          />
+          <span className="me-auto text-sm font-medium">
+            {t("selectedCount", { count: chosen.length })}
+          </span>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => setRemoving(chosen)}
+            className="h-11"
+          >
+            <Trash2 className="size-4" aria-hidden />
+            {tRoot("common.delete")}
+          </Button>
+        </div>
+      )}
+
       <ul className="space-y-2">
         {items.map((item) => {
           const done = item.status === "taillee";
+          const canRemove = removableIds.has(item.id);
+          const isSelected = canRemove && selected.has(item.id);
           const left = daysBetween(today, item.event_date);
           const urgent = !done && left <= 2;
           // Le nom de la pièce seul : la référence ne sert à rien au tailleur.
@@ -145,12 +221,25 @@ export function AlterationList({
           return (
             <li
               key={item.id}
+              {...(canRemove ? hold(item) : {})}
               className={cn(
                 "bg-card rounded-lg border p-3",
                 urgent ? "border-warning" : "border-border",
+                // Pas de loupe ni de menu iOS sous le doigt qui appuie.
+                canRemove && "select-none [-webkit-touch-callout:none]",
+                isSelected && "border-primary ring-primary ring-2",
               )}
             >
               <div className="flex items-start gap-2">
+                {selecting && canRemove && (
+                  <div className="-my-2 -ms-2">
+                    <SelectBox
+                      checked={isSelected}
+                      onChange={() => toggleOne(item.id)}
+                      label={t("remove")}
+                    />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">
                     <bdi>{item.customer_name}</bdi>
@@ -217,7 +306,7 @@ export function AlterationList({
                 )}
               </div>
 
-              <div className="mt-2 flex gap-2">
+              <div className={cn("mt-2 flex gap-2", selecting && "hidden")}>
                 {!done && (
                   <Button
                     type="button"
@@ -246,6 +335,17 @@ export function AlterationList({
                   >
                     <Undo2 className="size-4 rtl:-scale-x-100" aria-hidden />
                     {t("undo")}
+                  </Button>
+                )}
+                {canRemove && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setRemoving([item])}
+                    aria-label={t("remove")}
+                    className="text-destructive ms-auto size-11"
+                  >
+                    <Trash2 className="size-4" aria-hidden />
                   </Button>
                 )}
               </div>
@@ -292,6 +392,27 @@ export function AlterationList({
           const result = await undoAltered({ id: undo.id, locale });
           if (result.ok) router.refresh();
           return result;
+        }}
+      />
+
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        title={t("removeTitle", { count: removing?.length ?? 1 })}
+        description={
+          removing?.length === 1
+            ? t("removeBody", { customer: removing[0].customer_name, note: removing[0].note })
+            : t("removeManyBody", { count: removing?.length ?? 0 })
+        }
+        confirmLabel={tRoot("common.delete")}
+        onConfirm={async () => {
+          if (!removing?.length) return;
+          const result = await hideAlterations({ ids: removing.map((i) => i.id), locale });
+          if (!result.ok) return result;
+          toast.success(t("removedToast", { count: result.count }));
+          clear();
+          router.refresh();
+          return { ok: true };
         }}
       />
     </>
