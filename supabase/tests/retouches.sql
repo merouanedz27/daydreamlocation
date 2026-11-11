@@ -217,6 +217,24 @@ begin
     'select count(*) from public.list_alterations(p_id => %L)', v_alt));
   insert into test_results values ('14k. toujours lue par son id (QR)', '1', n::text, n = 1);
 
+  -- 5d. Le lendemain de l'événement, la taillée sort de la liste d'elle-même.
+  update public.line_alterations set hidden_at = null where id = v_alt;
+  n := pg_temp.run_as(v_tail, format(
+    'select count(*) from public.list_alterations(''taillee'') where id = %L', v_alt));
+  insert into test_results values ('14l. evenement a venir : dans Taillees', '1', n::text, n = 1);
+  update public.orders set
+    pickup_date = pickup_date - 12, event_date = event_date - 12, return_due_date = return_due_date - 12
+  where id = v_order;
+  n := pg_temp.run_as(v_tail, format(
+    'select count(*) from public.list_alterations(''taillee'') where id = %L', v_alt));
+  insert into test_results values ('14m. evenement passe : hors de Taillees', '0', n::text, n = 0);
+  n := pg_temp.run_as(v_tail, format(
+    'select count(*) from public.list_alterations(p_id => %L)', v_alt));
+  insert into test_results values ('14n. evenement passe : lue par son id (QR)', '1', n::text, n = 1);
+  update public.orders set
+    pickup_date = pickup_date + 12, event_date = event_date + 12, return_due_date = return_due_date + 12
+  where id = v_order;
+
   -- 6. Un compte désactivé ne passe plus.
   update public.profiles set is_active = false where id = v_tail;
   v_text := pg_temp.text_as(v_tail, format(
