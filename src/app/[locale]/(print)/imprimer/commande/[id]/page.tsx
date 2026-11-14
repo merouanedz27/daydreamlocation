@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { Great_Vibes } from "next/font/google";
+import { Great_Vibes, Tinos } from "next/font/google";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   CalendarDays,
-  Coins,
   Handshake,
   IdCard,
   Phone,
-  Ruler,
-  Scissors,
-  Shirt,
-  Tag,
   TriangleAlert,
   User,
 } from "lucide-react";
@@ -23,11 +18,16 @@ import { TicketPdfProvider } from "@/components/ticket-pdf";
 import { OrderQr } from "@/components/order-qr";
 import {
   BowTieIcon,
+  CoinsIcon,
   FacebookIcon,
   HangerIcon,
   InstagramIcon,
   JacketIcon,
+  ScissorsIcon,
+  ShirtIcon,
   ShoeIcon,
+  TagIcon,
+  TapeIcon,
   TiktokIcon,
   TrousersIcon,
 } from "@/components/ticket-icons";
@@ -57,6 +57,16 @@ const script = Great_Vibes({
   weight: "400",
   subsets: ["latin"],
   variable: "--font-script",
+  display: "block",
+});
+/**
+ * Le caractère du bon : un romain type Times (la maquette). Tinos a les
+ * métriques de Times New Roman. Latin seulement — l'arabe reste en Cairo.
+ */
+const serif = Tinos({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-serif",
   display: "block",
 });
 const SCRIPT = "font-[family-name:var(--font-script)] font-normal";
@@ -149,10 +159,10 @@ export default async function OrderSlipPage({
   const details = (
     [
       { icon: HangerIcon, label: tt("costume"), value: fields.costume },
-      { icon: Ruler, label: tt("size"), value: size },
+      { icon: TapeIcon, label: tt("size"), value: size },
       { icon: TrousersIcon, label: tt("pantsSize"), value: fields.pantsSize },
-      { icon: Scissors, label: tt("tailor"), value: fields.tailor },
-      { icon: Shirt, label: tt("shirt"), value: fields.shirt },
+      { icon: ScissorsIcon, label: tt("tailor"), value: fields.tailor },
+      { icon: ShirtIcon, label: tt("shirt"), value: fields.shirt },
       { icon: JacketIcon, label: tt("jabador"), value: fields.jabador },
       { icon: ShoeIcon, label: tt("shoes"), value: fields.shoes },
       { icon: BowTieIcon, label: tt("accessories"), value: fields.accessories },
@@ -202,15 +212,22 @@ export default async function OrderSlipPage({
       <OrderQr value={orderUrl} className="block size-[5.6em] shrink-0" />
       <span aria-hidden className="w-[1.5px] self-stretch bg-black" />
       <div className="flex min-w-0 flex-1 flex-col items-center">
-        {/* `unoptimized` : le logo servi par SON fichier (cache de
-            html-to-image) ; `priority` : chargé avant l'impression. */}
-        <Image
-          src={logo}
-          alt={t("app.name")}
-          priority
-          unoptimized
-          className="h-auto w-full max-w-[17em] [print-color-adjust:exact]"
-        />
+        <div className="flex w-full items-center gap-[0.4em]">
+          {/* `unoptimized` : le logo servi par SON fichier (cache de
+              html-to-image) ; `priority` : chargé avant l'impression. */}
+          <Image
+            src={logo}
+            alt={t("app.name")}
+            priority
+            unoptimized
+            className="h-auto w-0 min-w-0 flex-1 [print-color-adjust:exact]"
+          />
+          {/* Le filet qui prolonge « DAYDREAM » jusqu'au cadre (maquette). */}
+          <span
+            aria-hidden
+            className="w-[2.6em] shrink-0 -translate-y-[0.35em] border-t-[1.5px] border-black"
+          />
+        </div>
         <p
           className={cn(
             SCRIPT,
@@ -244,17 +261,17 @@ export default async function OrderSlipPage({
       <MoneyBox
         rows={[
           {
-            icon: Tag,
+            icon: TagIcon,
             label: tt("paid"),
             value: formatMoney(order.amount_paid, l),
           },
           {
-            icon: Coins,
+            icon: CoinsIcon,
             label: tt("price"),
             value: formatMoney(order.total_price, l),
           },
           {
-            icon: Handshake,
+            icon: HandshakeBold,
             label: balance < 0 ? t("orders.toRefund") : tt("rest"),
             value: formatMoney(Math.abs(balance), l),
           },
@@ -303,7 +320,13 @@ export default async function OrderSlipPage({
 
       {/* La police manuscrite posée ICI : la copie que `ticket-pdf`
           photographie se range dans le même parent, elle en hérite. */}
-      <div className={cn(script.variable, "space-y-4 print:space-y-0")}>
+      <div
+        className={cn(
+          script.variable,
+          serif.variable,
+          "space-y-4 print:space-y-0",
+        )}
+      >
         {/* --- BON DE LOCATION — copie du magasin --------------------------- */}
         <TicketFrame index={0}>
           <TicketCard>
@@ -344,86 +367,90 @@ export default async function OrderSlipPage({
             {cancelledBanner}
             {body}
             {footer}
+          </TicketCard>
 
-            {/* PARTIE RETOUCHE — détachée le long des pointillés et donnée au
+          {/* PARTIE RETOUCHE — détachée le long des pointillés et donnée au
                 tailleur avec le pantalon. Une par retouche. */}
-            {/* Taille FIXE, hors de `--fit` : sans elle, une commande d'une
+          {/* Taille FIXE, hors de `--fit` : sans elle, une commande d'une
                 seule pièce agrandissait tout le ticket — et cette partie avec.
                 Elle garde la même hauteur quel que soit le reste ; c'est le
                 haut du ticket qui s'ajuste autour d'elle. */}
-            {alterations.map((a) => (
-              <section
-                key={a.id}
-                style={{ fontSize: "7.5pt" }}
-                className="px-[1em] pb-[0.5em]"
-              >
-                <div className="relative -mx-[1em] flex items-center gap-[0.4em]">
-                  <Scissors
-                    className="ms-[0.5em] size-[1.1em] shrink-0"
-                    aria-hidden
-                  />
-                  <span className="flex-1 border-t-[1.5px] border-dashed border-black" />
-                  <span className="text-[0.68em] font-bold tracking-[0.12em] uppercase">
-                    {tt("alterationPart")}
-                  </span>
-                  <span className="w-[1em] border-t-[1.5px] border-dashed border-black" />
-                </div>
+          {alterations.map((a) => (
+            <section
+              key={a.id}
+              style={{ fontSize: "6.5pt" }}
+              className={cn(SERIF, "mt-[0.35em] shrink-0")}
+            >
+              <div className="flex items-center gap-[0.4em]">
+                <ScissorsIcon className="size-[1.1em] shrink-0" aria-hidden />
+                <span className="flex-1 border-t-[1.5px] border-dashed border-black" />
+                <span className="text-[0.68em] font-bold tracking-[0.12em] uppercase">
+                  {tt("alterationPart")}
+                </span>
+                <span className="w-[1em] border-t-[1.5px] border-dashed border-black" />
+              </div>
 
-                <div className="mt-[0.35em] flex items-stretch gap-[0.6em]">
-                  {/* Ce que disait l'ancienne étiquette, DANS le cadre : le
-                      client, la pièce, sa taille et la date, puis la retouche. */}
-                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-[0.05em] border-[1.5px] border-black px-[0.6em] py-[0.3em] leading-tight">
-                    <p className="text-[0.68em] font-semibold tracking-[0.16em] uppercase">
+              {/* Le texte COLLÉ au QR, le tout calé au bout (demande du
+                  client) : un seul bloc à découper. */}
+              <div className="mt-[0.25em] flex items-center justify-end gap-[0.6em] px-[0.4em]">
+                {/* Le client, puis la pièce, sa taille et la date sur UNE
+                      ligne, puis la retouche — sans cadre (demande du
+                      client). Collée au pantalon : basse. */}
+                <div className="flex min-w-0 flex-col justify-center leading-tight">
+                  <p className="flex min-w-0 items-baseline gap-[0.5em]">
+                    <span className="shrink-0 text-[0.75em] font-semibold tracking-[0.14em] uppercase">
                       {tt("alteration")}
-                    </p>
-                    <p className="truncate text-start text-[1.15em] font-bold">
-                      <bdi>{order.customer_name}</bdi>
-                    </p>
+                    </span>
+                    <bdi className="min-w-0 truncate text-start text-[1.15em] font-bold">
+                      {order.customer_name}
+                    </bdi>
+                  </p>
+                  <p className="flex min-w-0 items-baseline gap-x-[0.5em] whitespace-nowrap">
                     {a.name && (
-                      // « Tuxedo A · Pantalon » : la retouche est toujours sur
-                      // le pantalon — dit une fois, même si le nom le porte.
-                      <p className="truncate text-start text-[0.9em]">
-                        <bdi>{a.name}</bdi>
+                      // « Tuxedo A · Pantalon » : la retouche est toujours
+                      // sur le pantalon — dit une fois, même si le nom le porte.
+                      <bdi className="min-w-0 truncate text-start">
+                        {a.name}
                         {!a.name
                           .toLowerCase()
                           .includes(tt("pants").toLowerCase()) &&
                           ` · ${tt("pants")}`}
-                      </p>
-                    )}
-                    <p className="flex items-baseline gap-x-[0.6em]">
-                      {a.size && (
-                        <span className="text-[1.05em] font-bold">
-                          {t("alterations.size", { size: a.size })}
-                        </span>
-                      )}
-                      <span className="tabular font-bold">{eventDate}</span>
-                    </p>
-                    <p className="flex min-w-0 items-start gap-[0.35em] text-start font-bold">
-                      <Scissors
-                        className="mt-[0.15em] size-[1em] shrink-0"
-                        aria-hidden
-                      />
-                      <bdi className="line-clamp-2 min-w-0 wrap-break-word">
-                        {a.note}
                       </bdi>
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-center justify-center gap-[0.1em] border-[1.5px] border-black p-[0.25em]">
-                    {/* 0,65 pouce FIXE : c'est lui qui donne sa hauteur à la
-                        partie (collée au pantalon, elle doit rester petite),
-                        et il se scanne encore au téléphone du tailleur. */}
-                    <OrderQr
-                      value={alterationUrl(appUrl(), locale, a.id)}
-                      className="block size-[0.65in]"
-                    />
-                    <span className="text-[0.65em] font-bold tracking-[0.14em] uppercase">
-                      {tt("scan")}
+                    )}
+                    {a.size && (
+                      <span className="shrink-0 font-bold">
+                        {t("alterations.size", { size: a.size })}
+                      </span>
+                    )}
+                    <span className="tabular shrink-0 font-bold">
+                      {eventDate}
                     </span>
-                  </div>
+                  </p>
+                  <p className="flex min-w-0 items-start gap-[0.35em] text-start font-bold">
+                    <ScissorsIcon
+                      className="mt-[0.15em] size-[1em] shrink-0"
+                      aria-hidden
+                    />
+                    <bdi className="line-clamp-2 min-w-0 wrap-break-word">
+                      {a.note}
+                    </bdi>
+                  </p>
                 </div>
-              </section>
-            ))}
-          </TicketCard>
+                <div className="flex shrink-0 flex-col items-center justify-center gap-[0.15em]">
+                  {/* 0,5 pouce FIXE (12,7 mm) : c'est lui qui donne sa
+                        hauteur à la partie (collée au pantalon, elle doit
+                        rester petite), et il se scanne encore au téléphone. */}
+                  <OrderQr
+                    value={alterationUrl(appUrl(), locale, a.id)}
+                    className="block size-[0.5in]"
+                  />
+                  <span className="text-[0.6em] leading-none font-bold tracking-[0.14em] uppercase">
+                    {tt("scan")}
+                  </span>
+                </div>
+              </div>
+            </section>
+          ))}
         </TicketFrame>
       </div>
     </TicketPdfProvider>
@@ -444,18 +471,171 @@ type IconType = React.ComponentType<{
 }>;
 type Detail = { icon: IconType; label: string; value: string | null };
 
-/** Le cadre noir du ticket, aux coins arrondis, étiré jusqu'au bas. */
+/** Le romain du bon (Tinos) — l'arabe reste en Cairo. */
+const SERIF =
+  "font-[family-name:var(--font-serif),var(--font-cairo),serif] rtl:font-[family-name:var(--font-cairo),sans-serif]";
+
+/** Le cadre DOUBLE du ticket (maquette), étiré jusqu'au bas. */
 function TicketCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex grow flex-col rounded-[0.9em] border-[1.5px] border-black">
+    // Le contenu s'écarte du double filet (≈ 7 px) pour respirer.
+    <div className={cn(SERIF, "relative flex grow flex-col p-[4px]")}>
+      <NotchedFrame radius={13} stroke={2.6} inner={{ gap: 4.5, stroke: 1 }} />
       {children}
     </div>
+  );
+}
+
+/**
+ * Un cadre aux coins ÉCHANCRÉS (quart de cercle rentrant), simple ou double
+ * comme la maquette : un trait épais dehors, un fin dedans, qui suit la même
+ * échancrure. Quatre coins en SVG + des traits droits — un seul SVG étiré
+ * déformerait les arcs. Mesures en px, traits centrés sur le bord.
+ * `dir="ltr"` : le cadre est symétrique, rien à miroiter en arabe.
+ */
+function NotchedFrame({
+  radius: r,
+  stroke,
+  inner,
+}: {
+  radius: number;
+  stroke: number;
+  inner?: { gap: number; stroke: number };
+}) {
+  const gap = inner?.gap ?? 0;
+  const R = r + gap;
+  const xi = Math.sqrt(R * R - gap * gap);
+  const C = Math.ceil(R + 2);
+  const ink = "absolute bg-black [print-color-adjust:exact]";
+  const lines: React.CSSProperties[] = [];
+  const edge = (offset: number, width: number) => {
+    const o = offset - width / 2;
+    lines.push(
+      { top: o, height: width, insetInlineStart: C, insetInlineEnd: C },
+      { bottom: o, height: width, insetInlineStart: C, insetInlineEnd: C },
+      { insetInlineStart: o, width, top: C, bottom: C },
+      { insetInlineEnd: o, width, top: C, bottom: C },
+    );
+  };
+  edge(0, stroke);
+  if (inner) edge(gap, inner.stroke);
+  const corners: React.CSSProperties[] = [
+    { top: 0, insetInlineStart: 0 },
+    { top: 0, insetInlineEnd: 0, transform: "scaleX(-1)" },
+    { bottom: 0, insetInlineStart: 0, transform: "scaleY(-1)" },
+    { bottom: 0, insetInlineEnd: 0, transform: "scale(-1)" },
+  ];
+  return (
+    // Rentré d'un demi-trait : le filet reste DANS sa boîte. Débordant d'un
+    // pixel, il faisait croire à `fitTicket` que le contenu dépassait.
+    <div
+      dir="ltr"
+      aria-hidden
+      className="pointer-events-none absolute"
+      style={{ inset: stroke / 2 }}
+    >
+      {lines.map((style, i) => (
+        <span key={i} className={ink} style={style} />
+      ))}
+      {corners.map((style, i) => (
+        <svg
+          key={i}
+          width={C}
+          height={C}
+          viewBox={`0 0 ${C} ${C}`}
+          className="absolute overflow-visible"
+          style={style}
+          fill="none"
+          stroke="#000"
+        >
+          <path
+            d={`M${C} 0H${r}A${r} ${r} 0 0 1 0 ${r}V${C}`}
+            strokeWidth={stroke}
+          />
+          {inner && (
+            <path
+              d={`M${C} ${gap}H${xi}A${R} ${R} 0 0 1 ${gap} ${xi}V${C}`}
+              strokeWidth={inner.stroke}
+            />
+          )}
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * L'étiquette noire de la maquette (« DÉTAILS DE LA LOCATION »,
+ * « VERSEMENT ») : coins échancrés, un bout arrondi qui dépasse au milieu
+ * avec son point blanc, un liseré blanc qui suit tout le contour. Deux bouts
+ * en SVG (grille 14 × 20) autour d'un corps noir — l'étiquette s'allonge sans
+ * déformer ses courbes. Hauteur FIXE en `em`.
+ */
+const TAG_H = 2; // em
+function OrnateTag({
+  className,
+  bodyClassName,
+  children,
+}: {
+  className?: string;
+  bodyClassName?: string;
+  children: React.ReactNode;
+}) {
+  // Le liseré du corps, à la même hauteur que celui des bouts (1,3 / 20).
+  const liner = "absolute inset-x-0 h-px bg-white [print-color-adjust:exact]";
+  const inset = `${(1.3 / 20) * TAG_H}em`;
+  return (
+    <span
+      className={cn("inline-flex items-stretch text-white", className)}
+      style={{ height: `${TAG_H}em` }}
+    >
+      <TagEnd className="rtl:-scale-x-100" />
+      <span
+        className={cn(
+          "relative flex min-w-0 flex-1 items-center justify-center gap-[0.6em] bg-black [print-color-adjust:exact]",
+          bodyClassName,
+        )}
+      >
+        <span className={liner} style={{ top: inset }} />
+        <span className={liner} style={{ bottom: inset }} />
+        {children}
+      </span>
+      <TagEnd className="-scale-x-100 rtl:scale-x-100" />
+    </span>
+  );
+}
+
+function TagEnd({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 14 20"
+      className={cn("h-full shrink-0 overflow-visible", className)}
+      style={{ width: `${(14 / 20) * TAG_H}em` }}
+    >
+      <path
+        d="M14.8 0H9A3 3 0 0 1 6 3V4.5A5.5 5.5 0 0 0 6 15.5V17A3 3 0 0 1 9 20H14.8Z"
+        fill="#000"
+      />
+      <path
+        d="M14.8 1.3H10.1A4.3 4.3 0 0 1 7.3 4.1V6A4.2 4.2 0 1 0 7.3 14V15.9A4.3 4.3 0 0 1 10.1 18.7H14.8"
+        fill="none"
+        stroke="#fff"
+        strokeWidth={0.6}
+      />
+      <circle cx="4" cy="10" r="0.95" fill="#fff" />
+    </svg>
   );
 }
 
 /** Ce qui reste de hauteur : avant le pied de page, jamais en bas. */
 function Spacer() {
   return <div aria-hidden className="min-h-[0.6em] grow" />;
+}
+
+/** La poignée de main de « Reste », au trait épaissi (silhouettes pleines). */
+function HandshakeBold(props: { className?: string; "aria-hidden"?: boolean }) {
+  return <Handshake strokeWidth={2.6} {...props} />;
 }
 
 /** « : » entre l'intitulé et la valeur, dans les deux langues. */
@@ -488,8 +668,8 @@ function ClientBox({
         </span>
         <bdi className="min-w-0 truncate">{name}</bdi>
       </p>
-      <div className="mt-[0.2em] flex items-center gap-[0.5em] font-bold">
-        <p className="flex min-w-0 flex-1 items-center gap-[0.45em]">
+      <div className="mt-[0.2em] flex items-center justify-between gap-[0.5em] font-bold">
+        <p className="flex min-w-0 items-center gap-[0.45em]">
           <Phone className="size-[1.1em] shrink-0 fill-black" aria-hidden />
           <span className="shrink-0">
             {labels.phone}
@@ -526,9 +706,12 @@ function PillRule({
   return (
     <div className={cn("flex items-center", className)}>
       <span className="flex-1 border-t-[1.5px] border-black" />
-      <span className="rounded-full bg-black px-[1.4em] py-[0.15em] text-[1.05em] font-bold tracking-[0.04em] text-white uppercase [print-color-adjust:exact] rtl:tracking-normal">
+      <OrnateTag
+        className="text-[1.05em] font-bold tracking-[0.04em] uppercase rtl:tracking-normal"
+        bodyClassName="px-[0.6em]"
+      >
         {children}
-      </span>
+      </OrnateTag>
       <span className="flex-1 border-t-[1.5px] border-black" />
     </div>
   );
@@ -542,16 +725,16 @@ function DetailsTable({ details }: { details: Detail[] }) {
     <table className="mt-[0.3em] w-full border-separate border-spacing-0">
       <tbody>
         {details.map(({ icon: Icon, label, value }, i) => {
+          // Un filet gris continu sous l'intitulé, le « : » et la valeur — pas
+          // sous le pictogramme, ni sous la dernière ligne (maquette).
           const rule =
             i === details.length - 1
               ? ""
-              : // Pointillés dessinés en fond, continus d'une cellule à
-                // l'autre (une bordure `dotted` marquait chaque jonction).
-                "bg-[linear-gradient(to_right,#000_1px,transparent_1px)] bg-[length:3px_1px] bg-bottom bg-repeat-x [print-color-adjust:exact]";
+              : "border-b border-[#777] [print-color-adjust:exact]";
           return (
             <tr key={label}>
               <td className="w-[2.2em] py-[0.25em] pe-[0.5em] align-middle">
-                <Icon className="mx-auto size-[1.5em]" aria-hidden />
+                <Icon className="mx-auto size-[1.7em]" aria-hidden />
               </td>
               <td
                 className={cn(
@@ -587,7 +770,9 @@ function MoneyBox({
   rows: { icon: IconType; label: string; value: string }[];
 }) {
   return (
-    <div className="mt-[0.5em] overflow-hidden rounded-[0.8em] border-[1.5px] border-black">
+    // Coins échancrés, comme le cadre (maquette), en trait simple.
+    <div className="relative mt-[0.5em]">
+      <NotchedFrame radius={7} stroke={1.8} />
       {rows.map(({ icon: Icon, label, value }, i) => (
         <div
           key={i}
@@ -596,17 +781,26 @@ function MoneyBox({
             i > 0 && "border-t-[1.5px] border-black",
           )}
         >
-          <div
-            className={cn(
-              "flex items-center gap-[0.7em] border-e-[1.5px] border-black px-[0.8em] py-[0.2em] text-[1.15em] font-bold",
-              // Le versement en tête, sur fond noir, comme sur la maquette.
-              i === 0 &&
-                "bg-black text-white uppercase [print-color-adjust:exact]",
-            )}
-          >
-            <Icon className="size-[1.2em] shrink-0" aria-hidden />
-            <span className="min-w-0 truncate">{label}</span>
-          </div>
+          {i === 0 ? (
+            // Le versement en tête, dans l'étiquette noire de la maquette,
+            // CENTRÉE dans sa case : même marge des deux côtés.
+            <div className="flex items-center justify-center border-e-[1.5px] border-black px-[0.25em] py-[0.1em]">
+              <OrnateTag
+                className="w-full text-[1.15em] font-bold uppercase"
+                bodyClassName="justify-start ps-[0.3em] pe-[0.2em]"
+              >
+                <Icon className="size-[1.1em] shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-center">
+                  {label}
+                </span>
+              </OrnateTag>
+            </div>
+          ) : (
+            <div className="flex items-center gap-[0.7em] border-e-[1.5px] border-black px-[0.8em] py-[0.2em] text-[1.15em] font-bold">
+              <Icon className="size-[1.2em] shrink-0" aria-hidden />
+              <span className="min-w-0 truncate">{label}</span>
+            </div>
+          )}
           <p className="flex items-center gap-[0.4em] px-[0.6em] py-[0.2em] text-[1.25em] font-bold">
             <Colon />
             <bdi className="tabular flex-1 text-center whitespace-nowrap">
