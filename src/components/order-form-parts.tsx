@@ -127,18 +127,36 @@ export function RequiredMark() {
   );
 }
 
+/**
+ * Couleur d'un bloc du formulaire de commande : le patron voulait savoir, en
+ * faisant défiler, s'il est dans la retouche, le client, la tenue ou le
+ * paiement. Fond PÂLE + filet épais côté début ; jamais le rouge ni le vert,
+ * qui disent déjà « erreur » et « revenue ».
+ */
+const SECTION_TONES = {
+  gold: "bg-gold-soft border-gold-strong",
+  client: "bg-section-client border-section-client-edge",
+  outfit: "bg-brown-soft border-secondary",
+  payment: "bg-muted border-muted-foreground",
+} as const;
+
+export type SectionTone = keyof typeof SECTION_TONES;
+
 /** Une section : filet en tête plutôt qu'une carte, pour garder la largeur. */
 export function Section({
   id,
   title,
   aside,
   invalid,
+  tone,
   children,
 }: {
   id: string;
   title: React.ReactNode;
   aside?: React.ReactNode;
   invalid?: boolean;
+  /** Avec une teinte, la section devient une carte colorée. */
+  tone?: SectionTone;
   children: React.ReactNode;
 }) {
   return (
@@ -146,7 +164,18 @@ export function Section({
       id={id}
       tabIndex={-1}
       aria-labelledby={`${id}-title`}
-      className="border-border scroll-mt-20 border-t pt-5 pb-6 outline-none first-of-type:border-t-0 first-of-type:pt-0"
+      className={cn(
+        "scroll-mt-20 outline-none",
+        tone
+          ? cn(
+              "mb-4 rounded-lg border-s-4 p-4",
+              // Les champs shadcn sont transparents : sur la teinte, on les
+              // veut BLANCS, comme les listes et les dates à côté.
+              "[&_[data-slot=input]]:bg-background [&_[data-slot=textarea]]:bg-background",
+              SECTION_TONES[tone],
+            )
+          : "border-border border-t pt-5 pb-6 first-of-type:border-t-0 first-of-type:pt-0",
+      )}
     >
       <div className="mb-4 flex items-center gap-2">
         <h2

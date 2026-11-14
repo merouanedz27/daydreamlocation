@@ -2,6 +2,7 @@
 export const STATIC_ROUTES = [
   "/fr/commandes",
   "/fr/commandes/nouvelle",
+  "/fr/commandes/en-attente",
   "/fr/commandes/vente",
   "/fr/commandes/calendrier",
   "/fr/commandes/demain",

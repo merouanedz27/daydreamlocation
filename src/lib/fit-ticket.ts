@@ -28,6 +28,10 @@ export function fitTicket(el: HTMLElement) {
     parseFloat(style.paddingBottom) -
     FIT_SLACK_PX;
 
+  // Le contenu s'étire jusqu'au bas de la feuille (le pied de page y reste
+  // collé) : pendant la recherche, on le ramène à sa hauteur NATURELLE.
+  content.style.flexGrow = "0";
+
   const fits = (fit: number) => {
     el.style.setProperty("--fit", fit.toFixed(3));
     return (
@@ -49,25 +53,7 @@ export function fitTicket(el: HTMLElement) {
     }
   }
   el.style.setProperty("--fit", lo.toFixed(3));
-  shareQrSize(el);
-}
-
-/** Événement émis quand la taille du QR de référence change. */
-export const QR_SIZE_EVENT = "order-qr-size";
-
-/**
- * Le QR du ticket CLIENT (`[data-qr-master]`) donne sa taille réelle, une fois
- * le texte ajusté, à `--order-qr-size` : le QR du ticket du costume la reprend
- * — même taille sur les deux feuilles, quel que soit l'ajustement de chacune.
- * `offsetWidth` ignore la réduction d'affichage (`scale`) : c'est la taille
- * sur le papier.
- */
-function shareQrSize(el: HTMLElement) {
-  const qr = el.querySelector<HTMLElement>("[data-qr-master]");
-  if (!qr) return;
-  const size = `${qr.offsetWidth}px`;
-  const root = document.documentElement;
-  if (root.style.getPropertyValue("--order-qr-size") === size) return;
-  root.style.setProperty("--order-qr-size", size);
-  window.dispatchEvent(new Event(QR_SIZE_EVENT));
+  // Les quelques px qui restent : absorbés par l'espace avant le pied de page,
+  // jamais une bande blanche en bas de l'étiquette.
+  content.style.flexGrow = "";
 }

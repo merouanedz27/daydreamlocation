@@ -93,3 +93,92 @@ export function ticketFields(
     accessories: [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
   };
 }
+
+/** Le type de pièce d'une ligne du tableau du bon (ARTICLE). */
+export type TicketPart =
+  | "jacket"
+  | "vest"
+  | "pants"
+  | "shirt"
+  | "jabador"
+  | "shoes"
+  | "accessory";
+
+export type TicketItem = { part: TicketPart; model: string; size: string | null };
+
+/** Les cases fixes de la saisie, dans l'ordre (`QuickDraft.slots`). */
+const SLOT_PARTS: TicketPart[] = [
+  "jacket",
+  "vest",
+  "pants",
+  "shirt",
+  "jabador",
+  "shoes",
+  "accessory",
+];
+
+/** Catégorie du stock d'une pièce en plus → sa ligne sur le bon. */
+const CATEGORY_PART: Record<string, TicketPart> = {
+  veste: "jacket",
+  costume: "jacket",
+  gilet: "vest",
+  pantalon: "pants",
+  chemise: "shirt",
+  jabador: "jabador",
+  chaussures: "shoes",
+};
+
+/**
+ * Les pièces d'une commande en LIGNES du tableau Article / Modèle / Taille du
+ * bon de location — une par pièce, rangées comme les cases de la saisie
+ * (`draftFromOrder`). Jamais de référence : le client lit des noms.
+ * `costume` : le(s) modèle(s) du costume, pour l'en-tête du ticket client.
+ */
+export function ticketItems(
+  order: EditableOrder,
+  {
+    slotOf,
+    categoryOfUnit,
+  }: {
+    slotOf: (label: string) => number | null;
+    categoryOfUnit: (unitId: number) => string | null;
+  },
+): { costume: string | null; items: TicketItem[] } {
+  const draft = draftFromOrder(order, {
+    slotOf,
+    categoryOfUnit,
+    defaultWindow: { pickup: order.pickup_date, returnDue: order.return_due_date },
+  });
+
+  const items: TicketItem[] = [];
+  draft.slots.forEach((slot, index) => {
+    const model = slot.name.trim();
+    if (!model) return;
+    const size = slot.size.trim() || null;
+
+    // Costume NOMMÉ, d'avant les cases par partie : « 50 · G 48 · P 52 » dans
+    // la case de la veste devient trois lignes du même modèle — pantalon non
+    // précisé = taille de la veste, comme `ticketFields`.
+    if (index === 0 && !slot.unitId && size) {
+      const split = splitCostumeSize(size);
+      items.push({ part: "jacket", model, size: split.jacket || null });
+      if (split.vest) items.push({ part: "vest", model, size: split.vest });
+      items.push({ part: "pants", model, size: split.pants || split.jacket || null });
+      return;
+    }
+
+    const slug = slot.unitId ? categoryOfUnit(slot.unitId) : null;
+    const part =
+      SLOT_PARTS[index] ?? (slug ? CATEGORY_PART[slug] : undefined) ?? "accessory";
+    items.push({ part, model, size });
+  });
+
+  const costumeModels = [
+    ...new Set(
+      items
+        .filter((i) => i.part === "jacket" || i.part === "vest" || i.part === "pants")
+        .map((i) => i.model),
+    ),
+  ];
+  return { costume: costumeModels.join(" · ") || null, items };
+}

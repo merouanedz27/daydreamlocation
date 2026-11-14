@@ -40,3 +40,10 @@ export const expenseSchema = z.object({
 });
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+
+/**
+ * Correction d'un frais par le propriétaire : montant, type, libellé, date.
+ * Le rattachement à une commande n'est pas repris — la correction ne le
+ * touche pas, il reste tel qu'il a été saisi.
+ */
+export const expenseUpdateSchema = expenseSchema.omit({ order_id: true });

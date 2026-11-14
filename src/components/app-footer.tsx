@@ -2,7 +2,7 @@ import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import pkg from "../../package.json";
-import wordmark from "../../public/logo-wordmark.png";
+import logo from "../../public/logo-ink.png";
 
 /**
  * Pied de page — GRANDS ÉCRANS UNIQUEMENT.
@@ -66,8 +66,8 @@ export async function AppFooter({
           en faisaient plus du double. */}
       <div className="mx-auto grid max-w-5xl gap-6 px-4 py-5 text-xs md:grid-cols-3">
         <div>
-          {/* LE LOGO À LA PLACE DU NOM ÉCRIT — le mot du bon, en encre, tel
-              quel : le pied de page est en `brown-soft` (#F1E9E1), un fond
+          {/* LE LOGO À LA PLACE DU NOM ÉCRIT — sa version encre, telle
+              quelle : le pied de page est en `brown-soft` (#F1E9E1), un fond
               clair.
               Pas de `priority` : le pied de page est sous la ligne de
               flottaison, il se charge en différé — contrairement à celui de la
@@ -77,10 +77,10 @@ export async function AppFooter({
               En mode sombre, le fond devient brun foncé : le logo passe en
               BLANC, comme celui de la barre d'en-tête. */}
           <Image
-            src={wordmark}
+            src={logo}
             alt={t("app.name")}
-            sizes="125px"
-            className="h-6 w-auto dark:brightness-0 dark:invert"
+            sizes="165px"
+            className="h-8 w-auto dark:brightness-0 dark:invert"
           />
           <p className="text-muted-foreground mt-1.5">{t("app.tagline")}</p>
           <p className="text-muted-foreground mt-2">

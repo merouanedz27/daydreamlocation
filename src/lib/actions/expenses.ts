@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, isOwner } from "@/lib/auth";
-import { expenseSchema } from "@/lib/validation/expenses";
+import {
+  expenseSchema,
+  expenseUpdateSchema,
+} from "@/lib/validation/expenses";
 import { routing, type Locale } from "@/i18n/routing";
 
 export type ActionResult =
@@ -63,6 +66,48 @@ export async function createExpense(formData: FormData): Promise<ActionResult> {
   if (error && !(error.code === "23505" && clientOpId)) {
     return { ok: false, error: "errors.generic" };
   }
+
+  revalidatePath(`/${locale}/frais`);
+  revalidatePath(`/${locale}/tableau-de-bord`);
+  return { ok: true };
+}
+
+/**
+ * Corrige une dépense : une faute de frappe sur le montant, le mauvais type,
+ * la mauvaise date.
+ *
+ * Réservée au propriétaire, comme la suppression : la policy
+ * `expenses_owner_all` couvre l'UPDATE, l'équipe n'en a aucune. Le
+ * rattachement à une commande (`order_id`) n'est jamais modifié ici.
+ */
+export async function updateExpense(formData: FormData): Promise<ActionResult> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const profile = await getProfile();
+  if (!isOwner(profile)) return { ok: false, error: "errors.forbidden" };
+
+  const id = Number(formData.get("id"));
+  if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "errors.generic" };
+
+  const parsed = expenseUpdateSchema.safeParse({
+    spent_on: formData.get("spent_on"),
+    category: formData.get("category"),
+    amount: formData.get("amount"),
+    description: formData.get("description"),
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return { ok: false, error: issue.message, field: String(issue.path[0] ?? "") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("expenses")
+    .update(parsed.data)
+    .eq("id", id);
+
+  if (error) return { ok: false, error: "errors.generic" };
 
   revalidatePath(`/${locale}/frais`);
   revalidatePath(`/${locale}/tableau-de-bord`);

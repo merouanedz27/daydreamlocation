@@ -1,15 +1,22 @@
 "use client";
 
-import { Clock, List, Plane, Receipt, Undo2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Clock, List, PauseCircle, Plane, Undo2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { useParked } from "@/lib/parked-drafts";
+import { formatNumber } from "@/lib/format";
+import type { Locale } from "@/i18n/routing";
 
 /**
  * Barre d'onglets BASSE — les cinq onglets de son AppSheet, dans le même
  * ordre : l'équipe retrouve ses gestes sans réapprendre. Voir `daydream-ui`.
  *
- *   Pointage · Demain · Commandes · Pas rentrés · Frais
+ *   Pointage · Demain · Commandes · Pas rentrés · En attente
+ *
+ * « En attente » a pris la place des frais, à la demande du client : les
+ * clients mis de côté dans la boutique se retrouvent d'un toucher, et la
+ * pastille dit combien attendent. Les frais passent dans le menu du compte.
  *
  * Le pointage a pris la place du calendrier, à la demande du client : c'est
  * le geste de chaque matin. Le calendrier passe dans le menu du compte.
@@ -25,14 +32,16 @@ import { cn } from "@/lib/utils";
  */
 export function BottomNav() {
   const t = useTranslations("nav");
+  const locale = useLocale() as Locale;
   const pathname = usePathname();
+  const waiting = useParked().length;
 
   const items = [
     { href: "/pointage", icon: Clock, label: t("pointage") },
     { href: "/commandes/demain", icon: Plane, label: t("tomorrowShort") },
     { href: "/commandes", icon: List, label: t("ordersShort") },
     { href: "/commandes/pas-rentres", icon: Undo2, label: t("notReturnedShort") },
-    { href: "/frais", icon: Receipt, label: t("fraisShort") },
+    { href: "/commandes/en-attente", icon: PauseCircle, label: t("waitingShort") },
   ] as const;
 
   /**
@@ -75,11 +84,26 @@ export function BottomNav() {
               {active && (
                 <span className="bg-gold-soft absolute inset-x-3 top-0 h-0.5 rounded-full" aria-hidden />
               )}
-              <Icon
-                className={cn("size-5 shrink-0", href === "/commandes/demain" && "rtl:-scale-x-100")}
-                aria-hidden
-              />
-              <span className="max-w-full truncate">{label}</span>
+              <span className="relative">
+                <Icon
+                  className={cn("size-5 shrink-0", href === "/commandes/demain" && "rtl:-scale-x-100")}
+                  aria-hidden
+                />
+                {href === "/commandes/en-attente" && waiting > 0 && (
+                  <span
+                    aria-hidden
+                    className="bg-notification-badge text-notification-badge-foreground tabular absolute -end-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold"
+                  >
+                    {formatNumber(waiting, locale)}
+                  </span>
+                )}
+              </span>
+              <span className="max-w-full truncate">
+                {label}
+                {href === "/commandes/en-attente" && waiting > 0 && (
+                  <span className="sr-only"> ({formatNumber(waiting, locale)})</span>
+                )}
+              </span>
             </Link>
           );
         })}
