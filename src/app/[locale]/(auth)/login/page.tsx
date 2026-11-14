@@ -6,8 +6,7 @@ import { redirectTo } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { SignInForm } from "@/components/sign-in-form";
-import suit from "../../../../../public/logo-suit.png";
-import wordmark from "../../../../../public/logo-wordmark.png";
+import logo from "../../../../../public/logo-ink.png";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -39,10 +38,9 @@ export default async function LoginPage({
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-5 py-10">
       <div className="w-full max-w-sm">
-        {/* Ici le logo COMPLET du bon : la veste, puis le mot « DAYDREAM ·
-            LOCATION ». C'est le seul écran qui ait la place de les montrer
-            ensemble, et le seul où l'on arrive sans savoir encore où l'on est.
-            Encre sur page blanche, comme sur le papier.
+        {/* Le logo de la boutique, en grand : la veste et « DAYDREAM ·
+            LOCATION ». C'est le seul écran où l'on arrive sans savoir encore
+            où l'on est. Encre sur page blanche, comme sur le papier.
             Le nom de l'application reste le NOM ACCESSIBLE du titre, via
             `alt` : le logo est un bitmap, un lecteur d'écran n'y lit rien. */}
         <header className="text-center">
@@ -53,18 +51,11 @@ export default async function LoginPage({
                 c'est du gâchis pur. Petit, aussi : à 390 px de large, un grand
                 logo poussait « Se connecter » sous le clavier ouvert. */}
             <Image
-              src={suit}
-              alt=""
-              priority
-              sizes="64px"
-              className="mx-auto h-auto w-16 dark:brightness-0 dark:invert"
-            />
-            <Image
-              src={wordmark}
+              src={logo}
               alt={t("app.name")}
               priority
-              sizes="208px"
-              className="mx-auto mt-3 h-auto w-52 dark:brightness-0 dark:invert"
+              sizes="256px"
+              className="mx-auto h-auto w-64 dark:brightness-0 dark:invert"
             />
           </h1>
           <p className="text-muted-foreground mt-3 text-sm">

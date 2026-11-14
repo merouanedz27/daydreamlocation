@@ -4,13 +4,13 @@ import { formatDate } from "@/lib/format";
 import type { Locale } from "@/i18n/routing";
 
 /**
- * L'ÉTIQUETTE d'une retouche — la MÊME sur la feuille d'étiquettes
- * (`/imprimer/retouches`) et en bas du ticket du costume (bon, page 2).
+ * L'ÉTIQUETTE d'une retouche, sur la feuille d'étiquettes
+ * (`/imprimer/retouches`). Le ticket client porte le même QR dans sa
+ * « partie retouche », mis en page à part (`imprimer/commande/[id]`).
  *
  * QR à gauche ; à côté, sur la hauteur du QR : le client, le NOM de la pièce,
  * la taille, la date et ce qu'il faut faire. Jamais la référence (demande du
- * client). Tailles en pt et en pouces : l'ajustement automatique du bon
- * (`fitTicket`, en `em`) ne la grossit pas.
+ * client). Tailles en pt et en pouces.
  */
 export function AlterationLabel({
   url,

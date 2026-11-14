@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { FraisEditDrawer } from "@/components/frais-quick-form";
+import { useHold } from "@/lib/use-hold";
 import { sheet } from "@/components/sheet-table";
 import { Link } from "@/i18n/navigation";
 import { deleteExpense } from "@/lib/actions/expenses";
@@ -34,7 +43,10 @@ function Dot() {
  * Registre des dépenses, en tableau « façon tableur » — le même que celui des
  * commandes et du stock (`sheet`), sans défilement horizontal.
  *
- * Colonnes : Date · Description · Catégorie · Commande · Montant (DA) · corbeille.
+ * Colonnes : Date · Description · Catégorie · Commande · Montant (DA) · ⋮.
+ *
+ * Le ⋮ ouvre « Modifier » / « Supprimer ». Un APPUI LONG sur la ligne (ou un
+ * clic droit) ouvre le même menu : c'est le geste qu'il attend au téléphone.
  *
  * Sur téléphone (< 640 px), Catégorie et Commande quittent leurs colonnes pour
  * une seconde ligne, en petit, sous la description : quatre colonnes tiennent
@@ -44,9 +56,9 @@ function Dot() {
  *   dit déjà « Septembre 2026 ».
  * - **Montant nu**, la devise est dans l'en-tête : la colonne s'aligne et se
  *   parcourt comme dans le tableur.
- * - La hauteur de ligne est dictée par la corbeille : 44 px de cible tactile.
- *   La réduire ferait déborder sa zone sur la corbeille voisine — un risque
- *   d'effacement au mauvais endroit qu'on ne prend pas.
+ * - La hauteur de ligne est dictée par le bouton ⋮ : 44 px de cible tactile.
+ *   La réduire ferait déborder sa zone sur le bouton voisin — un risque
+ *   d'agir sur la mauvaise ligne qu'on ne prend pas.
  * - Pas de fiche détail : la ligne n'est pas cliquable (curseur normal).
  */
 export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
@@ -61,6 +73,16 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
   // dixième de seconde. Elle est simplement remplacée à la prochaine ouverture.
   const [toDelete, setToDelete] = useState<ExpenseRow | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // Même principe pour la correction : la dépense reste en place pendant la
+  // sortie du tiroir.
+  const [toEdit, setToEdit] = useState<ExpenseRow | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  // Le menu ouvert (un seul à la fois), par le ⋮ ou par l'appui long.
+  const [menuFor, setMenuFor] = useState<number | null>(null);
+  // Un tiroir s'ouvre depuis le menu : le focus ne doit pas revenir au ⋮,
+  // il volerait le focus du tiroir (cf. `team-list.tsx`).
+  const openingDrawer = useRef(false);
+  const hold = useHold<ExpenseRow>(true, false, (e) => setMenuFor(e.id));
 
   if (!expenses.length) {
     // Un mois vide n'a pas besoin d'une grande boîte en pointillés : une phrase
@@ -99,7 +121,9 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
                 </span>
               </th>
               <th scope="col" className={cn(sheet.th, "w-px")}>
-                <span className="sr-only">{t("common.delete")}</span>
+                <span className="sr-only">
+                  {t("common.edit")} / {t("common.delete")}
+                </span>
               </th>
             </tr>
           </thead>
@@ -123,8 +147,14 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
                 </Link>
               );
 
+              const label = e.description || category;
+
               return (
-                <tr key={e.id} className={cn(sheet.row, "cursor-auto")}>
+                <tr
+                  key={e.id}
+                  {...hold(e)}
+                  className={cn(sheet.row, "cursor-auto select-none")}
+                >
                   <td
                     className={cn(
                       sheet.td,
@@ -170,26 +200,62 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
                   </td>
 
                   <td className={cn(sheet.td, "w-px p-0 sm:p-0 md:p-0")}>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setToDelete(e);
-                        setConfirmOpen(true);
-                      }}
-                      className="text-muted-foreground hover:text-destructive size-11"
+                    <DropdownMenu
+                      open={menuFor === e.id}
+                      onOpenChange={(o) => setMenuFor(o ? e.id : null)}
                     >
-                      <Trash2 className="size-4" aria-hidden />
-                      {/* Le nom accessible porte la dépense visée : trente
-                          « Supprimer » identiques ne se distinguent pas au
-                          lecteur d'écran. */}
-                      <span className="sr-only">
-                        {t("expenses.deleteThis", {
-                          label: e.description || category,
-                        })}
-                      </span>
-                    </Button>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground size-11"
+                        >
+                          <MoreVertical className="size-4" aria-hidden />
+                          {/* Le nom accessible porte la dépense visée : trente
+                              « Actions » identiques ne se distinguent pas au
+                              lecteur d'écran. */}
+                          <span className="sr-only">
+                            {t("expenses.actionsFor", { label })}
+                          </span>
+                        </Button>
+                      </DropdownMenuTrigger>
+
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-auto min-w-48"
+                        onCloseAutoFocus={(ev) => {
+                          if (!openingDrawer.current) return;
+                          openingDrawer.current = false;
+                          ev.preventDefault();
+                        }}
+                      >
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => {
+                            openingDrawer.current = true;
+                            setToEdit(e);
+                            setEditOpen(true);
+                          }}
+                        >
+                          <Pencil className="size-4" aria-hidden />
+                          {t("common.edit")}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          variant="destructive"
+                          onSelect={() => {
+                            openingDrawer.current = true;
+                            setToDelete(e);
+                            setConfirmOpen(true);
+                          }}
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                          {t("expenses.deleteThis", { label })}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               );
@@ -231,6 +297,13 @@ export function ExpensesList({ expenses }: { expenses: ExpenseRow[] }) {
           data.set("locale", locale);
           return await deleteExpense(data);
         }}
+      />
+
+      {/* Un seul tiroir de correction, lui aussi hors du tableau. */}
+      <FraisEditDrawer
+        expense={toEdit}
+        open={editOpen}
+        onOpenChange={setEditOpen}
       />
     </>
   );

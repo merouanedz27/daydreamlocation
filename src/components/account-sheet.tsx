@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   WashingMachine,
   LogOut,
+  Receipt,
   Settings,
   TrendingUp,
   User,
@@ -86,6 +87,8 @@ export function AccountSheet({
     label: string;
     count?: number;
   }[] = [
+    // Les frais ont cédé leur onglet à « En attente » : toute l'équipe en saisit.
+    { href: "/frais", icon: Receipt, label: t("nav.frais") },
     { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },

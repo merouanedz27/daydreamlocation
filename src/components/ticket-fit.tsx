@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { PrintSheet } from "@/components/print-sheet";
 import { useTicketPdf } from "@/components/ticket-pdf";
-import { fitTicket, QR_SIZE_EVENT } from "@/lib/fit-ticket";
+import { fitTicket } from "@/lib/fit-ticket";
 import { cn } from "@/lib/utils";
 
 /** 4 pouces en px CSS (96 px au pouce) : la largeur EXACTE de l'étiquette. */
@@ -64,14 +64,10 @@ export function TicketFrame({
     for (const img of Array.from(ticket.querySelectorAll("img"))) {
       if (!img.complete) img.addEventListener("load", refit, { once: true });
     }
-    // Le QR du ticket client a changé de taille : celui du costume le suit,
-    // et sa feuille se réajuste autour.
-    window.addEventListener(QR_SIZE_EVENT, refit);
 
     return () => {
       alive = false;
       observer.disconnect();
-      window.removeEventListener(QR_SIZE_EVENT, refit);
     };
   }, []);
 
@@ -101,17 +97,22 @@ export function TicketFrame({
             // Calé en HAUT, pas centré : le QR tombe au même endroit sur les
             // deux tickets, même quand celui du costume a peu de texte.
             "flex h-[6in] w-[4in] max-w-none flex-col justify-start overflow-hidden bg-white p-[5mm] text-black sm:p-[5mm] print:p-[5mm]",
-            // Arial comme son modèle ; l'arabe retombe sur Cairo si Arial n'a pas les glyphes.
-            "font-[family-name:Arial,Helvetica,var(--font-cairo),sans-serif]",
+            // Inter pour le latin, Cairo pour l'arabe — les polices de l'appli,
+            // servies par elle-même (`next/font`) : hors ligne aussi.
+            "font-[family-name:var(--font-inter),var(--font-cairo),sans-serif]",
+            // Bon ARABE : Cairo pour tout (latin compris), comme l'appli. Un
+            // repli glyphe par glyphe Inter → Cairo se mesurait mal dans la
+            // photo, et l'espacement des lettres casse la liaison de l'arabe.
+            "rtl:font-[family-name:var(--font-cairo),sans-serif] rtl:**:tracking-normal",
             // Photographiée : la mise en page vivante reste en place mais ne
             // se voit ni ne s'imprime plus.
             photo && "invisible print:hidden",
             className,
           )}
         >
-          {/* À sa hauteur NATURELLE (élément flex de la colonne, sans
-              étirement) : c'est elle que `fitTicket` mesure. */}
-          <div data-ticket-content className="w-full shrink-0">
+          {/* Étiré jusqu'au bas de la feuille : le pied de page y reste collé.
+              `fitTicket` le ramène à sa hauteur NATURELLE pour la mesurer. */}
+          <div data-ticket-content className="flex w-full shrink-0 grow flex-col">
             {children}
           </div>
         </PrintSheet>

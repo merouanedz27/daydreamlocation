@@ -163,59 +163,33 @@ Dégradés violet-bleu · glassmorphism (halos, bords lumineux, cartes « en ver
 mesurée des barres de navigation ci-dessus est la seule exception) · ombres épaisses ·
 coins ultra-arrondis (`rounded-3xl`+) · émojis en guise d'icônes (utiliser `lucide-react`).
 
-## Logo — deux fichiers, fond transparent
+## Logo — un dessin, trois encres
 
-| Fichier | Contenu | Où |
+La source est `docs/new-logo.PNG` (veste + « DAYDREAM · LOCATION »), fournie en **blanc sur
+transparent**. `python scripts/gen-icons.py` n'en garde que la transparence et la recolore :
+
+| Fichier | Encre | Où |
 |---|---|---|
-| `public/dd-logo.png` | l'original, tel que fourni (marge transparente comprise) | page de connexion |
-| `public/dd-logo-trim.png` | le **même** verrou, marge transparente retirée | barre d'en-tête, pied de page |
+| `public/logo-white.png` | blanc | barres brunes : en-tête, atelier |
+| `public/logo-ink.png` | encre `#2B2119` | fonds clairs : connexion, pied de page (`dark:brightness-0 dark:invert` en sombre) |
+| `public/logo-print.png` | noir pur | les tickets imprimés |
 
-Le logo est un **bitmap à deux tons** — bloc brun `#522504`, bloc gris clair `#EEEEEE`, mot
-« location » `#401B01` — dessiné pour un fond **clair**. Il est posé **à nu**, sans plaque :
-le fond transparent est un choix du propriétaire. Ce que cela coûte, **mesuré** contre le brun
-des barres (`#6B4F3A`) :
+Règles :
 
-| Élément du logo | Sur la barre (pire cas `#816753`) | Avant l'éclaircissement | Lisible ? |
-|---|---|---|---|
-| « D » blanc du bloc gauche | 5,25:1 | 7,49:1 | oui |
-| bloc clair `#EEEEEE` | 4,53:1 | 6,45:1 | oui |
-| mot « location » `#401B01` | **2,91:1** | 2,04:1 | faible |
-| bloc brun `#522504` | **2,46:1** | 1,73:1 | se devine |
-
-Les deux « D » portent donc la marque ; le mot reste en retrait. Éclaircir la barre l'a amélioré
-sans le rendre franc, et la barre ne peut pas aller plus clair sans basculer en texte encre
-(voir le bloc `--nav` de `globals.css`). **Pas d'ombre portée** pour compenser — elle salirait le
-gris clair du logo sans rien gagner sur le brun.
-
-Trois règles qui en découlent :
-
-1. **Aucun fond sombre sous ce logo sans l'avoir mesuré** — et le jour où le mode sombre
-   s'ouvrira, la page de connexion posera le même problème que la barre.
-2. **Le logo remplace le nom écrit, il ne le double pas.** Il ne reste donc plus aucun
-   « DayDream Location » en toutes lettres dans la barre ni dans le pied de page — le nom ne
-   subsiste que dans les `alt` et dans `app.name`, dont les `<title>` se servent toujours.
-   Le pied de page est en `brown-soft` (#F1E9E1) : le logo y tient 10,76:1 (son brun) et
-   12,71:1 (le mot). C'est l'endroit du produit où il se lit le mieux, et aucune plaque n'y
-   est nécessaire.
-3. **Pas de marge transparente dans une barre.** L'original en a 42 px en haut et 16 px en bas
-   sur 454 : gardée, elle fait asseoir le logo trop bas et mange la hauteur utile. D'où la version
-   rognée — même image, bornes serrées, c'est la barre qui décide de son propre calage.
-4. **Corollaire d'accessibilité** : le logo devenant le seul nom de son lien ou de son bloc,
-   son `alt` doit porter `app.name`. Un logo en `alt=""` dans un lien sans texte, ou une colonne
-   de pied de page sans titre, est un bloc anonyme.
-
-Enfin, toujours renseigner `sizes` sur ces images : sans lui, `next/image` raisonne sur la largeur
-de l'écran et sert un fichier de 1080 px pour un logo de 54 px.
+1. **Jamais de filtre pour changer d'encre là où un fichier existe** : chaque fond a sa version.
+2. **Le logo remplace le nom écrit, il ne le double pas.** Son `alt` porte `app.name` : c'est
+   souvent le seul nom de son lien ou de son bloc.
+3. Toujours renseigner `sizes` (sinon `next/image` sert un fichier de 1080 px pour un logo de 140).
 
 ## Application installable (PWA)
 
 Le nom affiché est **« DD Location »** (`app.name`, identique en fr et ar : c'est une marque).
 
-- **Icônes** — générées par `python scripts/gen-icons.py` depuis `public/dd-logo.png`, à relancer
-  si le logo change. Onglet (`src/app/favicon.ico`, `icon.png`) : les tuiles « DD » seules, le mot
-  « location » est illisible à 16 px. Écran d'accueil (`apple-icon.png`, `public/icons/suit-*.png`) : logo
-  complet sur **blanc** (iOS noircit la transparence) ; la version `maskable` tient dans le cercle
-  de 80 %.
+- **Icônes** — générées par `python scripts/gen-icons.py` depuis `docs/new-logo.PNG`, à relancer
+  si le logo change. La VESTE seule (le mot est illisible à 16 px). Onglet (`src/app/favicon.ico`,
+  `icon.png`) : encre sur transparent. Écran d'accueil (`apple-icon.png`, `public/icons/suit-*.png`) :
+  veste blanche sur le brun `--nav` (iOS noircit la transparence) ; la version `maskable` tient
+  dans le cercle de 80 %. Badge de notification : blanc sur transparent.
 - **Manifeste** — `src/app/manifest.ts`. `start_url: "/"` : la langue vient du cookie
   `NEXT_LOCALE`, rendu persistant dans `src/i18n/routing.ts`. `theme_color` suit `--nav` et
   `viewport.themeColor` : les trois changent ensemble.

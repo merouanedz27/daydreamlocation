@@ -1,42 +1,63 @@
 """
-Génère les logos et les icônes de l'application à partir des deux images du
-modèle Word du propriétaire (« Daydream Ticket ») :
-
-- public/ticket-wordmark.png — « DAYDREAM · LOCATION », encre sur transparent ;
-- public/ticket-suit.png     — la veste et la cravate, encre sur BLANC.
+Génère les logos et les icônes de l'application à partir du logo du
+propriétaire, `docs/new-logo.PNG` : la veste + « DAYDREAM · LOCATION », en
+BLANC sur transparent (3020 × 594).
 
 À relancer quand le logo change :  python scripts/gen-icons.py   (Pillow requis)
 
-Sorties :
-- public/logo-wordmark.png : le mot, rogné au plus juste (barre, pied de page) ;
-- public/logo-suit.png     : la veste, fond rendu TRANSPARENT et rognée (connexion,
-  hors-ligne, onglet du navigateur) ;
-- les icônes : petites tailles (onglet) = la veste seule sur transparent ;
-  écran d'accueil = la veste centrée sur BLANC. iOS noircit la transparence, et
-  Android découpe l'icône « maskable » dans un cercle : elle tient alors dans la
-  zone sûre de 80 %.
+Le fichier n'existe qu'en blanc ; seule sa TRANSPARENCE sert, recolorée :
+- public/logo-white.png — blanc, rogné : les barres brunes (en-tête, atelier) ;
+- public/logo-ink.png   — encre #2B2119 : fonds clairs (connexion, pied de page) ;
+- public/logo-print.png — noir pur : les tickets imprimés ;
+- les icônes, la VESTE seule (le mot est illisible à 16 px) :
+  onglet = encre sur transparent ; écran d'accueil = blanc sur le brun des
+  barres (`--nav`, comme `theme_color`) — iOS noircit la transparence, et
+  Android découpe l'icône « maskable » dans un cercle : elle tient alors dans
+  la zone sûre de 80 % ; badge de notification = blanc sur transparent
+  (Android n'en garde que la forme).
 """
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 
-# --- Le mot -----------------------------------------------------------------
-WORDMARK = Image.open(PUBLIC / "ticket-wordmark.png").convert("RGBA")
-WORDMARK = WORDMARK.crop(WORDMARK.split()[3].getbbox())
-WORDMARK.save(PUBLIC / "logo-wordmark.png", optimize=True)
+SOURCE = Image.open(ROOT / "docs" / "new-logo.PNG").convert("RGBA")
+ALPHA = SOURCE.split()[3]
 
-# --- La veste : le blanc devient transparent ----------------------------------
-# L'encre garde son anti-crénelage : l'opacité suit la noirceur du pixel, et le
-# pixel lui-même devient noir pur. Sur un fond coloré, pas de liseré blanc.
-suit = Image.open(PUBLIC / "ticket-suit.png").convert("L")
-ink = suit.point(lambda v: 0 if v > 245 else min(255, round((255 - v) * 255 / 235)))
-SUIT = Image.new("RGBA", suit.size, (0, 0, 0, 255))
-SUIT.putalpha(ink)
-SUIT = SUIT.crop(ink.getbbox())
-SUIT.save(PUBLIC / "logo-suit.png", optimize=True)
+INK = (0x2B, 0x21, 0x19)
+BLACK = (0, 0, 0)
+WHITE_RGB = (255, 255, 255)
+NAV = (0x6B, 0x4F, 0x3A, 255)
+
+
+def tinted(alpha: Image.Image, rgb) -> Image.Image:
+    """La forme `alpha` remplie de la couleur `rgb`, rognée au plus juste."""
+    art = Image.new("RGBA", alpha.size, (*rgb, 255))
+    art.putalpha(alpha)
+    return art.crop(alpha.getbbox())
+
+
+# --- Le logo complet, en trois encres ------------------------------------------
+tinted(ALPHA, WHITE_RGB).save(PUBLIC / "logo-white.png", optimize=True)
+tinted(ALPHA, INK).save(PUBLIC / "logo-ink.png", optimize=True)
+tinted(ALPHA, BLACK).save(PUBLIC / "logo-print.png", optimize=True)
+
+# --- La veste seule --------------------------------------------------------------
+# Elle déborde au-dessus et au-dessous du « D » (pointes des revers, bas du
+# pan) : un simple rognage vertical la couperait. On garde tout ce qui est à
+# gauche du « D », plus les bandes au-dessus et au-dessous de lui.
+D_LEFT, SUIT_RIGHT, D_TOP, D_BOTTOM = 740, 920, 140, 450
+mask = Image.new("L", ALPHA.size, 0)
+draw = ImageDraw.Draw(mask)
+draw.rectangle((0, 0, D_LEFT, ALPHA.height), fill=255)
+draw.rectangle((D_LEFT, 0, SUIT_RIGHT, D_TOP), fill=255)
+draw.rectangle((D_LEFT, D_BOTTOM, SUIT_RIGHT, ALPHA.height), fill=255)
+suit_alpha = Image.new("L", ALPHA.size, 0)
+suit_alpha.paste(ALPHA, (0, 0), mask)
+SUIT_INK = tinted(suit_alpha, INK)
+SUIT_WHITE = tinted(suit_alpha, WHITE_RGB)
 
 
 def square(art: Image.Image, size: int, padding: float, background) -> Image.Image:
@@ -53,20 +74,22 @@ def square(art: Image.Image, size: int, padding: float, background) -> Image.Ima
 
 
 TRANSPARENT = (0, 0, 0, 0)
-WHITE = (255, 255, 255, 255)
 
 app = ROOT / "src" / "app"
 icons = PUBLIC / "icons"
 icons.mkdir(exist_ok=True)
 
 # Onglet du navigateur.
-square(SUIT, 256, 0.02, TRANSPARENT).save(app / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
-square(SUIT, 96, 0.02, TRANSPARENT).save(app / "icon.png", optimize=True)
+square(SUIT_INK, 256, 0.02, TRANSPARENT).save(app / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+square(SUIT_INK, 96, 0.02, TRANSPARENT).save(app / "icon.png", optimize=True)
 
-# Écran d'accueil.
-square(SUIT, 180, 0.12, WHITE).convert("RGB").save(app / "apple-icon.png", optimize=True)
-square(SUIT, 192, 0.12, WHITE).convert("RGB").save(icons / "suit-192.png", optimize=True)
-square(SUIT, 512, 0.12, WHITE).convert("RGB").save(icons / "suit-512.png", optimize=True)
-square(SUIT, 512, 0.22, WHITE).convert("RGB").save(icons / "suit-maskable-512.png", optimize=True)
+# Écran d'accueil : la veste blanche sur le brun des barres.
+square(SUIT_WHITE, 180, 0.14, NAV).convert("RGB").save(app / "apple-icon.png", optimize=True)
+square(SUIT_WHITE, 192, 0.14, NAV).convert("RGB").save(icons / "suit-192.png", optimize=True)
+square(SUIT_WHITE, 512, 0.14, NAV).convert("RGB").save(icons / "suit-512.png", optimize=True)
+square(SUIT_WHITE, 512, 0.24, NAV).convert("RGB").save(icons / "suit-maskable-512.png", optimize=True)
 
-print("OK", WORDMARK.size, SUIT.size)
+# Badge des notifications Android : la forme seule.
+square(SUIT_WHITE, 96, 0.04, TRANSPARENT).save(icons / "badge-96.png", optimize=True)
+
+print("OK", SUIT_INK.size)

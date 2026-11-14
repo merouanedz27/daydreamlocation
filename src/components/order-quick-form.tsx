@@ -18,6 +18,7 @@ import {
   CircleCheck,
   Eraser,
   Package,
+  PauseCircle,
   Plane,
   Plus,
   Scissors,
@@ -36,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { DatePicker, toCalendarDate } from "@/components/date-picker";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ParkedDiscardDialog, ParkedDraftsBar } from "@/components/parked-drafts-bar";
 import {
   FlagToggle,
   MoneyStepper,
@@ -72,6 +74,14 @@ import { fieldErrorsOf, orderSchema } from "@/lib/validation/orders";
 import { defaultWindow } from "@/lib/rental-range";
 import { createMemoryStore } from "@/lib/device-setting";
 import {
+  getParked,
+  park,
+  parkedHolds,
+  take as takeParked,
+  useParked,
+  type ParkedDraft,
+} from "@/lib/parked-drafts";
+import {
   ACCESSORIES_SLOT,
   EMPTY_DRAFT,
   EMPTY_SLOT,
@@ -81,8 +91,8 @@ import {
   SHOES_SLOT,
   SHIRT_SLOT,
   catalogSlotOf,
-  costumeSize,
   partOfSlot,
+  sanitizeQuickDraft,
   type QuickDraft,
   type Slot,
 } from "@/lib/quick-draft";
@@ -121,67 +131,6 @@ import type { Locale } from "@/i18n/routing";
  * au milieu de la saisie ne fait rien perdre. En MODIFICATION, le brouillon
  * vit en mémoire et part de la commande en base (voir `edit`).
  * ------------------------------------------------------------------------ */
-
-function sanitizeQuickDraft(value: unknown): QuickDraft | null {
-  if (!value || typeof value !== "object") return null;
-  const d = value as Omit<Partial<QuickDraft>, "v"> & { v?: number };
-  if (!Array.isArray(d.slots)) return null;
-  let slots = d.slots.map((s) => ({ ...EMPTY_SLOT, ...s }));
-  if (d.v === 1) {
-    // Brouillon d'avant la case « Accessoires » : trois cases fixes, puis
-    // les pièces en plus. On insère la nouvelle case à sa place plutôt que
-    // de jeter une saisie en cours.
-    if (slots.length < 3) return null;
-    slots = [...slots.slice(0, 3), EMPTY_SLOT, ...slots.slice(3)];
-  } else if (d.v !== 2 && d.v !== 3 && d.v !== 4) {
-    return null;
-  }
-  // v1 et v2 SEULEMENT. Écrit `d.v !== 3`, ce bloc s'appliquait aussi aux
-  // brouillons v4 : chaque rechargement insérait deux cases vides après la
-  // veste, et chaussures / accessoires glissaient en « Autre pièce » — des
-  // champs en double, un de plus à chaque visite.
-  if (d.v === 1 || d.v === 2) {
-    // Brouillon d'avant les cases par partie : une seule case « Costume »,
-    // ses tailles gilet / pantalon à part. Un costume nommé les reprend
-    // dans sa taille (« 50 · G 48 · P 52 ») ; gilet et pantalon arrivent vides.
-    if (slots.length < 4) return null;
-    const old = d as { vestSize?: string; pantsSize?: string };
-    const [jacket, ...rest] = slots;
-    const size =
-      jacket.name && !jacket.unitId
-        ? (costumeSize(jacket.size, old.vestSize ?? "", old.pantsSize ?? "") ??
-          "")
-        : jacket.size;
-    slots = [{ ...jacket, size }, EMPTY_SLOT, EMPTY_SLOT, ...rest];
-  }
-  // v3 avait six cases fixes. Le Jabador devient la nouvelle case 4 :
-  // les chaussures et accessoires sont donc conservés mais décalés.
-  if (d.v !== 4) {
-    if (slots.length < 6) return null;
-    slots = [
-      ...slots.slice(0, JABADOR_SLOT),
-      EMPTY_SLOT,
-      ...slots.slice(JABADOR_SLOT),
-    ];
-  }
-  if (slots.length < FIXED_SLOTS) return null;
-  // Les pièces en plus restées vides n'ont rien à garder — et cela nettoie
-  // les brouillons déjà gonflés par le bug ci-dessus.
-  slots = slots.filter((s, i) => i < FIXED_SLOTS || s.name.trim());
-  // Brouillon d'avant les retouches par pièce : la note « Tailleur » unique
-  // va sur la première pièce saisie, comme la saisie l'enregistrait.
-  const { tailor: legacyTailor, ...rest } = d as typeof d & { tailor?: unknown };
-  if (typeof legacyTailor === "string" && legacyTailor.trim()) {
-    const first = slots.findIndex((s) => s.name.trim());
-    if (first >= 0 && !slots[first].alteration) {
-      slots[first] = {
-        ...slots[first],
-        alteration: { id: null, note: legacyTailor.trim(), done: false },
-      };
-    }
-  }
-  return { ...EMPTY_DRAFT, ...rest, v: 4, slots };
-}
 
 /**
  * Store local au formulaire: son premier snapshot est toujours EMPTY_DRAFT.
@@ -301,6 +250,7 @@ const FIELD_TARGETS = [
 ] as const;
 
 const EMPTY_BUSY = new Map<number, Unavailability>();
+const NO_PARKED: ParkedDraft[] = [];
 
 /**
  * Catégories du stock montrées d'office dans chaque case (numérotée comme
@@ -487,6 +437,18 @@ export function OrderQuickForm({
   }, [hasStock, windowKey, edit?.orderId]);
 
   const busy = availability.key === windowKey ? availability.busy : EMPTY_BUSY;
+
+  // Clients EN ATTENTE sur ce téléphone : leurs pièces ne sont pas réservées
+  // en base, mais deux clients de la boutique ne prennent pas la même veste.
+  // Saisie d'une nouvelle commande seulement.
+  const parkedAll = useParked();
+  const parked = edit ? NO_PARKED : parkedAll;
+  const [discarding, setDiscarding] = useState<ParkedDraft | null>(null);
+  const cleaningBuffer = settings.cleaning_buffer_days;
+  const holds = useMemo(
+    () => parkedHolds(parked, pickup, returnDue, cleaningBuffer),
+    [parked, pickup, returnDue, cleaningBuffer],
+  );
   const isChecking =
     hasStock && Boolean(windowKey) && availability.key !== windowKey;
 
@@ -592,7 +554,9 @@ export function OrderQuickForm({
   const total = Number(draft.price) || 0;
   const balance = total - (Number(draft.paid) || 0);
 
-  const takenSlots = draft.slots.filter((s) => s.unitId && busy.has(s.unitId));
+  const takenSlots = draft.slots.filter(
+    (s) => s.unitId && (busy.has(s.unitId) || holds.has(s.unitId)),
+  );
 
   function collectIssues(): Issues {
     const parsed = orderSchema.safeParse({
@@ -752,6 +716,91 @@ export function OrderQuickForm({
     setGeneralError(null);
   }
 
+  /**
+   * « En attente » : le client en cours est mis de côté, le formulaire se vide
+   * pour le suivant. Il faut son nom — c'est ce que dit sa puce.
+   */
+  function parkCurrent() {
+    const current = store.get();
+    const name = current.customerName.trim();
+    if (!name) {
+      // Le nom seul : les autres champs manquants n'empêchent pas d'attendre.
+      toast(t("orders.parked.needName"));
+      const el = document.getElementById("q-name");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.focus({ preventScroll: true });
+      return;
+    }
+    park(current);
+    reset(false);
+    setShowDates(false);
+    toast(t("orders.parked.parkedToast", { name }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * Reprend un client en attente ; celui en cours, s'il y en a un, prend sa
+   * place. `savedName` : la commande qu'on vient d'enregistrer, pour le dire.
+   */
+  function resumeParked(id: string, savedName?: string) {
+    const current = store.get();
+    const next = takeParked(id);
+    if (!next) return;
+    // Une saisie sans nom n'est pas perdue : sa puce dira « ? ».
+    if (isDirty(current)) {
+      park(current.customerName.trim() ? current : { ...current, customerName: "?" });
+    }
+    store.set(next);
+    setAttempted(false);
+    setServerIssue(null);
+    setGeneralError(null);
+    setShowDates(false);
+    const nextName = next.customerName.trim();
+    if (savedName) {
+      toast.success(t("orders.parked.savedResumeToast", { name: savedName, next: nextName }));
+    } else {
+      toast(t("orders.parked.resumedToast", { name: nextName }));
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  /**
+   * « Enregistrer » alors que des clients ATTENDENT : pas de retour à la liste
+   * des commandes. Un seul client → la saisie le reprend aussitôt ; plusieurs →
+   * la page « En attente », pour choisir lequel. Rend `false` si personne
+   * n'attend.
+   */
+  function continueWithWaiting(savedName: string, fullNavigation = false): boolean {
+    const waiting = getParked();
+    if (waiting.length === 0) return false;
+    reset(false);
+    setShowDates(false);
+    if (waiting.length === 1) {
+      resumeParked(waiting[0].id, savedName);
+      return true;
+    }
+    toast.success(t("orders.quick.savedToast", { name: savedName }));
+    if (fullNavigation) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- navigation COMPLÈTE voulue : sans réseau, seul le service worker peut servir la page.
+      window.location.assign(`/${locale}/commandes/en-attente`);
+    } else {
+      router.push("/commandes/en-attente");
+    }
+    return true;
+  }
+
+  // Arrivée depuis la page « En attente » (`?attente=<id>`) : ce client-là
+  // revient dans la saisie. L'adresse est nettoyée, un rechargement ne le
+  // reprend pas deux fois.
+  useEffect(() => {
+    if (edit || !localReady) return;
+    const id = new URLSearchParams(window.location.search).get("attente");
+    if (!id) return;
+    router.replace("/commandes/nouvelle");
+    queueMicrotask(() => resumeParked(id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- une seule fois, une fois le brouillon du téléphone relu.
+  }, [edit, localReady]);
+
   // --- listes à cocher -------------------------------------------------------
   // `n` change à chaque ouverture : la liste est remontée et repart de la case.
   const [picker, setPicker] = useState<{
@@ -812,6 +861,7 @@ export function OrderQuickForm({
     const { unit } = unitIndex.get(id)!;
     const own = draft.slots[index] as Slot | undefined;
     const blocked = busy.get(id);
+    const heldBy = holds.get(id);
     const material = unit.status !== "disponible";
     const elsewhere = pickedUnits.has(id) && own?.unitId !== id;
 
@@ -827,9 +877,16 @@ export function OrderQuickForm({
       reason = blocked.freeFrom
         ? t("orders.freeFrom", { date: formatDate(blocked.freeFrom, locale) })
         : t("orders.takenOnDates");
+    else if (heldBy !== undefined)
+      reason = t("orders.parked.heldBy", { name: heldBy });
 
-    // `taken` : la pièce n'est pas libre sur ces dates (ou pas en état).
-    return { reason, taken: material || Boolean(blocked), elsewhere };
+    // `taken` : la pièce n'est pas libre sur ces dates (ou pas en état), ou
+    // un client en attente la tient.
+    return {
+      reason,
+      taken: material || Boolean(blocked) || heldBy !== undefined,
+      elsewhere,
+    };
   }
 
   /** Cette pièce du stock va-t-elle dans la case `index` ? */
@@ -1199,7 +1256,9 @@ export function OrderQuickForm({
     // « Enregistrer » d'une NOUVELLE commande : l'action redirige elle-même
     // vers la liste (un seul aller-retour). Les autres cas restent sur place
     // ou choisissent leur page : ils veulent le résultat.
-    const redirects = !edit && !another;
+    // Des clients attendent : la saisie choisit elle-même où aller (voir
+    // `continueWithWaiting`), l'action ne redirige donc pas vers la liste.
+    const redirects = !edit && !another && getParked().length === 0;
     if (!redirects) formData.set("return_id", "1");
     if (edit) formData.set("id", String(edit.orderId));
     formData.set("customer_name", draft.customerName);
@@ -1262,6 +1321,10 @@ export function OrderQuickForm({
         t("offline.orderTitle", { name, date: formatDate(draft.eventDate, locale) }),
       );
       setFrozen(null);
+      if (!another && continueWithWaiting(name, true)) {
+        toast(t("offline.queuedToast"));
+        return;
+      }
       reset(another);
       toast(t("offline.queuedToast"));
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1324,6 +1387,7 @@ export function OrderQuickForm({
         router.push(`/commandes/${edit.orderId}`);
         return;
       }
+      if (result.ok && !another && continueWithWaiting(name)) return;
       if (result.ok) {
         const href = `/commandes/${result.id}`;
         // « Enregistrer » seul est redirigé par l'action : ici, c'est
@@ -1475,6 +1539,8 @@ export function OrderQuickForm({
     const slot = draft.slots[index];
     const partIssue = issueText(`part_${index}`);
     const taken = slot.unitId ? busy.get(slot.unitId) : undefined;
+    const heldBy = slot.unitId ? holds.get(slot.unitId) : undefined;
+    const warn = Boolean(taken) || heldBy !== undefined;
     return (
       <>
         {partIssue && (
@@ -1487,12 +1553,12 @@ export function OrderQuickForm({
           <p
             className={cn(
               "mt-1.5 flex items-center gap-1.5 text-xs",
-              taken
+              warn
                 ? "text-warning-foreground font-medium"
                 : "text-success",
             )}
           >
-            {taken ? (
+            {warn ? (
               <AlertTriangle
                 className="size-3.5 shrink-0"
                 aria-hidden
@@ -1515,6 +1581,9 @@ export function OrderQuickForm({
                     })
                   : t("orders.takenOnDates")
               }`}
+            {!taken &&
+              heldBy !== undefined &&
+              ` · ${t("orders.parked.heldBy", { name: heldBy })}`}
           </p>
         )}
       </>
@@ -1550,6 +1619,14 @@ export function OrderQuickForm({
         )}
       </div>
 
+      {!edit && (
+        <ParkedDraftsBar
+          parked={parked}
+          onResume={resumeParked}
+          onDiscard={setDiscarding}
+        />
+      )}
+
       {resumed && (
         <Alert className="mb-4">
           <AlertCircle />
@@ -1568,6 +1645,7 @@ export function OrderQuickForm({
           return (
             <Section
               id="q-retouche"
+              tone="gold"
               title={
                 <span className="flex items-center gap-2">
                   <Scissors className="text-gold-strong size-5" aria-hidden />
@@ -1619,7 +1697,7 @@ export function OrderQuickForm({
         })()}
 
       {/* --- Client ---------------------------------------------------------- */}
-      <Section id="q-client" title={t("orders.customer")}>
+      <Section id="q-client" tone="client" title={t("orders.customer")}>
         <FieldGroup>
           <Field data-invalid={!!issues.customer_name || undefined}>
             <FieldLabel htmlFor="q-name">
@@ -1674,9 +1752,23 @@ export function OrderQuickForm({
               onChange={onEventDateChange}
               placeholder={t("common.pickDate")}
               invalid={!!issues.event_date}
+              // Tant qu'elle manque, la date bloque toutes les pièces : on la
+              // signale en or (pas en rouge, réservé aux erreurs).
+              className={
+                !draft.eventDate && !issues.event_date
+                  ? "border-gold-strong bg-gold-soft hover:bg-gold-soft ring-gold-strong/30 ring-2 [&_svg]:text-gold-strong"
+                  : undefined
+              }
             />
-            {issues.event_date && (
+            {issues.event_date ? (
               <FieldError>{issueText("event_date")}</FieldError>
+            ) : (
+              !draft.eventDate && (
+                <p className="text-gold-strong flex items-center gap-1.5 text-sm font-medium">
+                  <CalendarRange className="size-4 shrink-0" aria-hidden />
+                  {t("orders.quick.dateFirstHint")}
+                </p>
+              )
             )}
 
             {saleOnly ? (
@@ -1784,6 +1876,7 @@ export function OrderQuickForm({
           liste, « Valider ». Plus rien à taper pour un vêtement déjà connu. */}
       <Section
         id="q-outfit"
+        tone="outfit"
         title={
           <>
             {t("orders.quick.outfit")}
@@ -1865,7 +1958,7 @@ export function OrderQuickForm({
                 )}
 
                 {!isPants && slot.name.trim() && slot.alteration && (
-                  <div className="border-gold-strong/30 bg-gold-soft/40 mt-2 rounded-md border p-2">
+                  <div className="border-gold-strong/30 bg-gold-soft mt-2 rounded-md border p-2">
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <label
                         htmlFor={`q-alt-${index}`}
@@ -1928,7 +2021,7 @@ export function OrderQuickForm({
 
       {/* --- Paiement --------------------------------------------------------
           L'ordre de son AppSheet : VERS, PRIX, puis REST calculé. */}
-      <Section id="q-payment" title={t("orders.quick.payment")}>
+      <Section id="q-payment" tone="payment" title={t("orders.quick.payment")}>
         <FieldGroup>
           <Field data-invalid={!!issues.amount_paid || undefined}>
             <FieldLabel htmlFor="q-paid">{t("orders.paid")}</FieldLabel>
@@ -1972,7 +2065,7 @@ export function OrderQuickForm({
             <p className="mb-1.5 text-sm font-medium">{t("orders.balance")}</p>
             <p
               className={cn(
-                "bg-muted/60 tabular flex h-12 items-center rounded-md px-3 text-base",
+                "bg-background tabular flex h-12 items-center rounded-md px-3 text-base",
                 balance > 0
                   ? "text-warning-foreground font-medium"
                   : "text-muted-foreground",
@@ -2083,7 +2176,7 @@ export function OrderQuickForm({
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-[1fr_auto] gap-2">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2">
             <Button
               type="submit"
               value="save"
@@ -2098,10 +2191,27 @@ export function OrderQuickForm({
               value="another"
               variant="outline"
               disabled={isPending}
-              className="h-12 px-4 text-base"
+              className="h-12 px-3 text-base"
             >
               <Plus className="size-4" aria-hidden />
               {t("orders.quick.saveAnother")}
+            </Button>
+            {/* À côté de « Suivante » : les deux gestes qui enchaînent les
+                clients — l'un enregistre, l'autre met de côté sans rien envoyer. */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={parkCurrent}
+              disabled={isPending}
+              aria-label={
+                draft.customerName.trim()
+                  ? t("orders.parked.parkLabel", { name: draft.customerName.trim() })
+                  : undefined
+              }
+              className="h-12 px-3 text-base"
+            >
+              <PauseCircle className="size-4" aria-hidden />
+              {t("orders.parked.park")}
             </Button>
           </div>
         )}
@@ -2175,6 +2285,8 @@ export function OrderQuickForm({
           setShowDates(false);
         }}
       />
+
+      <ParkedDiscardDialog item={discarding} onClose={() => setDiscarding(null)} />
     </form>
   );
 }

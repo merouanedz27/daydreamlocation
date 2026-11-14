@@ -11,7 +11,7 @@ import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Link } from "@/i18n/navigation";
 import { signOut } from "@/lib/actions/auth";
 import type { Locale } from "@/i18n/routing";
-import wordmark from "../../public/logo-wordmark.png";
+import logo from "../../public/logo-white.png";
 
 /**
  * L'en-tête de l'ATELIER : le logo, le nom, la langue, la déconnexion — rien
@@ -36,11 +36,11 @@ export function AtelierHeader({
       <div className="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
         <Link href={homeHref} className="flex shrink-0 items-center">
           <Image
-            src={wordmark}
+            src={logo}
             alt={t("app.name")}
             priority
-            sizes="140px"
-            className="h-5 w-auto brightness-0 invert"
+            sizes="145px"
+            className="h-7 w-auto"
           />
         </Link>
         <div className="min-w-0 flex-1 text-end">

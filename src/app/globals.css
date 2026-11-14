@@ -55,6 +55,10 @@
   --color-cream: var(--cream);
   --color-cream-foreground: var(--cream-foreground);
   --color-brown-soft: var(--brown-soft);
+  /* Bloc CLIENT du formulaire de commande : un bleu, pour ne pas se lire
+     comme un statut (jaune / rouge / vert sont pris par les lignes). */
+  --color-section-client: var(--section-client);
+  --color-section-client-edge: var(--section-client-edge);
 
   /* Fond de LIGNE du tableau des commandes, selon son statut. */
   --color-row-reserved: var(--row-reserved);
@@ -214,6 +218,8 @@
      cette variante foncée.  #A16207 — 4,92:1. */
   --gold-strong: oklch(0.5538 0.1207 66.44);
   --brown-soft: oklch(0.9381 0.0138 67.66); /* #F1E9E1 */
+  --section-client: oklch(0.96 0.025 240); /* bleu très pâle, texte ≥ 12:1 */
+  --section-client-edge: oklch(0.6 0.1 240);
 
   /* Lignes du tableau des commandes — toute la ligne prend la couleur de son
      statut, comme dans son AppSheet. Teintes CLAIRES : le texte noir reste
@@ -291,6 +297,8 @@
   --gold-soft: oklch(0.31 0.05 86); /* or sur ce voile ~8:1 */
   --gold-strong: oklch(0.86 0.17 92);
   --brown-soft: oklch(0.25 0.025 62);
+  --section-client: oklch(0.27 0.035 240);
+  --section-client-edge: oklch(0.65 0.09 240);
 
   /* Lignes du tableau des commandes : teintes PROFONDES, même sens qu'en
      clair ; le texte crème reste au-dessus de 10:1. */

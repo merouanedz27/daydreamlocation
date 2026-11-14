@@ -122,6 +122,72 @@ export const EMPTY_DRAFT: QuickDraft = {
 };
 
 /**
+ * Un brouillon relu du téléphone (`localStorage`), ou `null` s'il est
+ * illisible. Les brouillons d'anciennes versions sont remis à jour plutôt que
+ * jetés : une saisie en cours ne se perd pas à une mise à jour de l'app.
+ */
+export function sanitizeQuickDraft(value: unknown): QuickDraft | null {
+  if (!value || typeof value !== "object") return null;
+  const d = value as Omit<Partial<QuickDraft>, "v"> & { v?: number };
+  if (!Array.isArray(d.slots)) return null;
+  let slots = d.slots.map((s) => ({ ...EMPTY_SLOT, ...s }));
+  if (d.v === 1) {
+    // Brouillon d'avant la case « Accessoires » : trois cases fixes, puis
+    // les pièces en plus. On insère la nouvelle case à sa place plutôt que
+    // de jeter une saisie en cours.
+    if (slots.length < 3) return null;
+    slots = [...slots.slice(0, 3), EMPTY_SLOT, ...slots.slice(3)];
+  } else if (d.v !== 2 && d.v !== 3 && d.v !== 4) {
+    return null;
+  }
+  // v1 et v2 SEULEMENT. Écrit `d.v !== 3`, ce bloc s'appliquait aussi aux
+  // brouillons v4 : chaque rechargement insérait deux cases vides après la
+  // veste, et chaussures / accessoires glissaient en « Autre pièce » — des
+  // champs en double, un de plus à chaque visite.
+  if (d.v === 1 || d.v === 2) {
+    // Brouillon d'avant les cases par partie : une seule case « Costume »,
+    // ses tailles gilet / pantalon à part. Un costume nommé les reprend
+    // dans sa taille (« 50 · G 48 · P 52 ») ; gilet et pantalon arrivent vides.
+    if (slots.length < 4) return null;
+    const old = d as { vestSize?: string; pantsSize?: string };
+    const [jacket, ...rest] = slots;
+    const size =
+      jacket.name && !jacket.unitId
+        ? (costumeSize(jacket.size, old.vestSize ?? "", old.pantsSize ?? "") ??
+          "")
+        : jacket.size;
+    slots = [{ ...jacket, size }, EMPTY_SLOT, EMPTY_SLOT, ...rest];
+  }
+  // v3 avait six cases fixes. Le Jabador devient la nouvelle case 4 :
+  // les chaussures et accessoires sont donc conservés mais décalés.
+  if (d.v !== 4) {
+    if (slots.length < 6) return null;
+    slots = [
+      ...slots.slice(0, JABADOR_SLOT),
+      EMPTY_SLOT,
+      ...slots.slice(JABADOR_SLOT),
+    ];
+  }
+  if (slots.length < FIXED_SLOTS) return null;
+  // Les pièces en plus restées vides n'ont rien à garder — et cela nettoie
+  // les brouillons déjà gonflés par le bug ci-dessus.
+  slots = slots.filter((s, i) => i < FIXED_SLOTS || s.name.trim());
+  // Brouillon d'avant les retouches par pièce : la note « Tailleur » unique
+  // va sur la première pièce saisie, comme la saisie l'enregistrait.
+  const { tailor: legacyTailor, ...rest } = d as typeof d & { tailor?: unknown };
+  if (typeof legacyTailor === "string" && legacyTailor.trim()) {
+    const first = slots.findIndex((s) => s.name.trim());
+    if (first >= 0 && !slots[first].alteration) {
+      slots[first] = {
+        ...slots[first],
+        alteration: { id: null, note: legacyTailor.trim(), done: false },
+      };
+    }
+  }
+  return { ...EMPTY_DRAFT, ...rest, v: 4, slots };
+}
+
+/**
  * « 50 · G 48 · P 52 » — veste, gilet, pantalon dans la seule colonne taille
  * de la ligne du costume. Le pantalon n'est écrit que s'il DIFFÈRE de la
  * veste : « 50 » seul veut dire veste et pantalon en 50, comme sur son tableur.

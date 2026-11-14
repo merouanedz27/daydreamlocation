@@ -29,6 +29,8 @@ import { idbClear, idbGet, idbSet, idbUpdate } from "@/lib/offline/store";
 import type { OfflineCatalog, OutboxItem, OutboxOp } from "@/lib/offline/types";
 import type { Unavailability } from "@/lib/queries/orders";
 import { freeFrom, rangesOverlap, rentalRange } from "@/lib/rental-range";
+import { park } from "@/lib/parked-drafts";
+import { sanitizeQuickDraft, type QuickDraft } from "@/lib/quick-draft";
 
 const OUTBOX = "outbox";
 /** L'ancien cliché des commandes (avant les écrans gardés) : effacé s'il traîne. */
@@ -269,30 +271,31 @@ export async function dropOtherUsers(userId: string): Promise<void> {
   emit(OUTBOX_EVENT);
 }
 
-/** Une saisie de nouvelle commande est-elle en cours dans ce téléphone ? */
-function quickDraftInProgress(): boolean {
+/** La saisie de nouvelle commande en cours dans ce téléphone, s'il y en a une. */
+function quickDraftInProgress(): QuickDraft | null {
   try {
-    const d = JSON.parse(localStorage.getItem("dd.quickOrder") ?? "null") as {
-      customerName?: string;
-      slots?: { name?: string }[];
-    } | null;
-    return Boolean(d && (d.customerName?.trim() || d.slots?.some((slot) => slot.name?.trim())));
+    const d = sanitizeQuickDraft(JSON.parse(localStorage.getItem("dd.quickOrder") ?? "null"));
+    return d && (d.customerName.trim() || d.slots.some((slot) => slot.name.trim())) ? d : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
 /**
  * « Corriger » une commande provisoire REFUSÉE (pièce déjà louée, commande
  * changée entre-temps) : la saisie revient dans le formulaire, toute remplie,
- * et quitte la file. Rend `false` si une autre saisie est en cours — on ne
- * l'écrase pas.
+ * et quitte la file. Une autre saisie en cours n'est pas écrasée : elle passe
+ * EN ATTENTE, l'employé la reprend d'une touche.
  */
 export async function reopenOrder(item: OutboxItem, locale: string): Promise<boolean> {
   const op = item.op;
   if (op.kind === "order") {
-    if (quickDraftInProgress()) return false;
+    const inProgress = quickDraftInProgress();
     try {
+      if (inProgress) {
+        // Avec un nom, sa puce le dit ; sans, on lui donne celui du brouillon.
+        park(inProgress.customerName.trim() ? inProgress : { ...inProgress, customerName: "?" });
+      }
       localStorage.setItem("dd.quickOrder", JSON.stringify(op.draft));
     } catch {
       return false;

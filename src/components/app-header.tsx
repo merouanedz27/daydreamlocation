@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   WashingMachine,
   LogOut,
+  PauseCircle,
   Plane,
   Receipt,
   Scissors,
@@ -45,7 +46,7 @@ import { detachPush } from "@/lib/notifications/browser";
 import { ThemeChoice } from "@/components/theme-choice";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
-import wordmark from "../../public/logo-wordmark.png";
+import logo from "../../public/logo-white.png";
 
 export function AppHeader({
   fullName,
@@ -84,7 +85,7 @@ export function AppHeader({
     { href: "/commandes/demain", icon: Plane, label: t("nav.tomorrowShort") },
     { href: "/commandes", icon: ClipboardList, label: t("nav.orders") },
     { href: "/commandes/pas-rentres", icon: Undo2, label: t("nav.notReturnedShort") },
-    { href: "/frais", icon: Receipt, label: t("nav.fraisShort") },
+    { href: "/commandes/en-attente", icon: PauseCircle, label: t("nav.waitingShort") },
   ] as const;
 
   /** Pages hors onglets, rangées dans le menu du compte. */
@@ -94,6 +95,7 @@ export function AppHeader({
     label: string;
     count?: number;
   }[] = [
+    { href: "/frais", icon: Receipt, label: t("nav.frais") },
     { href: "/commandes/calendrier", icon: CalendarDays, label: t("nav.calendar") },
     { href: "/stock", icon: LayoutGrid, label: t("nav.stock") },
     { href: "/pressing", icon: WashingMachine, label: t("nav.pressing") },
@@ -135,21 +137,19 @@ export function AppHeader({
        de bordure fait toujours la séparation. Voir `daydream-ui`.) */
     <header className="border-nav-border bg-nav supports-[backdrop-filter]:bg-nav/92 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="relative mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
-        {/* LE LOGO DU BON — « DAYDREAM · LOCATION », celui du modèle Word du
-            propriétaire, pour que l'écran et le papier portent la même marque.
-            Le fichier est en encre noire sur transparent : `brightness-0
-            invert` le passe en BLANC, lisible sur le brun de la barre. Pas de
-            second fichier à tenir à jour.
+        {/* LE LOGO DE LA BOUTIQUE — la veste et « DAYDREAM · LOCATION »,
+            le même que sur le bon imprimé. Sa version BLANCHE, lisible sur le
+            brun de la barre (`scripts/gen-icons.py`).
 
             Le `alt` n'est pas décoratif : plus aucun texte n'accompagne le
             logo, il est donc le SEUL nom accessible de ce lien. */}
         <Link href="/commandes" className="flex shrink-0 items-center">
           <Image
-            src={wordmark}
+            src={logo}
             alt={t("app.name")}
             priority
-            sizes="140px"
-            className="h-5 w-auto brightness-0 invert sm:h-6"
+            sizes="165px"
+            className="h-7 w-auto sm:h-8"
           />
         </Link>
 

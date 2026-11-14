@@ -60,6 +60,25 @@ test.describe("frais — chacun les siens", () => {
     test("ajoute un frais", async ({ page }) => {
       await addFrais(page, "700", "E2E frais patron");
     });
+
+    test("corrige un frais par le menu ⋮", async ({ page }) => {
+      await addFrais(page, "800", "E2E frais à corriger");
+      await page
+        .getByRole("button", { name: "Actions pour « E2E frais à corriger »" })
+        .first()
+        .click();
+      await page.getByRole("menuitem", { name: "Modifier" }).click();
+      const d = drawer(page);
+      await expect(d).toBeVisible();
+      await expect(d.locator("#fe-detail")).toHaveValue("E2E frais à corriger");
+      await d.locator("#fe-amount").fill("900");
+      await d.locator("#fe-detail").fill("E2E frais corrigé");
+      await d.getByRole("button", { name: "Enregistrer" }).click();
+      await expect(d).toBeHidden();
+      await expectNotFrozen(page);
+      await page.reload();
+      await expect(page.getByText("E2E frais corrigé").first()).toBeVisible();
+    });
   });
 
   test.describe("employé", () => {
