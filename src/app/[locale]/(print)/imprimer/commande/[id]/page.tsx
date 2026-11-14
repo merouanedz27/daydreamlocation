@@ -248,13 +248,16 @@ export default async function OrderSlipPage({
     </p>
   );
 
-  const body = (
+  // `bigDate` : sur le TICKET CLIENT, la date de l'événement un peu plus
+  // grande (demande du client).
+  const renderBody = (bigDate: boolean) => (
     <div className="px-[0.8em] pt-[0.6em]">
       <ClientBox
         labels={{ client: tt("client"), phone: tt("phone"), date: tt("date") }}
         name={order.customer_name}
         phone={order.customer_phone}
         date={eventDate}
+        bigDate={bigDate}
       />
       <PillRule className="mt-[0.7em]">{tt("details")}</PillRule>
       <DetailsTable details={details} />
@@ -280,7 +283,10 @@ export default async function OrderSlipPage({
     </div>
   );
 
-  const footer = (
+  // Le numéro de la boutique (Paramètres) — sur le BON DE LOCATION seul,
+  // demande du client.
+  const shopPhone = settings.shop_phone?.trim() || null;
+  const renderFooter = (withShopPhone: boolean) => (
     <>
       <Spacer />
       <footer className="px-[0.8em] pb-[0.5em]">
@@ -297,6 +303,15 @@ export default async function OrderSlipPage({
           <li aria-hidden className="h-[1.2em] w-[1.5px] bg-black" />
           <Social icon={FacebookIcon}>{SHOP_SOCIALS.facebook}</Social>
         </ul>
+        {withShopPhone && shopPhone && (
+          <p
+            dir="ltr"
+            className="mt-[0.3em] flex items-center justify-center gap-[0.4em] text-[min(1.1em,12pt)] leading-none font-bold"
+          >
+            <Phone className="size-[1em] shrink-0 fill-black" aria-hidden />
+            <bdi className="tabular">{shopPhone}</bdi>
+          </p>
+        )}
         <ScriptRule className="mt-[0.35em]" large>
           {tt("thanks")}
         </ScriptRule>
@@ -352,8 +367,8 @@ export default async function OrderSlipPage({
               ))}
             </section>
 
-            {body}
-            {footer}
+            {renderBody(false)}
+            {renderFooter(true)}
           </TicketCard>
         </TicketFrame>
 
@@ -365,8 +380,8 @@ export default async function OrderSlipPage({
           <TicketCard>
             {header}
             {cancelledBanner}
-            {body}
-            {footer}
+            {renderBody(true)}
+            {renderFooter(false)}
           </TicketCard>
 
           {/* PARTIE RETOUCHE — détachée le long des pointillés et donnée au
@@ -652,11 +667,13 @@ function ClientBox({
   name,
   phone,
   date,
+  bigDate = false,
 }: {
   labels: { client: string; phone: string; date: string };
   name: string;
   phone: string | null;
   date: string;
+  bigDate?: boolean;
 }) {
   return (
     <div className="rounded-[0.8em] border-[1.5px] border-black px-[0.7em] py-[0.35em]">
@@ -688,7 +705,9 @@ function ClientBox({
             {labels.date}
             <Colon />
           </span>
-          <span className="tabular">{date}</span>
+          <span className={cn("tabular", bigDate && "text-[1.3em]")}>
+            {date}
+          </span>
         </p>
       </div>
     </div>
