@@ -59,6 +59,9 @@
      comme un statut (jaune / rouge / vert sont pris par les lignes). */
   --color-section-client: var(--section-client);
   --color-section-client-edge: var(--section-client-edge);
+  /* Bloc VENTE : un violet, bien distinct de la tenue louée. */
+  --color-section-sale: var(--section-sale);
+  --color-section-sale-edge: var(--section-sale-edge);
 
   /* Fond de LIGNE du tableau des commandes, selon son statut. */
   --color-row-reserved: var(--row-reserved);
@@ -220,6 +223,8 @@
   --brown-soft: oklch(0.9381 0.0138 67.66); /* #F1E9E1 */
   --section-client: oklch(0.96 0.025 240); /* bleu très pâle, texte ≥ 12:1 */
   --section-client-edge: oklch(0.6 0.1 240);
+  --section-sale: oklch(0.95 0.035 300); /* violet pâle, texte ≥ 12:1 */
+  --section-sale-edge: oklch(0.55 0.15 300);
 
   /* Lignes du tableau des commandes — toute la ligne prend la couleur de son
      statut, comme dans son AppSheet. Teintes CLAIRES : le texte noir reste
@@ -299,6 +304,8 @@
   --brown-soft: oklch(0.25 0.025 62);
   --section-client: oklch(0.27 0.035 240);
   --section-client-edge: oklch(0.65 0.09 240);
+  --section-sale: oklch(0.28 0.05 300);
+  --section-sale-edge: oklch(0.68 0.13 300);
 
   /* Lignes du tableau des commandes : teintes PROFONDES, même sens qu'en
      clair ; le texte crème reste au-dessus de 10:1. */

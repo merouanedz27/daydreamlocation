@@ -120,6 +120,7 @@
       "eventDate": "Événement",
       "pickupDate": "Retrait",
       "createdBy": "Saisie par",
+      "returnedBy": "Retour validé par",
       "status": "Statut",
       "total": "Total",
       "paid": "Versé",
@@ -156,6 +157,7 @@
     "settled": "Soldé",
     "callCustomer": "Appeler le client",
     "createdBy": "Créée le {date} par {name}",
+    "returnedBy": "Retour validé par {name} le {date}",
     "createdOn": "Créée le {date}",
     "piecesCount": "{count} pièce(s)",
     "notesTitle": "Note",
@@ -236,7 +238,10 @@
       "sizePantsShort": "Pantalon",
       "stepDown": "Moins {step}",
       "stepUp": "Plus {step}",
-      "noSaleStock": "Aucun article à vendre en stock. Ajoutez-en dans Stock › Vente."
+      "noSaleStock": "Aucun article à vendre en stock. Ajoutez-en dans Stock › Vente.",
+      "saleSection": "Vente",
+      "saleHint": "Articles achetés par le client (stock de vente). Ils figurent sur le même ticket.",
+      "salePrice": "Prix de la vente"
     },
     "parked": {
       "pageTitle": "En attente",
@@ -843,6 +848,7 @@
       "shoes": "Chaussures",
       "accessories": "Accessoires",
       "pants": "Pantalon",
+      "sale": "Achat",
       "paid": "Versement",
       "price": "Prix",
       "rest": "Reste",
@@ -1140,6 +1146,7 @@
       "jabador": "Jabador 👘 :",
       "shoes": "Chaussures 👞 :",
       "accessories": "Accessoires 🦋 :",
+      "sale": "Achat 🛍️ :",
       "paid": "VERS :",
       "price": "PRIX :",
       "rest": "REST :",

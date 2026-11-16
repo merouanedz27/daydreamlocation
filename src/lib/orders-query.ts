@@ -81,6 +81,8 @@ export type OrderTableRow = OrderRow & {
    * lire que son propre profil. `null` pour les commandes reprises du tableur.
    */
   created_by_name: string | null;
+  /** Qui a coché « Retour validé » (`returned_by`) — au propriétaire SEUL. */
+  returned_by_name: string | null;
 };
 
 export type OrdersQuery = {

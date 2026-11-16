@@ -569,6 +569,8 @@ export type Database = {
           caution_returned: boolean;
           picked_up: boolean;
           returned: boolean;
+          returned_at: string | null;
+          returned_by: string | null;
           status: string;
           notes: string | null;
           created_by: string | null;
@@ -594,6 +596,8 @@ export type Database = {
           caution_returned?: boolean;
           picked_up?: boolean;
           returned?: boolean;
+          returned_at?: string | null;
+          returned_by?: string | null;
           status?: string;
           notes?: string | null;
           created_by?: string | null;
@@ -619,6 +623,8 @@ export type Database = {
           caution_returned?: boolean;
           picked_up?: boolean;
           returned?: boolean;
+          returned_at?: string | null;
+          returned_by?: string | null;
           status?: string;
           notes?: string | null;
           created_by?: string | null;
@@ -632,6 +638,13 @@ export type Database = {
           {
             foreignKeyName: "orders_created_by_fkey";
             columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "orders_returned_by_fkey";
+            columns: ["returned_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];

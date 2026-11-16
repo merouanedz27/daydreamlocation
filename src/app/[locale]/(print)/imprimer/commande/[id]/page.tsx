@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Great_Vibes, Tinos } from "next/font/google";
@@ -8,8 +9,8 @@ import {
   Handshake,
   IdCard,
   Phone,
+  ShoppingBag,
   TriangleAlert,
-  User,
 } from "lucide-react";
 import { PrintToolbar } from "@/components/print-toolbar";
 import { TicketActions } from "@/components/ticket-share";
@@ -137,10 +138,9 @@ export default async function OrderSlipPage({
   const fields = ticketFields(
     {
       ...order,
-      // Une paire VENDUE ne figure pas sur le bon : il dit ce qui doit revenir.
-      order_lines: order.order_lines.filter(
-        (line) => line.is_active && line.line_kind !== "vente",
-      ),
+      // Les articles VENDUS ne vont pas dans les cases de la tenue : ils ont
+      // leur ligne « Achat » (`fields.sales`). Un seul ticket pour les deux.
+      order_lines: order.order_lines.filter((line) => line.is_active),
     },
     {
       slotOf: (label) => labelSlots.get(normalizeSearch(label)) ?? null,
@@ -166,6 +166,7 @@ export default async function OrderSlipPage({
       { icon: JacketIcon, label: tt("jabador"), value: fields.jabador },
       { icon: ShoeIcon, label: tt("shoes"), value: fields.shoes },
       { icon: BowTieIcon, label: tt("accessories"), value: fields.accessories },
+      { icon: ShoppingBag, label: tt("sale"), value: fields.sales },
     ] satisfies Detail[]
   ).filter((d) => Boolean(d.value));
 
@@ -204,38 +205,26 @@ export default async function OrderSlipPage({
   );
 
   const header = (
-    // QR à GAUCHE, sur un bon arabe aussi (`dir="ltr"`).
+    // QR à GAUCHE, sur un bon arabe aussi (`dir="ltr"`). Bandeau de taille
+    // FIXE (pouces, pas `em`) : il ne grandit pas avec le texte, toute la
+    // hauteur gagnée va au client et aux détails (demande du client : le bon
+    // doit se lire de loin).
     <header
       dir="ltr"
-      className="mx-[0.8em] flex items-center gap-[0.8em] border-b-[1.5px] border-black pt-[0.8em] pb-[0.6em]"
+      className="mx-0 flex items-center gap-[8px] border-b-[1.5px] border-black pt-[5px] pb-[4px]"
     >
-      <OrderQr value={orderUrl} className="block size-[5.6em] shrink-0" />
+      <OrderQr value={orderUrl} className="block size-[0.6in] shrink-0" />
       <span aria-hidden className="w-[1.5px] self-stretch bg-black" />
-      <div className="flex min-w-0 flex-1 flex-col items-center">
-        <div className="flex w-full items-center gap-[0.4em]">
-          {/* `unoptimized` : le logo servi par SON fichier (cache de
-              html-to-image) ; `priority` : chargé avant l'impression. */}
-          <Image
-            src={logo}
-            alt={t("app.name")}
-            priority
-            unoptimized
-            className="h-auto w-0 min-w-0 flex-1 [print-color-adjust:exact]"
-          />
-          {/* Le filet qui prolonge « DAYDREAM » jusqu'au cadre (maquette). */}
-          <span
-            aria-hidden
-            className="w-[2.6em] shrink-0 -translate-y-[0.35em] border-t-[1.5px] border-black"
-          />
-        </div>
-        <p
-          className={cn(
-            SCRIPT,
-            "mt-[0.2em] text-[1.35em] leading-none whitespace-nowrap",
-          )}
-        >
-          {tt("tagline")}
-        </p>
+      <div className="flex min-w-0 flex-1 justify-center">
+        {/* `unoptimized` : le logo servi par SON fichier (cache de
+            html-to-image) ; `priority` : chargé avant l'impression. */}
+        <Image
+          src={logo}
+          alt={t("app.name")}
+          priority
+          unoptimized
+          className="h-[0.52in] w-auto max-w-full object-contain [print-color-adjust:exact]"
+        />
       </div>
     </header>
   );
@@ -251,15 +240,13 @@ export default async function OrderSlipPage({
   // `bigDate` : sur le TICKET CLIENT, la date de l'événement un peu plus
   // grande (demande du client).
   const renderBody = (bigDate: boolean) => (
-    <div className="px-[0.8em] pt-[0.6em]">
+    <div className="px-[0.5em] pt-[0.3em]">
       <ClientBox
-        labels={{ client: tt("client"), phone: tt("phone"), date: tt("date") }}
         name={order.customer_name}
         phone={order.customer_phone}
         date={eventDate}
         bigDate={bigDate}
       />
-      <PillRule className="mt-[0.7em]">{tt("details")}</PillRule>
       <DetailsTable details={details} />
       <MoneyBox
         rows={[
@@ -289,13 +276,12 @@ export default async function OrderSlipPage({
   const renderFooter = (withShopPhone: boolean) => (
     <>
       <Spacer />
-      <footer className="px-[0.8em] pb-[0.5em]">
-        {/* Tailles PLAFONNÉES : sur une commande d'une seule pièce, `--fit`
-            grimpe à 2,2 et ces lignes sans retour sortaient de l'étiquette. */}
-        <ScriptRule>{tt("socials")}</ScriptRule>
+      <footer className="px-[0.5em] pb-[2px]">
+        {/* Tailles FIXES (pt) : le pied de page ne grandit pas avec le
+            texte, et ces lignes sans retour ne sortent jamais de l'étiquette. */}
         <ul
           dir="ltr"
-          className="mt-[0.3em] flex items-center justify-center-safe gap-[0.5em] text-[min(0.78em,8.5pt)] whitespace-nowrap"
+          className="flex flex-wrap items-center justify-center gap-x-[0.5em] border-t-[1.5px] border-black pt-[3px] text-[6.8pt] whitespace-nowrap rtl:text-[6.3pt]"
         >
           <Social icon={InstagramIcon}>{SHOP_SOCIALS.instagram}</Social>
           <li aria-hidden className="h-[1.2em] w-[1.5px] bg-black" />
@@ -306,15 +292,13 @@ export default async function OrderSlipPage({
         {withShopPhone && shopPhone && (
           <p
             dir="ltr"
-            className="mt-[0.3em] flex items-center justify-center gap-[0.4em] text-[min(1.1em,12pt)] leading-none font-bold"
+            className="mt-[2px] flex items-center justify-center gap-[0.4em] text-[11pt] leading-none font-bold"
           >
             <Phone className="size-[1em] shrink-0 fill-black" aria-hidden />
             <bdi className="tabular">{shopPhone}</bdi>
           </p>
         )}
-        <ScriptRule className="mt-[0.35em]" large>
-          {tt("thanks")}
-        </ScriptRule>
+        <ScriptRule>{tt("thanks")}</ScriptRule>
       </footer>
     </>
   );
@@ -352,7 +336,7 @@ export default async function OrderSlipPage({
             <section
               lang="ar"
               dir="rtl"
-              className="mx-[0.8em] mt-[0.5em] text-center font-[family-name:var(--font-cairo)] leading-[1.45] font-bold"
+              className="mx-[0.8em] mt-[0.3em] text-center font-[family-name:var(--font-cairo)] leading-[1.3] font-bold"
             >
               <h2 className="flex items-center justify-center gap-[0.4em] text-[1.15em] font-extrabold">
                 <TriangleAlert className="size-[1.05em] shrink-0" aria-hidden />
@@ -361,7 +345,7 @@ export default async function OrderSlipPage({
                 <TriangleAlert className="size-[1.05em] shrink-0" aria-hidden />
               </h2>
               {terms.map((term, i) => (
-                <p key={i} className="mt-[0.15em] text-[0.95em]">
+                <p key={i} className="text-[0.95em]">
                   {term}
                 </p>
               ))}
@@ -494,7 +478,7 @@ const SERIF =
 function TicketCard({ children }: { children: React.ReactNode }) {
   return (
     // Le contenu s'écarte du double filet (≈ 7 px) pour respirer.
-    <div className={cn(SERIF, "relative flex grow flex-col p-[4px]")}>
+    <div className={cn(SERIF, "relative flex grow flex-col px-[10px] py-[5px]")}>
       <NotchedFrame radius={13} stroke={2.6} inner={{ gap: 4.5, stroke: 1 }} />
       {children}
     </div>
@@ -579,78 +563,9 @@ function NotchedFrame({
   );
 }
 
-/**
- * L'étiquette noire de la maquette (« DÉTAILS DE LA LOCATION »,
- * « VERSEMENT ») : coins échancrés, un bout arrondi qui dépasse au milieu
- * avec son point blanc, un liseré blanc qui suit tout le contour. Deux bouts
- * en SVG (grille 14 × 20) autour d'un corps noir — l'étiquette s'allonge sans
- * déformer ses courbes. Hauteur FIXE en `em`.
- */
-const TAG_H = 2; // em
-function OrnateTag({
-  className,
-  bodyClassName,
-  children,
-}: {
-  className?: string;
-  bodyClassName?: string;
-  children: React.ReactNode;
-}) {
-  // Le liseré du corps, à la même hauteur que celui des bouts (1,3 / 20).
-  const liner = "absolute inset-x-0 h-px bg-white [print-color-adjust:exact]";
-  const inset = `${(1.3 / 20) * TAG_H}em`;
-  return (
-    <span
-      className={cn("inline-flex items-stretch text-white", className)}
-      style={{ height: `${TAG_H}em` }}
-    >
-      <TagEnd className="rtl:-scale-x-100" />
-      <span
-        className={cn(
-          "relative flex min-w-0 flex-1 items-center justify-center gap-[0.6em] bg-black [print-color-adjust:exact]",
-          bodyClassName,
-        )}
-      >
-        <span className={liner} style={{ top: inset }} />
-        <span className={liner} style={{ bottom: inset }} />
-        {children}
-      </span>
-      <TagEnd className="-scale-x-100 rtl:scale-x-100" />
-    </span>
-  );
-}
-
-function TagEnd({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 14 20"
-      className={cn("h-full shrink-0 overflow-visible", className)}
-      style={{ width: `${(14 / 20) * TAG_H}em` }}
-    >
-      <path
-        d="M14.8 0H9A3 3 0 0 1 6 3V4.5A5.5 5.5 0 0 0 6 15.5V17A3 3 0 0 1 9 20H14.8Z"
-        fill="#000"
-      />
-      <path
-        d="M14.8 1.3H10.1A4.3 4.3 0 0 1 7.3 4.1V6A4.2 4.2 0 1 0 7.3 14V15.9A4.3 4.3 0 0 1 10.1 18.7H14.8"
-        fill="none"
-        stroke="#fff"
-        strokeWidth={0.6}
-      />
-      <circle cx="4" cy="10" r="0.95" fill="#fff" />
-    </svg>
-  );
-}
-
 /** Ce qui reste de hauteur : avant le pied de page, jamais en bas. */
 function Spacer() {
-  return <div aria-hidden className="min-h-[0.6em] grow" />;
-}
-
-/** La poignée de main de « Reste », au trait épaissi (silhouettes pleines). */
-function HandshakeBold(props: { className?: string; "aria-hidden"?: boolean }) {
-  return <Handshake strokeWidth={2.6} {...props} />;
+  return <div aria-hidden className="min-h-[0.3em] grow" />;
 }
 
 /** « : » entre l'intitulé et la valeur, dans les deux langues. */
@@ -662,50 +577,39 @@ function Colon() {
   );
 }
 
+/**
+ * Le client, ce qu'on doit lire DE LOIN (demande du client) : son nom seul,
+ * très grand, centré — sans intitulé ni pictogramme. Il passe à la ligne
+ * plutôt que d'être tronqué. Dessous, le téléphone et la date.
+ */
 function ClientBox({
-  labels,
   name,
   phone,
   date,
   bigDate = false,
 }: {
-  labels: { client: string; phone: string; date: string };
   name: string;
   phone: string | null;
   date: string;
   bigDate?: boolean;
 }) {
   return (
-    <div className="rounded-[0.8em] border-[1.5px] border-black px-[0.7em] py-[0.35em]">
-      <p className="flex items-center gap-[0.5em] text-[1.35em] leading-tight font-bold">
-        <User className="size-[0.9em] shrink-0 fill-black" aria-hidden />
-        <span className="shrink-0">
-          {labels.client}
-          <Colon />
-        </span>
-        <bdi className="min-w-0 truncate">{name}</bdi>
-      </p>
-      <div className="mt-[0.2em] flex items-center justify-between gap-[0.5em] font-bold">
-        <p className="flex min-w-0 items-center gap-[0.45em]">
-          <Phone className="size-[1.1em] shrink-0 fill-black" aria-hidden />
-          <span className="shrink-0">
-            {labels.phone}
-            <Colon />
-          </span>
-          {phone && (
-            <bdi dir="ltr" className="tabular truncate">
+    <div className="rounded-[0.6em] border-[1.5px] border-black px-[0.4em] py-[0.1em] text-center">
+      <bdi className="block text-[2.6em] leading-[1.1] font-bold wrap-break-word">
+        {name}
+      </bdi>
+      <div className="flex flex-wrap items-center justify-center gap-x-[0.8em] text-[1.3em] leading-tight font-bold">
+        {phone && (
+          <p className="flex items-center gap-[0.3em]">
+            <Phone className="size-[0.9em] shrink-0 fill-black" aria-hidden />
+            <bdi dir="ltr" className="tabular">
               {phone}
             </bdi>
-          )}
-        </p>
-        <span aria-hidden className="h-[1.3em] w-[1.5px] shrink-0 bg-black" />
-        <p className="flex shrink-0 items-center gap-[0.45em]">
-          <CalendarDays className="size-[1.1em] shrink-0" aria-hidden />
-          <span>
-            {labels.date}
-            <Colon />
-          </span>
-          <span className={cn("tabular", bigDate && "text-[1.3em]")}>
+          </p>
+        )}
+        <p className="flex items-center gap-[0.3em]">
+          <CalendarDays className="size-[0.9em] shrink-0" aria-hidden />
+          <span className={cn("tabular", bigDate && "text-[1.25em]")}>
             {date}
           </span>
         </p>
@@ -714,63 +618,38 @@ function ClientBox({
   );
 }
 
-/** Le bandeau noir arrondi au milieu d'un filet : « DÉTAILS DE LA LOCATION ». */
-function PillRule({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={cn("flex items-center", className)}>
-      <span className="flex-1 border-t-[1.5px] border-black" />
-      <OrnateTag
-        className="text-[1.05em] font-bold tracking-[0.04em] uppercase rtl:tracking-normal"
-        bodyClassName="px-[0.6em]"
-      >
-        {children}
-      </OrnateTag>
-      <span className="flex-1 border-t-[1.5px] border-black" />
-    </div>
-  );
-}
-
-/** Pictogramme | intitulé | : | valeur — séparés en pointillés. */
+/** Pictogramme | intitulé | : | valeur — un filet gris entre les lignes. */
 function DetailsTable({ details }: { details: Detail[] }) {
   return (
     // Bordures sur les CELLULES (`border-separate`) : en `border-collapse`,
-    // les pointillés d'une ligne se chevauchaient aux jonctions des colonnes.
-    <table className="mt-[0.3em] w-full border-separate border-spacing-0">
+    // les filets d'une ligne se chevauchaient aux jonctions des colonnes.
+    <table className="mt-[0.15em] w-full border-separate border-spacing-0 text-[1.2em] leading-tight">
       <tbody>
         {details.map(({ icon: Icon, label, value }, i) => {
-          // Un filet gris continu sous l'intitulé, le « : » et la valeur — pas
-          // sous le pictogramme, ni sous la dernière ligne (maquette).
+          // Un filet gris sous l'intitulé, le « : » et la valeur — pas sous
+          // le pictogramme, ni sous la dernière ligne (maquette).
           const rule =
             i === details.length - 1
               ? ""
               : "border-b border-[#777] [print-color-adjust:exact]";
           return (
             <tr key={label}>
-              <td className="w-[2.2em] py-[0.25em] pe-[0.5em] align-middle">
-                <Icon className="mx-auto size-[1.7em]" aria-hidden />
+              <td className="w-[1.5em] py-[0.12em] pe-[0.35em] align-middle">
+                <Icon className="mx-auto size-[1.15em]" aria-hidden />
               </td>
               <td
                 className={cn(
                   rule,
-                  "py-[0.3em] align-middle font-bold whitespace-nowrap",
+                  "py-[0.12em] align-middle font-bold whitespace-nowrap",
                 )}
               >
                 {label}
               </td>
-              <td className={cn(rule, "py-[0.3em] align-middle")}>
+              <td className={cn(rule, "py-[0.12em] align-middle")}>
                 <Colon />
               </td>
               <td
-                className={cn(
-                  rule,
-                  "py-[0.3em] align-middle leading-snug wrap-break-word",
-                )}
+                className={cn(rule, "py-[0.12em] align-middle wrap-break-word")}
               >
                 <bdi>{value}</bdi>
               </td>
@@ -782,7 +661,10 @@ function DetailsTable({ details }: { details: Detail[] }) {
   );
 }
 
-/** Versement / Prix / Reste : l'intitulé à gauche, le montant à droite. */
+/**
+ * Versement / Prix / Reste : DEUX colonnes séparées par un filet vertical —
+ * le pictogramme et l'intitulé d'un côté, le montant de l'autre.
+ */
 function MoneyBox({
   rows,
 }: {
@@ -790,56 +672,54 @@ function MoneyBox({
 }) {
   return (
     // Coins échancrés, comme le cadre (maquette), en trait simple.
-    <div className="relative mt-[0.5em]">
+    // UNE grille pour les trois lignes : le filet vertical reste aligné. Les
+    // colonnes ne descendent jamais sous leur contenu (`max-content`) : un
+    // intitulé trop long élargit la grille, `fitTicket` voit le débordement et
+    // réduit le tout — jamais un mot coupé (« التسب / يق ») ni un chevauchement.
+    <div
+      data-fit-box
+      className="relative mt-[0.25em] grid grid-cols-[minmax(max-content,1fr)_minmax(max-content,1fr)] text-[1.35em] leading-tight font-bold"
+    >
       <NotchedFrame radius={7} stroke={1.8} />
-      {rows.map(({ icon: Icon, label, value }, i) => (
-        <div
-          key={i}
-          className={cn(
-            "grid grid-cols-[1.15fr_1fr] items-stretch",
-            i > 0 && "border-t-[1.5px] border-black",
-          )}
-        >
-          {i === 0 ? (
-            // Le versement en tête, dans l'étiquette noire de la maquette,
-            // CENTRÉE dans sa case : même marge des deux côtés.
-            <div className="flex items-center justify-center border-e-[1.5px] border-black px-[0.25em] py-[0.1em]">
-              <OrnateTag
-                className="w-full text-[1.15em] font-bold uppercase"
-                bodyClassName="justify-start ps-[0.3em] pe-[0.2em]"
-              >
-                <Icon className="size-[1.1em] shrink-0" aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-center">
-                  {label}
-                </span>
-              </OrnateTag>
+      {rows.map(({ icon: Icon, label, value }, i) => {
+        const rule = i > 0 && "border-t-[1.5px] border-black";
+        return (
+          <Fragment key={i}>
+            <div
+              className={cn(
+                rule,
+                "flex items-center gap-[0.4em] border-e-[1.5px] border-black px-[0.45em] py-[0.08em]",
+              )}
+            >
+              <Icon className="size-[0.95em] shrink-0" aria-hidden />
+              <span className="whitespace-nowrap">{label}</span>
             </div>
-          ) : (
-            <div className="flex items-center gap-[0.7em] border-e-[1.5px] border-black px-[0.8em] py-[0.2em] text-[1.15em] font-bold">
-              <Icon className="size-[1.2em] shrink-0" aria-hidden />
-              <span className="min-w-0 truncate">{label}</span>
+            <div
+              className={cn(
+                rule,
+                "flex items-center justify-center px-[0.4em] py-[0.08em]",
+              )}
+            >
+              <bdi className="tabular whitespace-nowrap">{value}</bdi>
             </div>
-          )}
-          <p className="flex items-center gap-[0.4em] px-[0.6em] py-[0.2em] text-[1.25em] font-bold">
-            <Colon />
-            <bdi className="tabular flex-1 text-center whitespace-nowrap">
-              {value}
-            </bdi>
-          </p>
-        </div>
-      ))}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
 
-/** Une phrase manuscrite entre deux filets. */
+/** La poignée de main de « Reste », au trait épaissi (silhouettes pleines). */
+function HandshakeBold(props: { className?: string; "aria-hidden"?: boolean }) {
+  return <Handshake strokeWidth={2.6} {...props} />;
+}
+
+/** Une phrase manuscrite entre deux filets — taille FIXE. */
 function ScriptRule({
   className,
-  large,
   children,
 }: {
   className?: string;
-  large?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -848,10 +728,7 @@ function ScriptRule({
       <span
         className={cn(
           SCRIPT_LATIN,
-          "leading-[1.15] whitespace-nowrap",
-          large
-            ? "text-[min(2.1em,26pt)] rtl:text-[min(1.35em,16pt)]"
-            : "text-[min(1.6em,20pt)] rtl:text-[min(1.1em,13pt)]",
+          "text-[15pt] leading-[1.15] whitespace-nowrap rtl:text-[10pt]",
         )}
       >
         {children}

@@ -94,6 +94,7 @@ import {
   partOfSlot,
   sanitizeQuickDraft,
   type QuickDraft,
+  type SaleItem,
   type Slot,
 } from "@/lib/quick-draft";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -108,6 +109,7 @@ import {
   sortSizes,
 } from "@/lib/sizes";
 import { HighlightText } from "@/components/highlight";
+import { SaleItemsSection, useSaleCatalog } from "@/components/sale-items-section";
 import type {
   CustomerSuggestion,
   ItemSuggestion,
@@ -193,14 +195,24 @@ function createQuickDraftStore() {
   };
 }
 
-/** Tant que le prix n'est pas tapé à la main, il vaut la somme des pièces du stock. */
+/**
+ * Tant que le prix n'est pas tapé à la main, il vaut la somme des pièces du
+ * stock — la location et la vente chacune de son côté.
+ */
 function withAutoPrice(d: QuickDraft): QuickDraft {
-  if (d.priceTouched) return d;
-  const sum = d.slots.reduce(
-    (s, slot) => s + (slot.unitId ? (slot.stockPrice ?? 0) : 0),
-    0,
-  );
-  return { ...d, price: sum > 0 ? String(sum) : "" };
+  let next = d;
+  if (!d.priceTouched) {
+    const sum = d.slots.reduce(
+      (s, slot) => s + (slot.unitId ? (slot.stockPrice ?? 0) : 0),
+      0,
+    );
+    next = { ...next, price: sum > 0 ? String(sum) : "" };
+  }
+  if (!d.salePriceTouched) {
+    const sum = d.sales.reduce((s, item) => s + (item.stockPrice ?? 0), 0);
+    next = { ...next, salePrice: sum > 0 ? String(sum) : "" };
+  }
+  return next;
 }
 
 function isDirty(d: QuickDraft): boolean {
@@ -211,7 +223,8 @@ function isDirty(d: QuickDraft): boolean {
     Boolean(d.paid || d.caution || d.notes) ||
     d.pickedUp ||
     d.returned ||
-    d.slots.some((s) => s.name || s.size || s.alteration?.note)
+    d.slots.some((s) => s.name || s.size || s.alteration?.note) ||
+    d.sales.length > 0
   );
 }
 
@@ -243,6 +256,8 @@ const FIELD_TARGETS = [
   ["part_3", "q-slot-3"],
   ["part_4", "q-slot-4"],
   ["lines", "q-slot-0"],
+  ["sales", "q-sale-scan"],
+  ["sale_price", "q-sale-price"],
   ["price", "q-price"],
   ["amount_paid", "q-paid"],
   ["caution_amount", "q-caution"],
@@ -463,39 +478,23 @@ export function OrderQuickForm({
   }, [models]);
 
   /**
-   * Les pièces de la commande qu'on modifie. Une ancienne commande mixte ou de
-   * vente seule garde ainsi ses articles de vente dans leurs cases.
+   * Le stock de VENTE : son bloc à lui, sous la tenue — scanné ou pris dans la
+   * liste. Les cases de la tenue, elles, ne proposent que la location.
    */
-  const initialUnitIds = useMemo(
-    () =>
-      new Set(
-        (edit?.initial.slots ?? [])
-          .map((s) => s.unitId)
-          .filter((id): id is number => Boolean(id)),
-      ),
+  const saleCatalog = useSaleCatalog(models, { ownOrderId: edit?.orderId, holds });
+  /** Les articles déjà vendus par la commande qu'on modifie : jamais « à retirer ». */
+  const initialSaleIds = useMemo(
+    () => new Set((edit?.initial.sales ?? []).map((item) => item.unitId)),
     [edit?.initial],
   );
+  const saleBlockReason = (id: number) =>
+    initialSaleIds.has(id) ? null : saleCatalog.blockReason(id);
 
-  /**
-   * Les articles de VENTE encore visibles ici. La saisie est réservée à la
-   * LOCATION, à la demande du client : la vente passe par son propre écran
-   * (`/commandes/vente`). Ne restent que ceux d'une commande qu'on modifie.
-   */
-  const saleUnitIds = useMemo(() => {
-    const ids = new Set<number>();
-    for (const model of models) {
-      if (model.purpose !== "vente") continue;
-      for (const unit of model.units) if (initialUnitIds.has(unit.id)) ids.add(unit.id);
-    }
-    return ids;
-  }, [models, initialUnitIds]);
-  const isSaleUnit = (id: number | null | undefined) => Boolean(id && saleUnitIds.has(id));
-
-  // VENTE SEULE : tout ce qui est saisi vient du stock de vente. Rien à
+  // VENTE SEULE : rien de loué, seulement des articles vendus. Rien à
   // rendre, donc une seule date — celle de la vente — envoyée comme retrait et
   // retour. La base, elle, en déduit `has_rental` toute seule.
   const filledSlots = draft.slots.filter((s) => s.name.trim());
-  const saleOnly = filledSlots.length > 0 && filledSlots.every((s) => isSaleUnit(s.unitId));
+  const saleOnly = filledSlots.length === 0 && draft.sales.length > 0;
   const sendPickup = saleOnly && draft.eventDate ? draft.eventDate : pickup;
   const sendReturn = saleOnly && draft.eventDate ? draft.eventDate : returnDue;
 
@@ -548,10 +547,28 @@ export function OrderQuickForm({
     const weights = filled.map(({ slot }) =>
       slot.unitId && !slot.external ? (listPrice.get(slot.unitId) ?? 0) : 0,
     );
-    return spreadOutfitPrice(raw, Number(draft.price) || 0, weights);
-  }, [draft.slots, draft.price, listPrice]);
+    const rental = spreadOutfitPrice(raw, Number(draft.price) || 0, weights);
 
-  const total = Number(draft.price) || 0;
+    // La VENTE, à part : son prix à elle, réparti sur ses articles. Chaque
+    // ligne vendue porte ainsi sa vraie recette (tableau de bord).
+    const sold: DraftLine[] = draft.sales.map((item) => ({
+      kind: "unit",
+      unitId: item.unitId,
+      unitPrice: 0,
+      note: null,
+      modelName: item.name,
+      refCode: item.ref ?? "",
+      size: item.size || null,
+    }));
+    const saleWeights = draft.sales.map((item) => listPrice.get(item.unitId) ?? 0);
+    return [
+      ...rental,
+      ...spreadOutfitPrice(sold, Number(draft.salePrice) || 0, saleWeights),
+    ];
+  }, [draft.slots, draft.price, draft.sales, draft.salePrice, listPrice]);
+
+  // Le prix FINAL : la location plus la vente.
+  const total = (Number(draft.price) || 0) + (Number(draft.salePrice) || 0);
   const balance = total - (Number(draft.paid) || 0);
 
   const takenSlots = draft.slots.filter(
@@ -617,6 +634,13 @@ export function OrderQuickForm({
     }
     if (draft.price.trim() && !(Number(draft.price) >= 0)) {
       issues.price = { key: "errors.numberInvalid" };
+    }
+    if (draft.salePrice.trim() && !(Number(draft.salePrice) >= 0)) {
+      issues.sale_price = { key: "errors.numberInvalid" };
+    }
+    // Un article vendu entre-temps (ou plus en état) : à retirer.
+    if (draft.sales.some((item) => saleBlockReason(item.unitId))) {
+      issues.sales = { key: "orders.sale.removeBlocked" };
     }
     if (!issues.lines && takenSlots.length > 0) {
       issues.lines = {
@@ -696,6 +720,27 @@ export function OrderQuickForm({
 
   function removeSlot(index: number) {
     updateDraft({ slots: store.get().slots.filter((_, i) => i !== index) });
+  }
+
+  /** Un article VENDU scanné ou choisi dans la liste. Lu dans le store : la liste en ajoute plusieurs d'un coup. */
+  function addSale(id: number) {
+    setServerIssue(null);
+    const current = store.get();
+    const found = saleCatalog.saleUnits.get(id);
+    if (!found || current.sales.some((item) => item.unitId === id)) return;
+    const item: SaleItem = {
+      unitId: id,
+      name: found.name,
+      size: found.unit.size ?? "",
+      ref: found.unit.ref_code,
+      stockPrice: found.price,
+    };
+    updateDraft({ sales: [...current.sales, item] });
+  }
+
+  function removeSale(id: number) {
+    setServerIssue(null);
+    updateDraft({ sales: store.get().sales.filter((item) => item.unitId !== id) });
   }
 
   function reset(keepDate: boolean) {
@@ -838,9 +883,9 @@ export function OrderQuickForm({
       const name =
         (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
       for (const unit of model.units) {
-        // Le stock de VENTE n'a pas sa place dans la saisie de location — sauf
-        // les articles de la commande qu'on modifie.
-        if (model.purpose === "vente" && !initialUnitIds.has(unit.id)) continue;
+        // Le stock de VENTE a son propre bloc (`SaleItemsSection`) : les
+        // cases de la tenue ne proposent que la location.
+        if (model.purpose === "vente") continue;
         // Une paire vendue par UNE AUTRE commande a quitté la boutique : elle
         // n'est plus proposée nulle part. Celle de la commande qu'on modifie
         // reste, sinon elle disparaîtrait de sa propre case.
@@ -854,7 +899,7 @@ export function OrderQuickForm({
       }
     }
     return map;
-  }, [models, locale, edit?.orderId, initialUnitIds]);
+  }, [models, locale, edit?.orderId]);
 
   /** Pourquoi une pièce ne peut pas être prise, pour la case `index`. */
   function unitState(id: number, index: number) {
@@ -942,9 +987,6 @@ export function OrderQuickForm({
               aria-hidden
             />
             {unit.size && `${t("stock.size")} ${unit.size}`}
-            {isSaleUnit(id) && (
-              <span className="text-gold-strong font-medium"> · {t("orders.saleTag")}</span>
-            )}
             {reason && (
               <span className="text-warning-foreground"> · {reason}</span>
             )}
@@ -1408,8 +1450,10 @@ export function OrderQuickForm({
       }
 
       if (result.error.startsWith("errors.unitUnavailable")) {
-        // Un collègue a pris la pièce entre-temps : on relit la disponibilité.
+        // Un collègue a pris la pièce entre-temps : on relit la disponibilité,
+        // et le catalogue (un article vendu entre-temps disparaît de la vente).
         setRecheck((n) => n + 1);
+        router.refresh();
         setServerIssue({ key: result.error, values: result.values });
         revealFirst({ lines: { key: result.error } });
         return;
@@ -1568,11 +1612,6 @@ export function OrderQuickForm({
             )}
             {t("orders.quick.fromStock")} <bdi>{slot.ref}</bdi>
             {slot.size && ` · ${t("stock.size")} ${slot.size}`}
-            {isSaleUnit(slot.unitId) && (
-              <span className="text-gold-strong font-medium">
-                {` · ${t("orders.saleTag")}`}
-              </span>
-            )}
             {taken &&
               ` · ${
                 taken.freeFrom
@@ -2019,6 +2058,45 @@ export function OrderQuickForm({
         </Button>
       </Section>
 
+      {/* --- Vente -----------------------------------------------------------
+          Les articles ACHETÉS par le client (stock de vente seulement), sur la
+          même commande que sa location : un seul ticket. Teinte à part, pour
+          ne pas les confondre avec la tenue louée. */}
+      <Section
+        id="q-sale"
+        tone="sale"
+        title={t("orders.quick.saleSection")}
+        invalid={!!issues.sales}
+      >
+        <p className="text-muted-foreground -mt-2 mb-4 text-sm">
+          {t("orders.quick.saleHint")}
+        </p>
+        <SaleItemsSection
+          catalog={{ ...saleCatalog, blockReason: saleBlockReason }}
+          unitIds={draft.sales.map((item) => item.unitId)}
+          fallback={(id) => {
+            const item = draft.sales.find((s) => s.unitId === id);
+            return item ? { name: item.name, ref: item.ref, size: item.size || null } : null;
+          }}
+          onAdd={addSale}
+          onRemove={removeSale}
+          error={issueText("sales")}
+          scanId="q-sale-scan"
+        />
+        {(draft.sales.length > 0 || draft.salePrice) && (
+          <Field data-invalid={!!issues.sale_price || undefined} className="mt-4">
+            <FieldLabel htmlFor="q-sale-price">{t("orders.quick.salePrice")}</FieldLabel>
+            <MoneyStepper
+              id="q-sale-price"
+              value={draft.salePrice}
+              onChange={(v) => updateDraft({ salePrice: v, salePriceTouched: true })}
+              invalid={!!issues.sale_price}
+            />
+            {issues.sale_price && <FieldError>{issueText("sale_price")}</FieldError>}
+          </Field>
+        )}
+      </Section>
+
       {/* --- Paiement --------------------------------------------------------
           L'ordre de son AppSheet : VERS, PRIX, puis REST calculé. */}
       <Section id="q-payment" tone="payment" title={t("orders.quick.payment")}>
@@ -2036,6 +2114,9 @@ export function OrderQuickForm({
             )}
           </Field>
 
+          {/* Vente seule : le prix est celui du bloc Vente. Un prix de tenue
+              déjà saisi reste visible, pour pouvoir l'effacer. */}
+          {(!saleOnly || draft.price) && (
           <Field data-invalid={!!issues.price || undefined}>
             <FieldLabel htmlFor="q-price">{t("orders.quick.price")}</FieldLabel>
             <MoneyStepper
@@ -2046,6 +2127,7 @@ export function OrderQuickForm({
             />
             {issues.price && <FieldError>{issueText("price")}</FieldError>}
           </Field>
+          )}
 
           {total > 0 && draft.paid !== String(total) && (
             <Button

@@ -138,6 +138,8 @@ const SECTION_TONES = {
   client: "bg-section-client border-section-client-edge",
   outfit: "bg-brown-soft border-secondary",
   payment: "bg-muted border-muted-foreground",
+  /** Les articles VENDUS : à part de la tenue louée, d'un coup d'œil. */
+  sale: "bg-section-sale border-section-sale-edge",
 } as const;
 
 export type SectionTone = keyof typeof SECTION_TONES;

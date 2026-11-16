@@ -25,6 +25,8 @@ export type TicketFields = {
   jabador: string | null;
   shoes: string | null;
   accessories: string | null;
+  /** Les articles VENDUS de la commande, « Nom (taille) ». */
+  sales: string | null;
 };
 
 export function ticketFields(
@@ -91,6 +93,13 @@ export function ticketFields(
     jabador: piece(jabador),
     shoes: piece(shoes, true, !hideRefs.shoes),
     accessories: [accessory, ...others].map((s) => piece(s)).filter(Boolean).join(" · ") || null,
+    sales:
+      draft.sales
+        .map((s) => {
+          const name = withRefs && s.ref ? `${s.name} · ${s.ref}` : s.name;
+          return s.size ? `${name} (${s.size})` : name;
+        })
+        .join(" · ") || null,
   };
 }
 

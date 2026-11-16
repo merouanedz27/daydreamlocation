@@ -1,5 +1,5 @@
 /** Bornes du facteur de taille : la recherche garde le plus GRAND qui tient. */
-const FIT_MAX = 2.2;
+const FIT_MAX = 3;
 const FIT_MIN = 0.5;
 const FIT_STEPS = 10;
 /** Quelques px de marge : le moteur d'impression arrondit autrement que l'écran. */
@@ -32,12 +32,18 @@ export function fitTicket(el: HTMLElement) {
   // collé) : pendant la recherche, on le ramène à sa hauteur NATURELLE.
   content.style.flexGrow = "0";
 
+  // Les boîtes qui vérifient elles-mêmes leur largeur (`data-fit-box`) : en
+  // arabe, un débordement part vers la GAUCHE et ne se voit pas dans le
+  // `scrollWidth` du contenu — on interroge la boîte directement.
+  const boxes = Array.from(el.querySelectorAll<HTMLElement>("[data-fit-box]"));
+
   const fits = (fit: number) => {
     el.style.setProperty("--fit", fit.toFixed(3));
     return (
       content.offsetHeight <= available &&
       // Un mot trop long pour la largeur déborderait sur le côté.
-      content.scrollWidth <= content.clientWidth + 1
+      content.scrollWidth <= content.clientWidth + 1 &&
+      boxes.every((box) => box.scrollWidth <= box.clientWidth + 1)
     );
   };
 

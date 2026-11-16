@@ -79,7 +79,8 @@ export async function getOrdersTable(
          external_source, external_cost, line_note, is_active,
          article_units ( ref_code, part, article_models ( categories ( slug ) ) ),
          line_alterations ( id, note, status, done_at ) ),
-       profiles ( full_name )`,
+       profiles!orders_created_by_fkey ( full_name ),
+       returner:profiles!orders_returned_by_fkey ( full_name )`,
       { count: "exact" },
     );
 
@@ -101,6 +102,7 @@ export async function getOrdersTable(
 
   type Raw = OrderRow & {
     profiles: { full_name: string } | null;
+    returner: { full_name: string } | null;
     order_lines: {
       id: number;
       unit_id: number | null;
@@ -122,7 +124,7 @@ export async function getOrdersTable(
 
   const slotOf = (label: string) => labelSlots.get(normalizeSearch(label)) ?? null;
 
-  const rows = ((data ?? []) as unknown as Raw[]).map(({ order_lines, profiles, ...order }) => {
+  const rows = ((data ?? []) as unknown as Raw[]).map(({ order_lines, profiles, returner, ...order }) => {
     const lines = (order_lines ?? []).filter((l) => l.is_active);
     const categoryByUnit = new Map<number, string | null>();
     for (const l of lines) {
@@ -153,6 +155,7 @@ export async function getOrdersTable(
       shoes: fields.shoes,
       accessories: fields.accessories,
       created_by_name: profiles?.full_name ?? null,
+      returned_by_name: returner?.full_name ?? null,
     };
   });
 

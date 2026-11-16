@@ -96,7 +96,7 @@ export function TicketFrame({
             // Encre noire sur blanc, même en thème sombre : c'est du papier.
             // Calé en HAUT, pas centré : le QR tombe au même endroit sur les
             // deux tickets, même quand celui du costume a peu de texte.
-            "flex h-[6in] w-[4in] max-w-none flex-col justify-start overflow-hidden bg-white p-[5mm] text-black sm:p-[5mm] print:p-[5mm]",
+            "flex h-[6in] w-[4in] max-w-none flex-col justify-start overflow-hidden bg-white p-[3mm] text-black sm:p-[3mm] print:p-[3mm]",
             // Inter pour le latin, Cairo pour l'arabe — les polices de l'appli,
             // servies par elle-même (`next/font`) : hors ligne aussi.
             "font-[family-name:var(--font-inter),var(--font-cairo),sans-serif]",

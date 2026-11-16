@@ -32,7 +32,7 @@ import { isOwner, requireProfile } from "@/lib/auth";
 import { countOrderExpenses, getOrder, type OrderDetailLine } from "@/lib/queries/orders";
 import { daysBetween, todayIso } from "@/lib/rental-range";
 import { STATUS_BADGE_CLASS, orderTone } from "@/lib/orders-query";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import { formatDate, formatMoney, formatNumber, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Locale } from "@/i18n/routing";
 
@@ -369,6 +369,18 @@ export default async function OrderPage({
                     returned={order.returned}
                     hasRental={order.has_rental}
                   />
+                  {/* Qui a contrôlé et validé le retour : au propriétaire seul.
+                      Une pièce abîmée passée au contrôle a ainsi un nom. */}
+                  {owner && order.has_rental && order.returned && order.returner?.full_name && (
+                    <p className="text-muted-foreground mt-2 text-xs">
+                      {t("orders.returnedBy", {
+                        name: order.returner.full_name,
+                        date: order.returned_at
+                          ? `${formatDate(order.returned_at, l)} ${formatTime(order.returned_at, l)}`
+                          : "—",
+                      })}
+                    </p>
+                  )}
                 </div>
               )}
             </CardContent>

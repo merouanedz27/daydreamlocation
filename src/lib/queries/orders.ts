@@ -346,6 +346,8 @@ export type OrderDetailLine = OrderLine & {
 export type OrderDetail = Order & {
   order_lines: OrderDetailLine[];
   profiles: { full_name: string } | null;
+  /** Qui a coché « Retour validé » — au propriétaire seul. */
+  returner: { full_name: string } | null;
 };
 
 /** Une commande et toutes ses lignes, pour la fiche. */
@@ -354,7 +356,8 @@ async function fetchOrder(id: number): Promise<OrderDetail | null> {
   const { data, error } = await supabase
     .from("orders")
     .select(
-      `*, profiles ( full_name ),
+      `*, profiles!orders_created_by_fkey ( full_name ),
+       returner:profiles!orders_returned_by_fkey ( full_name ),
        order_lines ( *, article_units ( ref_code, model_id ),
          line_alterations ( id, note, status, done_at ) )`,
     )
