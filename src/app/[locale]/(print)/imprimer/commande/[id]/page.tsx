@@ -571,7 +571,7 @@ function Spacer() {
 /** « : » entre l'intitulé et la valeur, dans les deux langues. */
 function Colon() {
   return (
-    <span aria-hidden className="px-[0.3em] font-bold">
+    <span aria-hidden className="px-[0.25em] font-bold">
       :
     </span>
   );
@@ -618,7 +618,7 @@ function ClientBox({
   );
 }
 
-/** Pictogramme | intitulé | : | valeur — un filet gris entre les lignes. */
+/** Pictogramme | intitulé : valeur — un filet gris entre les lignes. */
 function DetailsTable({ details }: { details: Detail[] }) {
   return (
     // Bordures sur les CELLULES (`border-separate`) : en `border-collapse`,
@@ -626,7 +626,7 @@ function DetailsTable({ details }: { details: Detail[] }) {
     <table className="mt-[0.15em] w-full border-separate border-spacing-0 text-[1.2em] leading-tight">
       <tbody>
         {details.map(({ icon: Icon, label, value }, i) => {
-          // Un filet gris sous l'intitulé, le « : » et la valeur — pas sous
+          // Un filet gris sous l'intitulé et la valeur — pas sous
           // le pictogramme, ni sous la dernière ligne (maquette).
           const rule =
             i === details.length - 1
@@ -637,20 +637,14 @@ function DetailsTable({ details }: { details: Detail[] }) {
               <td className="w-[1.5em] py-[0.12em] pe-[0.35em] align-middle">
                 <Icon className="mx-auto size-[1.15em]" aria-hidden />
               </td>
-              <td
-                className={cn(
-                  rule,
-                  "py-[0.12em] align-middle font-bold whitespace-nowrap",
-                )}
-              >
-                {label}
-              </td>
-              <td className={cn(rule, "py-[0.12em] align-middle")}>
-                <Colon />
-              </td>
+              {/* Intitulé, « : » et valeur dans UNE cellule : la valeur suit
+                  l'intitulé, sans le vide d'une colonne calée sur le plus
+                  long (demande du client). */}
               <td
                 className={cn(rule, "py-[0.12em] align-middle wrap-break-word")}
               >
+                <span className="font-bold whitespace-nowrap">{label}</span>
+                <Colon />
                 <bdi>{value}</bdi>
               </td>
             </tr>
