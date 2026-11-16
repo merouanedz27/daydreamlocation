@@ -120,6 +120,7 @@
       "eventDate": "المناسبة",
       "pickupDate": "الاستلام",
       "createdBy": "أدخلها",
+      "returnedBy": "تحقّق من الإرجاع",
       "status": "الحالة",
       "total": "المجموع",
       "paid": "التسبيق",
@@ -156,6 +157,7 @@
     "settled": "مسدَّدة",
     "callCustomer": "الاتصال بالزبون",
     "createdBy": "أنشأها {name} في {date}",
+    "returnedBy": "تحقّق من الإرجاع {name} في {date}",
     "createdOn": "أُنشئت في {date}",
     "piecesCount": "{count} قطعة",
     "notesTitle": "ملاحظة",
@@ -236,7 +238,10 @@
       "sizePantsShort": "السروال",
       "stepDown": "ناقص {step}",
       "stepUp": "زائد {step}",
-      "noSaleStock": "لا توجد سلع للبيع في المخزون. أضفها من المخزون › بيع."
+      "noSaleStock": "لا توجد سلع للبيع في المخزون. أضفها من المخزون › بيع.",
+      "saleSection": "بيع",
+      "saleHint": "السلع التي يشتريها الزبون (مخزون البيع). تظهر في نفس التذكرة.",
+      "salePrice": "سعر البيع"
     },
     "parked": {
       "pageTitle": "في الانتظار",
@@ -842,6 +847,7 @@
       "jabador": "جبادور",
       "shoes": "الحذاء",
       "accessories": "الإكسسوارات",
+      "sale": "مشتريات",
       "pants": "السروال",
       "paid": "التسبيق",
       "price": "السعر",
@@ -1140,6 +1146,7 @@
       "jabador": "جبادور 👘:",
       "shoes": "الحذاء 👞:",
       "accessories": "الإكسسوارات 🦋:",
+      "sale": "مشتريات 🛍️:",
       "paid": "المدفوع:",
       "price": "السعر:",
       "rest": "الباقي:",

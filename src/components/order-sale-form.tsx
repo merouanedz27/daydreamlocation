@@ -4,15 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import {
-  AlertCircle,
-  ChevronDown,
-  List,
-  Package,
-  Plane,
-  ScanLine,
-  X,
-} from "lucide-react";
+import { AlertCircle, ChevronDown, Plane } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -20,19 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { DatePicker } from "@/components/date-picker";
-import { ListPicker, type PickerOption } from "@/components/list-picker";
 import { SuggestInput, normalizeSearch, type SuggestOption } from "@/components/suggest-input";
 import { HighlightText } from "@/components/highlight";
-import { QrScanSheet, type ScanOutcome } from "@/components/qr-scan-sheet";
+import { SaleItemsSection, useSaleCatalog } from "@/components/sale-items-section";
 import { FlagToggle, MoneyStepper, Section } from "@/components/order-form-parts";
 import { createOrder } from "@/lib/actions/orders";
-import {
-  resolveUnitPrice,
-  spreadOutfitPrice,
-  toPayload,
-  type DraftLine,
-} from "@/lib/order-draft";
-import { EMPTY_DRAFT, EMPTY_SLOT, type QuickDraft } from "@/lib/quick-draft";
+import { spreadOutfitPrice, toPayload, type DraftLine } from "@/lib/order-draft";
+import { EMPTY_DRAFT, type QuickDraft } from "@/lib/quick-draft";
 import { isNetworkError, queueOp } from "@/lib/offline/outbox";
 import { fieldErrorsOf, orderSchema } from "@/lib/validation/orders";
 import { todayIso } from "@/lib/rental-range";
@@ -110,16 +96,6 @@ function saveDraft(d: SaleDraft) {
   }
 }
 
-/** Les références se comparent sans casse ni espaces : « gio-079-01 » = « GIO-079-01 ». */
-const refKey = (ref: string) => ref.trim().toUpperCase();
-
-type SaleUnit = {
-  model: PickerModel;
-  unit: PickerModel["units"][number];
-  name: string;
-  price: number;
-};
-
 export function OrderSaleForm({
   models,
   customers,
@@ -152,43 +128,17 @@ export function OrderSaleForm({
     });
   }
 
-  const [scanOpen, setScanOpen] = useState(false);
-  const [picker, setPicker] = useState<{ n: number; open: boolean } | null>(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [generalError, setGeneralError] = useState<{ key: string; values?: Record<string, string> } | null>(null);
 
-  /** Toutes les pièces du catalogue par référence — pour dire POURQUOI un scan est refusé. */
-  const { saleUnits, byRef } = useMemo(() => {
-    const saleUnits = new Map<number, SaleUnit>();
-    const byRef = new Map<string, { id: number; purpose: PickerModel["purpose"] }>();
-    for (const model of models) {
-      const name = (locale === "ar" ? model.name_ar : model.name_fr) || model.name_fr;
-      for (const unit of model.units) {
-        byRef.set(refKey(unit.ref_code), { id: unit.id, purpose: model.purpose });
-        if (model.purpose === "vente") {
-          saleUnits.set(unit.id, { model, unit, name, price: resolveUnitPrice(model, unit) });
-        }
-      }
-    }
-    return { saleUnits, byRef };
-  }, [models, locale]);
+  const catalog = useSaleCatalog(models);
+  const { saleUnits, blockReason } = catalog;
 
   // Une paire du brouillon vendue entre-temps (ou retirée du stock) n'est
   // plus proposée : elle reste à l'écran, signalée, pour que l'employé la retire.
   const chosen = draft.unitIds.map((id) => ({ id, found: saleUnits.get(id) }));
-
-  /** Pourquoi une paire ne peut pas être vendue maintenant ; `null` = elle peut. */
-  function blockReason(id: number): string | null {
-    const found = saleUnits.get(id);
-    if (!found) return t("orders.sale.notForSale");
-    if (found.unit.sold_order_id) return t("orders.sale.alreadySold");
-    if (found.unit.status !== "disponible") {
-      return t(found.unit.status === "nettoyage" ? "stock.cleaning" : "stock.repair");
-    }
-    return null;
-  }
 
   const listTotal = chosen.reduce((s, c) => s + (c.found?.price ?? 0), 0);
   const price = draft.priceTouched ? draft.price : listTotal > 0 ? String(listTotal) : "";
@@ -227,63 +177,6 @@ export function OrderSaleForm({
   function removeUnit(id: number) {
     update({ unitIds: draft.unitIds.filter((u) => u !== id) });
   }
-
-  /** Un QR lu (ou une référence tapée) → la paire s'ajoute, ou on dit pourquoi pas. */
-  function onScan(ref: string): ScanOutcome {
-    const hit = byRef.get(refKey(ref));
-    const shown = ref.trim();
-    if (!hit) return { ok: false, message: t("orders.sale.unknownRef", { ref: shown }) };
-    if (hit.purpose !== "vente") {
-      return { ok: false, message: t("orders.sale.rentalRef", { ref: shown }) };
-    }
-    const found = saleUnits.get(hit.id)!;
-    if (draft.unitIds.includes(hit.id)) {
-      return { ok: false, message: t("orders.sale.alreadyInSale", { ref: found.unit.ref_code }) };
-    }
-    const reason = blockReason(hit.id);
-    if (reason) return { ok: false, message: `${found.unit.ref_code} · ${reason}` };
-    addUnit(hit.id);
-    return {
-      ok: true,
-      message: t("orders.sale.added", {
-        name: found.name,
-        size: found.unit.size ?? "—",
-        price: formatMoney(found.price, locale),
-      }),
-    };
-  }
-
-  const pickerOptions: PickerOption[] = [...saleUnits.entries()]
-    .filter(([, { unit }]) => !unit.sold_order_id)
-    .map(([id, { name, unit, price }]) => {
-      const reason = blockReason(id);
-      return {
-        option: {
-          key: String(id),
-          label: name,
-          search: `${name} ${unit.ref_code}`,
-          secondary: (
-            <>
-              <bdi>{unit.ref_code}</bdi>
-              {unit.size && ` · ${t("stock.size")} ${unit.size}`}
-              {reason && <span className="text-warning-foreground"> · {reason}</span>}
-            </>
-          ),
-          trailing: <span className="tabular">{formatMoney(price, locale)}</span>,
-          disabled: Boolean(reason) || draft.unitIds.includes(id),
-          featured: true,
-        } satisfies PickerOption,
-        name,
-        size: unit.size ?? "",
-      };
-    })
-    .sort(
-      (a, b) =>
-        Number(Boolean(a.option.disabled)) - Number(Boolean(b.option.disabled)) ||
-        a.name.localeCompare(b.name) ||
-        a.size.localeCompare(b.size, undefined, { numeric: true }),
-    )
-    .map((r) => r.option);
 
   const customerOptions: SuggestOption[] = (() => {
     const q = normalizeSearch(draft.customerName);
@@ -386,23 +279,20 @@ export function OrderSaleForm({
         pickup: saleDate,
         returnDue: saleDate,
         datesTouched: true,
-        slots: [
-          ...EMPTY_DRAFT.slots,
-          ...draft.unitIds.map((id) => {
-            const f = saleUnits.get(id);
-            return {
-              ...EMPTY_SLOT,
-              name: f?.name ?? "",
-              size: f?.unit.size ?? "",
-              unitId: id,
-              ref: f?.unit.ref_code ?? null,
-              stockPrice: f?.price ?? null,
-            };
-          }),
-        ],
+        // Les articles dans le bloc VENTE de la saisie rapide.
+        sales: draft.unitIds.map((id) => {
+          const f = saleUnits.get(id);
+          return {
+            unitId: id,
+            name: f?.name ?? "",
+            size: f?.unit.size ?? "",
+            ref: f?.unit.ref_code ?? null,
+            stockPrice: f?.price ?? null,
+          };
+        }),
+        salePrice: price,
+        salePriceTouched: draft.priceTouched,
         pickedUp: draft.handedOver,
-        price,
-        priceTouched: draft.priceTouched,
         paid,
         notes: draft.notes,
       };
@@ -469,69 +359,13 @@ export function OrderSaleForm({
 
       {/* --- Articles : le geste du comptoir, en premier ------------------------ */}
       <Section id="s-items" title={t("orders.sale.items")} invalid={!!issues.lines}>
-        <div className="grid grid-cols-[1fr_auto] gap-2">
-          <Button
-            type="button"
-            onClick={() => setScanOpen(true)}
-            className="h-14 text-base"
-          >
-            <ScanLine className="size-5" aria-hidden />
-            {t("orders.sale.scan")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setPicker({ n: Date.now(), open: true })}
-            className="h-14 px-4 text-base"
-          >
-            <List className="size-5" aria-hidden />
-            {t("orders.sale.pickFromList")}
-          </Button>
-        </div>
-
-        {chosen.length === 0 ? (
-          <p className="text-muted-foreground mt-4 text-sm">{t("orders.sale.empty")}</p>
-        ) : (
-          <ul className="divide-border border-border mt-4 divide-y rounded-lg border">
-            {chosen.map(({ id, found }) => {
-              const reason = blockReason(id);
-              return (
-                <li key={id} className="flex items-center gap-3 py-2 ps-3 pe-1">
-                  <Package className="text-gold-strong size-5 shrink-0" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{found?.name ?? "—"}</p>
-                    <p className="text-muted-foreground text-xs">
-                      <bdi>{found?.unit.ref_code}</bdi>
-                      {found?.unit.size && ` · ${t("stock.size")} ${found.unit.size}`}
-                      {reason && (
-                        <span className="text-destructive font-medium"> · {reason}</span>
-                      )}
-                    </p>
-                  </div>
-                  <span className="tabular text-sm">
-                    {formatMoney(found?.price ?? 0, locale)}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeUnit(id)}
-                    className="text-muted-foreground hover:text-destructive size-11"
-                  >
-                    <X className="size-4" aria-hidden />
-                    <span className="sr-only">{t("orders.removeLine")}</span>
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {issues.lines && (
-          <p role="alert" className="text-destructive mt-3 text-sm">
-            {t(issues.lines)}
-          </p>
-        )}
+        <SaleItemsSection
+          catalog={catalog}
+          unitIds={draft.unitIds}
+          onAdd={addUnit}
+          onRemove={removeUnit}
+          error={issues.lines ? t(issues.lines) : null}
+        />
       </Section>
 
       {/* --- Paiement ------------------------------------------------------------ */}
@@ -666,25 +500,6 @@ export function OrderSaleForm({
         </Button>
       </div>
 
-      <QrScanSheet open={scanOpen} onOpenChange={setScanOpen} onScan={onScan} />
-
-      {picker && (
-        <ListPicker
-          key={picker.n}
-          open={picker.open}
-          onOpenChange={(open) => setPicker({ ...picker, open })}
-          title={t("orders.sale.pickFromList")}
-          options={pickerOptions}
-          selected={[]}
-          onDone={(keys) => {
-            for (const key of keys) addUnit(Number(key));
-            setPicker({ ...picker, open: false });
-          }}
-          allowNew={false}
-          instant
-          emptyText={t("orders.quick.noSaleStock")}
-        />
-      )}
     </form>
   );
 }

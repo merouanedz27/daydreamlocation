@@ -40,6 +40,19 @@ export type SlotAlteration = {
   done: boolean;
 };
 
+/**
+ * Un article VENDU dans la commande (stock de vente). Il a son bloc à lui dans
+ * la saisie, sous la tenue : une commande peut louer un costume ET vendre des
+ * chaussures — une seule commande, un seul ticket (demande du client).
+ */
+export type SaleItem = {
+  unitId: number;
+  name: string;
+  size: string;
+  ref: string | null;
+  stockPrice: number | null;
+};
+
 export type QuickDraft = {
   v: 4;
   customerName: string;
@@ -59,6 +72,11 @@ export type QuickDraft = {
   price: string;
   /** Prix tapé à la main : on ne le recalcule plus depuis le stock. */
   priceTouched: boolean;
+  /** Les articles VENDUS — à part des cases de la location. */
+  sales: SaleItem[];
+  /** Prix des articles vendus, à part du prix de la location. Total = les deux. */
+  salePrice: string;
+  salePriceTouched: boolean;
   paid: string;
   caution: string;
   notes: string;
@@ -116,6 +134,9 @@ export const EMPTY_DRAFT: QuickDraft = {
   returned: false,
   price: "",
   priceTouched: false,
+  sales: [],
+  salePrice: "",
+  salePriceTouched: false,
   paid: "",
   caution: "",
   notes: "",
@@ -184,7 +205,22 @@ export function sanitizeQuickDraft(value: unknown): QuickDraft | null {
       };
     }
   }
-  return { ...EMPTY_DRAFT, ...rest, v: 4, slots };
+  // Brouillon d'avant le bloc « Vente » : aucun article vendu.
+  const sales = Array.isArray(d.sales)
+    ? d.sales.filter(
+        (s): s is SaleItem =>
+          Boolean(s) && typeof s === "object" && typeof s.unitId === "number",
+      )
+    : [];
+  return {
+    ...EMPTY_DRAFT,
+    ...rest,
+    v: 4,
+    slots,
+    sales,
+    salePrice: typeof d.salePrice === "string" ? d.salePrice : "",
+    salePriceTouched: d.salePriceTouched === true,
+  };
 }
 
 /**
@@ -247,6 +283,9 @@ export type EditableOrder = {
   notes: string | null;
   order_lines: {
     unit_id: number | null;
+    /** `vente` : la ligne va dans le bloc Vente, pas dans une case. */
+    line_kind?: string | null;
+    unit_price?: number | null;
     model_name_snapshot: string | null;
     size_snapshot: string | null;
     line_note: string | null;
@@ -290,11 +329,27 @@ export function draftFromOrder(
 ): QuickDraft {
   const slots: Slot[] = EMPTY_DRAFT.slots.map((s) => ({ ...s }));
   const extra: Slot[] = [];
+  const sales: SaleItem[] = [];
+  let saleTotal = 0;
   let cursor = 0;
 
   for (const line of order.order_lines) {
     const name = (line.model_name_snapshot ?? line.external_label ?? "").trim();
     if (!name) continue;
+
+    // Un article VENDU : son bloc à lui, jamais une case de la location (une
+    // paire vendue n'irait pas dans « Chaussures » louées).
+    if (line.line_kind === "vente" && line.unit_id) {
+      sales.push({
+        unitId: line.unit_id,
+        name,
+        size: line.size_snapshot ?? "",
+        ref: line.article_units?.ref_code ?? null,
+        stockPrice: null,
+      });
+      saleTotal += Number(line.unit_price) || 0;
+      continue;
+    }
 
     let preferred: number | null = null;
     if (line.unit_id) {
@@ -365,8 +420,16 @@ export function draftFromOrder(
     slots: [...slots, ...extra],
     pickedUp: order.picked_up,
     returned: order.returned,
-    price: String(order.total_price),
+    // Le prix de la commande, partagé entre location et vente. Une vente seule
+    // garde un prix de location vide.
+    price:
+      sales.length && slots.concat(extra).every((s) => !s.name)
+        ? ""
+        : String(Math.max(Number(order.total_price) - saleTotal, 0)),
     priceTouched: true,
+    sales,
+    salePrice: sales.length ? String(saleTotal) : "",
+    salePriceTouched: true,
     paid: order.amount_paid ? String(order.amount_paid) : "",
     caution: order.caution_amount ? String(order.caution_amount) : "",
     notes: order.notes ?? "",

@@ -219,7 +219,7 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
       admin
         .from("orders")
         .select(
-          `*, profiles ( full_name ),
+          `*, profiles!orders_created_by_fkey ( full_name ),
            order_lines ( *, article_units ( ref_code, part, article_models ( categories ( slug ) ) ),
              line_alterations ( id, note, status, done_at ) )`,
         )
@@ -307,6 +307,7 @@ export async function notifyNewOrder(orderId: number, excludeId?: string): Promi
             [t("order.jabador"), fields.jabador],
             [t("order.shoes"), fields.shoes],
             [t("order.accessories"), fields.accessories],
+            [t("order.sale"), fields.sales],
             [t("order.paid"), formatMoney(order.amount_paid, loc)],
             [t("order.price"), formatMoney(order.total_price, loc)],
             [t(balance < 0 ? "order.refund" : "order.rest"), formatMoney(Math.abs(balance), loc)],

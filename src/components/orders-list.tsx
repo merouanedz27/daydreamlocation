@@ -76,6 +76,7 @@ const COLUMNS = [
   "order_no",
   "status",
   "created_by_name",
+  "returned_by_name",
 ] as const;
 
 type Column = (typeof COLUMNS)[number];
@@ -103,10 +104,11 @@ const HEADERS: Record<Column, string> = {
   order_no: "orders.short.orderNo",
   status: "orders.short.status",
   created_by_name: "orders.short.createdBy",
+  returned_by_name: "orders.short.returnedBy",
 };
 
-/** Colonnes réservées au propriétaire : qui a saisi la commande. */
-const OWNER_ONLY: Column[] = ["created_by_name"];
+/** Colonnes réservées au propriétaire : qui a saisi la commande, qui a validé le retour. */
+const OWNER_ONLY: Column[] = ["created_by_name", "returned_by_name"];
 
 const MONEY: Column[] = ["amount_paid", "total_price", "balance", "caution_amount"];
 
@@ -487,6 +489,8 @@ export function OrdersList({
         return order[column] ? <Highlight text={order[column]} /> : "—";
       case "created_by_name":
         return order.created_by_name ?? "—";
+      case "returned_by_name":
+        return order.returned_by_name ?? "—";
       case "amount_paid":
       case "total_price":
       case "caution_amount":

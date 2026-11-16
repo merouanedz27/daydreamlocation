@@ -124,6 +124,13 @@ export function parkedHolds(
   cleaningBufferDays: number,
 ): Map<number, string> {
   const holds = new Map<number, string>();
+  // Un article VENDU est tenu quelles que soient les dates : une vente n'a
+  // pas de fin.
+  for (const { draft } of parked) {
+    for (const sale of draft.sales ?? []) {
+      if (!holds.has(sale.unitId)) holds.set(sale.unitId, draft.customerName.trim());
+    }
+  }
   if (!pickup || !returnDue || returnDue < pickup) return holds;
   const candidate = rentalRange(pickup, returnDue, cleaningBufferDays);
   for (const { draft } of parked) {
@@ -141,5 +148,5 @@ export function parkedHolds(
 
 /** Les pièces saisies d'un client en attente — le compte affiché sur sa puce. */
 export function filledCount(draft: QuickDraft): number {
-  return draft.slots.filter((s) => s.name.trim()).length;
+  return draft.slots.filter((s) => s.name.trim()).length + (draft.sales?.length ?? 0);
 }
