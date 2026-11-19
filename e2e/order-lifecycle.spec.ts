@@ -73,6 +73,38 @@ test("aller, versement, retour, modification, annulation", async ({ page }) => {
   await expectNotFrozen(page);
 });
 
+test("pas rentrés : le $ encaisse le reste depuis la liste", async ({ page }) => {
+  test.setTimeout(240_000);
+  const name = "E2E Encaisse";
+  const url = await createOrder(page, name, 10);
+
+  // Un prix connu, rien de versé : le reste dû vaut ce prix.
+  await page.getByRole("link", { name: "Modifier" }).click();
+  await expect(page).toHaveURL(/\/modifier$/, { timeout: 60_000 });
+  await page.locator("#q-price").fill("20000");
+  await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
+  await expect(page).toHaveURL(url, { timeout: 120_000 });
+
+  // Sortie : la commande entre dans « Pas rentrés ».
+  const allez = page.getByRole("switch", { name: /Aller validé/ });
+  await allez.click();
+  await expect(allez).toHaveAttribute("aria-checked", "true");
+  await expect(allez).toBeEnabled({ timeout: 60_000 });
+
+  await page.goto(`/fr/commandes/pas-rentres?q=${encodeURIComponent(name)}`);
+  const collect = page.getByRole("button", { name: `Encaisser le reste — ${name}` });
+  await expect(collect).toBeVisible({ timeout: 60_000 });
+  await collect.click();
+
+  const d = drawer(page);
+  await expect(d).toBeVisible();
+  await expect(d.getByLabel("Montant reçu")).toHaveValue("20000");
+  await d.getByRole("button", { name: "Encaisser", exact: true }).click();
+  await expect(d).toBeHidden({ timeout: 60_000 });
+  await expect(collect).toBeHidden({ timeout: 60_000 });
+  await expectNotFrozen(page);
+});
+
 test("listes : commandes, demain, pas rentrés, impayés, calendrier", async ({ page }) => {
   await createOrder(page, "E2E Listes", 9);
   await page.goto("/fr/commandes");

@@ -183,6 +183,7 @@
     "restoreOrder": "Remettre en service",
     "stepDone": "Validé",
     "collectBalance": "Encaisser le reste",
+    "collectNamed": "Encaisser le reste — {name}",
     "addPayment": "Enregistrer un versement",
     "addPaymentHint": "Le montant que le client vient de remettre. Il s'ajoute aux versements déjà enregistrés.",
     "correctPayment": "Corriger",
