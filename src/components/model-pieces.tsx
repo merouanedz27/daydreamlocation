@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sizeSeries, sortSizes } from "@/lib/sizes";
 import { nextUnitRefs, partRef, type Part } from "@/lib/stock-refs";
-import { MAX_PIECES } from "@/lib/validation/stock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,9 +52,9 @@ export function ModelPieces({
   function change(size: string, delta: number) {
     setCounts((current) => {
       const next = { ...current };
-      const value = Math.min((next[size] ?? 0) + delta, 50);
+      const value = (next[size] ?? 0) + delta;
       if (value <= 0) delete next[size];
-      else if (total + (value - (current[size] ?? 0)) <= MAX_PIECES) next[size] = value;
+      else next[size] = value;
       return next;
     });
   }

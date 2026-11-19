@@ -582,7 +582,7 @@
     "refCodeInvalid": "Lettres, chiffres, point, tiret et barre oblique uniquement.",
     "refCodeTaken": "Cette référence existe déjà.",
     "refCodeRace": "Références prises entre-temps. Réessayez.",
-    "tooManyPieces": "Trop de pièces d'un coup (200 maximum, 50 par taille).",
+    "tooManyPieces": "Trop de tailles différentes d'un coup (30 maximum).",
     "photoType": "Format non accepté : JPEG, PNG, WebP ou AVIF.",
     "photoTooBig": "Photo trop lourde (5 Mo maximum).",
     "photoUpload": "Envoi de la photo impossible. Réessayez.",

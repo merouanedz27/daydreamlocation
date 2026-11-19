@@ -67,9 +67,8 @@ export const modelSchema = z.object({
 
 export type ModelInput = z.infer<typeof modelSchema>;
 
-/** Plafonds de la création en série : un arrivage, pas un entrepôt. */
+/** Tailles différentes saisies d'un coup. Le nombre de pièces, lui, n'a pas de plafond. */
 export const MAX_PIECE_ROWS = 30;
-export const MAX_PIECES = 200;
 
 /**
  * Les pièces saisies AVEC le modèle : une ligne « taille × nombre » par taille
@@ -90,12 +89,9 @@ export const piecesSchema = z
       .array(
         z.object({
           size: z.string().min(1, { message: "errors.required" }).max(20),
-          qty: z.number().int().min(1).max(50, { message: "errors.tooManyPieces" }),
+          qty: z.number().int().min(1),
         }),
-      )
-      .refine((rows) => rows.reduce((n, r) => n + r.qty, 0) <= MAX_PIECES, {
-        message: "errors.tooManyPieces",
-      }),
+      ),
   );
 
 /**

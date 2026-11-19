@@ -398,7 +398,7 @@ export function ModelUnits({
                         variant="outline"
                         size="icon"
                         className="size-11"
-                        disabled={!online || count >= 50}
+                        disabled={!online}
                         onClick={() => step(size, 1)}
                         aria-label={t("stock.increaseFor", { size: label })}
                       >

@@ -664,9 +664,7 @@ export async function addUnitsOfSize(formData: FormData): Promise<ActionResult> 
   const size = String(formData.get("size") ?? "").trim().slice(0, 20);
   const count = Number(formData.get("count") ?? 1);
   if (!Number.isInteger(modelId) || modelId <= 0) return { ok: false, error: "errors.generic" };
-  if (!Number.isInteger(count) || count < 1 || count > 50) {
-    return { ok: false, error: "errors.tooManyPieces" };
-  }
+  if (!Number.isInteger(count) || count < 1) return { ok: false, error: "errors.generic" };
 
   const supabase = await createClient();
   const [{ data: model }, { data: existing }] = await Promise.all([

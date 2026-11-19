@@ -119,7 +119,7 @@ async function DaySection({
 
       <div className="mt-2">
         {orders.length ? (
-          <OrderRowList orders={orders} action="picked_up" />
+          <OrderRowList orders={orders} action="picked_up" collect />
         ) : (
           <p className="border-border text-muted-foreground rounded-lg border border-dashed px-4 py-5 text-center text-sm">
             {empty}
