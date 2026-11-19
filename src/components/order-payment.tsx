@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { AlertCircle, Banknote, Check, Undo2 } from "lucide-react";
@@ -57,55 +57,15 @@ export function OrderPaymentDrawer({
   amountPaid: number;
 }) {
   const t = useTranslations();
-  const { locale } = useParams<{ locale: Locale }>();
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
   const [direction, setDirection] = useState<"payment" | "refund">("payment");
-  const [amount, setAmount] = useState("");
 
   const due = Math.max(balance, 0);
 
   function openWith(mode: "payment" | "refund") {
-    setError(null);
     setDirection(mode);
-    // Pré-remplissage du seul cas évident : il solde. Une correction, elle, ne
-    // se devine pas — le champ reste vide pour forcer à la taper.
-    setAmount(mode === "payment" && due > 0 ? String(due) : "");
     setOpen(true);
   }
-
-  /**
-   * Sans réseau, l'encaissement attend dans la file. Son identifiant
-   * (`opId`) est tiré ICI, une fois : si la requête part mais que la réponse
-   * se perd, le renvoi porte le même et la base ne compte pas deux fois.
-   */
-  function onSubmit() {
-    setError(null);
-    const value = Number(amount);
-    const title = `${direction === "refund" ? t("orders.correctPayment") : t("orders.collect")} ${formatMoney(value, locale)} — ${name}`;
-    startTransition(async () => {
-      const result = await sendOrQueue(
-        { kind: "payment", orderId, amount: value, direction, opId: crypto.randomUUID() },
-        title,
-      );
-      if (result.ok) {
-        setOpen(false);
-        setAmount("");
-        if (result.queued) toast(t("offline.queuedToast"));
-        return;
-      }
-      setError(result.error);
-    });
-  }
-
-  // Aperçu du résultat AVANT d'appuyer. C'est la seule protection contre le
-  // zéro de trop sur un champ d'argent : le nouveau reste dû saute aux yeux.
-  const typed = Number(amount);
-  const valid = Number.isFinite(typed) && typed > 0;
-  const delta = valid ? (direction === "refund" ? -typed : typed) : 0;
-  const nextBalance = balance - delta;
-  const nextPaid = amountPaid + delta;
 
   return (
     <>
@@ -135,7 +95,98 @@ export function OrderPaymentDrawer({
         )}
       </div>
 
-      <Drawer open={open} onOpenChange={setOpen}>
+      <PaymentDrawer
+        open={open}
+        onOpenChange={setOpen}
+        direction={direction}
+        orderId={orderId}
+        name={name}
+        balance={balance}
+        amountPaid={amountPaid}
+      />
+    </>
+  );
+}
+
+/**
+ * Le tiroir d'encaissement lui-même, piloté de l'extérieur : la fiche l'ouvre
+ * par ses deux boutons, la liste « Pas rentrés » par le $ de chaque ligne.
+ */
+export function PaymentDrawer({
+  open,
+  onOpenChange,
+  direction,
+  orderId,
+  name,
+  balance,
+  amountPaid,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  direction: "payment" | "refund";
+  orderId: number;
+  name: string;
+  balance: number;
+  amountPaid: number;
+  /** Après un encaissement réussi — envoyé ou mis en file hors ligne. */
+  onSuccess?: (queued: boolean) => void;
+}) {
+  const t = useTranslations();
+  const { locale } = useParams<{ locale: Locale }>();
+  const inputId = useId();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+
+  // À chaque ouverture, on repart d'un champ propre. Pré-remplissage du seul
+  // cas évident : il solde. Une correction, elle, ne se devine pas — le champ
+  // reste vide pour forcer à la taper.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      const due = Math.max(balance, 0);
+      setError(null);
+      setAmount(direction === "payment" && due > 0 ? String(due) : "");
+    }
+  }
+
+  /**
+   * Sans réseau, l'encaissement attend dans la file. Son identifiant
+   * (`opId`) est tiré ICI, une fois : si la requête part mais que la réponse
+   * se perd, le renvoi porte le même et la base ne compte pas deux fois.
+   */
+  function onSubmit() {
+    setError(null);
+    const value = Number(amount);
+    const title = `${direction === "refund" ? t("orders.correctPayment") : t("orders.collect")} ${formatMoney(value, locale)} — ${name}`;
+    startTransition(async () => {
+      const result = await sendOrQueue(
+        { kind: "payment", orderId, amount: value, direction, opId: crypto.randomUUID() },
+        title,
+      );
+      if (result.ok) {
+        onOpenChange(false);
+        setAmount("");
+        if (result.queued) toast(t("offline.queuedToast"));
+        onSuccess?.(Boolean(result.queued));
+        return;
+      }
+      setError(result.error);
+    });
+  }
+
+  // Aperçu du résultat AVANT d'appuyer. C'est la seule protection contre le
+  // zéro de trop sur un champ d'argent : le nouveau reste dû saute aux yeux.
+  const typed = Number(amount);
+  const valid = Number.isFinite(typed) && typed > 0;
+  const delta = valid ? (direction === "refund" ? -typed : typed) : 0;
+  const nextBalance = balance - delta;
+  const nextPaid = amountPaid + delta;
+
+  return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="max-h-[92svh]">
           <DrawerHeader className="text-start">
             <DrawerTitle>
@@ -157,13 +208,13 @@ export function OrderPaymentDrawer({
 
             <div className="flex-1 overflow-y-auto px-4">
               <Field>
-                <FieldLabel htmlFor="amount">
+                <FieldLabel htmlFor={inputId}>
                   {direction === "refund"
                     ? t("orders.amountToRemove")
                     : t("orders.amountReceived")}
                 </FieldLabel>
                 <Input
-                  id="amount"
+                  id={inputId}
                   name="amount"
                   type="number"
                   inputMode="numeric"
@@ -231,7 +282,6 @@ export function OrderPaymentDrawer({
           </form>
         </DrawerContent>
       </Drawer>
-    </>
   );
 }
 

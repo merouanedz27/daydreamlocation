@@ -56,7 +56,7 @@ export default async function NotReturnedPage({
 
       <div className="mt-4">
         {orders.length ? (
-          <OrderRowList orders={orders} date="return" action="returned" />
+          <OrderRowList orders={orders} date="return" action="returned" collect />
         ) : (
           <div className="border-border flex flex-col items-center rounded-lg border border-dashed px-6 py-14 text-center">
             <CircleCheck className="text-success-foreground size-8" aria-hidden />

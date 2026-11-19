@@ -183,6 +183,7 @@
     "restoreOrder": "إعادة إلى الخدمة",
     "stepDone": "تم",
     "collectBalance": "تحصيل الباقي",
+    "collectNamed": "تحصيل الباقي — {name}",
     "addPayment": "تسجيل دفعة",
     "addPaymentHint": "المبلغ الذي سلّمه الزبون الآن. يُضاف إلى الدفعات المسجّلة من قبل.",
     "correctPayment": "تصحيح",

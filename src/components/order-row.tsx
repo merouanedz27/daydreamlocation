@@ -4,8 +4,9 @@ import { useOptimistic, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { CircleCheck, Phone, Plane } from "lucide-react";
+import { CircleCheck, DollarSign, Phone, Plane } from "lucide-react";
 import { MessageButton } from "@/components/customer-message";
+import { PaymentDrawer } from "@/components/order-payment";
 import { Highlight } from "@/components/highlight";
 import { Spinner } from "@/components/ui/spinner";
 import { Link } from "@/i18n/navigation";
@@ -39,11 +40,14 @@ export function OrderListRow({
   order,
   date = "event",
   action,
+  collect,
 }: {
   order: Order;
   /** Date affichée en bout de ligne : l'événement, ou le retour prévu. */
   date?: "event" | "return";
   action?: "picked_up" | "returned";
+  /** Bouton $ « encaisser le reste » sur les lignes qui doivent encore. */
+  collect?: boolean;
 }) {
   const t = useTranslations();
   const { locale } = useParams<{ locale: Locale }>();
@@ -94,6 +98,15 @@ export function OrderListRow({
           </a>
           <MessageButton order={order} phone={order.customer_phone} />
         </>
+      )}
+
+      {collect && (order.balance ?? 0) > 0 && (
+        <QuickCollect
+          orderId={order.id}
+          name={order.customer_name}
+          balance={order.balance ?? 0}
+          amountPaid={order.amount_paid}
+        />
       )}
 
       {action && (
@@ -200,6 +213,53 @@ function QuickCheck({
   );
 }
 
+/**
+ * « Il rend le costume et paie le reste » — sans quitter la liste. Rouge parce
+ * que c'est de l'argent encore dû. Ouvre le même tiroir que la fiche, le reste
+ * déjà tapé : un appui de plus sur « Encaisser » solde la commande. Le bouton
+ * disparaît quand la base renvoie un reste nul ; hors ligne, dès la mise en file.
+ */
+function QuickCollect({
+  orderId,
+  name,
+  balance,
+  amountPaid,
+}: {
+  orderId: number;
+  name: string;
+  balance: number;
+  amountPaid: number;
+}) {
+  const t = useTranslations();
+  const [open, setOpen] = useState(false);
+  const [queued, setQueued] = useState(false);
+
+  if (queued) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={t("orders.collectNamed", { name })}
+        onClick={() => setOpen(true)}
+        className="press bg-destructive text-destructive-foreground flex size-11 shrink-0 items-center justify-center rounded-full"
+      >
+        <DollarSign className="size-5" aria-hidden />
+      </button>
+      <PaymentDrawer
+        open={open}
+        onOpenChange={setOpen}
+        direction="payment"
+        orderId={orderId}
+        name={name}
+        balance={balance}
+        amountPaid={amountPaid}
+        onSuccess={(wasQueued) => wasQueued && setQueued(true)}
+      />
+    </>
+  );
+}
+
 /** La valeur d'une coche encore en file pour cette commande, ou `null`. */
 function pendingCheck(items: OutboxItem[], orderId: number, field: "picked_up" | "returned"): boolean | null {
   let value: boolean | null = null;
@@ -217,15 +277,17 @@ export function OrderRowList({
   orders,
   date,
   action,
+  collect,
 }: {
   orders: Order[];
   date?: "event" | "return";
   action?: "picked_up" | "returned";
+  collect?: boolean;
 }) {
   return (
     <ul className="border-border bg-card overflow-hidden rounded-lg border">
       {orders.map((order) => (
-        <OrderListRow key={order.id} order={order} date={date} action={action} />
+        <OrderListRow key={order.id} order={order} date={date} action={action} collect={collect} />
       ))}
     </ul>
   );
